@@ -1,7 +1,9 @@
 /* Панель полупрозрачна, поэтому фотография подмешивается в её фон и съедает контраст текста.
-   0.86 — нижняя граница, при которой мелкий текст --muted остаётся читаемым на любом снимке. */
+   --muted и --accent подобраны так, что на стекле поверх самого чёрного (светлая схема) или
+   самого белого (тёмная) снимка держат 4.5:1 — порог WCAG AA. Менять их или 0.86 только с
+   пересчётом контраста. */
 :root {
-  --bg: #fdfdfc; --fg: #1a1a18; --muted: #6b6b66; --accent: #2f6f4f; --line: #e3e3df;
+  --bg: #fdfdfc; --fg: #1a1a18; --muted: #5f5f5a; --accent: #2a6a4a; --line: #e3e3df;
   --callout: #f1f4f2; --code-bg: #f5f5f3;
   --warn: #c98a2b; --danger: #c0503f; --tip: #2f8f5f;
   --panel: rgba(253, 253, 252, 0.86);
@@ -17,7 +19,7 @@
    выбор «тёмная». Набор повторён дважды: обычный CSS не умеет отдать один блок двум условиям. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-color-scheme="light"]) {
-    --bg: #16171a; --fg: #e6e6e3; --muted: #9a9a94; --accent: #7fbf9a; --line: #2b2d31;
+    --bg: #16171a; --fg: #e6e6e3; --muted: #a1a19b; --accent: #7fbf9a; --line: #2b2d31;
     --callout: #1e2024; --code-bg: #1b1d21;
     --warn: #d9a84e; --danger: #d97a68; --tip: #6fbf94;
     --panel: rgba(22, 23, 26, 0.86);
@@ -29,7 +31,7 @@
 }
 
 :root[data-color-scheme="dark"] {
-  --bg: #16171a; --fg: #e6e6e3; --muted: #9a9a94; --accent: #7fbf9a; --line: #2b2d31;
+  --bg: #16171a; --fg: #e6e6e3; --muted: #a1a19b; --accent: #7fbf9a; --line: #2b2d31;
   --callout: #1e2024; --code-bg: #1b1d21;
   --warn: #d9a84e; --danger: #d97a68; --tip: #6fbf94;
   --panel: rgba(22, 23, 26, 0.86);
@@ -56,10 +58,8 @@ body {
   background-attachment: fixed;
 }
 
-main { max-width: 44rem; margin: 0 auto; padding: 1rem 1.25rem 4rem; }
-
 .top, .bottom {
-  width: min(100rem, calc(100% - 2rem));
+  width: min(76rem, calc(100% - 2rem));
   margin: 0 auto;
   padding: 1rem 0.5rem;
   color: var(--muted);
@@ -69,7 +69,20 @@ main { max-width: 44rem; margin: 0 auto; padding: 1rem 1.25rem 4rem; }
    Поднимаем шапку над панелью. */
 .top { position: relative; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
 .top a { color: var(--fg); font-family: system-ui, sans-serif; font-weight: bold; text-decoration: none; }
+/* Подвал лежит прямо на снимке, а обводку ему даёт схема, а не яркость снимка: светлая схема
+   поверх тёмной фотографии расплывалась. Подкладка из того же стекла, что и панель, отвязывает
+   подвал от снимка и держит те же 4.5:1. */
 .bottom { font-size: 0.9rem; }
+.bottom span {
+  display: inline-block;
+  padding: 0.15rem 0.55rem;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  text-shadow: none;
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+}
 
 /* Меню владельца: <details> без js, раскрывается вправо под именем. */
 .user-menu { position: relative; font-family: system-ui, sans-serif; font-size: 0.9rem; }
@@ -115,9 +128,11 @@ main { max-width: 44rem; margin: 0 auto; padding: 1rem 1.25rem 4rem; }
 .user-menu form { margin: 0; }
 
 /* Общая панель: навигация и статья лежат в одном скруглённом блоке матового стекла.
-   Ниже 720px панель разворачивается в одну колонку со сворачиваемым деревом сверху. */
+   Ниже 720px панель разворачивается в одну колонку со сворачиваемым деревом сверху.
+   76rem = столбец текста 44rem + боковик 16rem + поля: шире панель только растит пустое
+   стекло справа от текста и закрывает фотографию. */
 .shell {
-  width: min(100rem, calc(100% - 2rem));
+  width: min(76rem, calc(100% - 2rem));
   margin: 0 auto 1.5rem;
   padding: 1.25rem 1.5rem 2rem;
   display: grid;
@@ -136,21 +151,23 @@ main { max-width: 44rem; margin: 0 auto; padding: 1rem 1.25rem 4rem; }
 /* Вход — одна короткая форма, широкая панель вокруг неё смотрится пустой. */
 .shell-plain:has(.login) { width: min(26rem, calc(100% - 2rem)); }
 
-/* Ширина строки: панель тянется почти во всё окно, а читать длинные строки тяжело. */
-.shell main { max-width: 52rem; margin: 0 auto; padding: 0; }
+/* Ширина строки: панель тянется почти во всё окно, а читать длинные строки тяжело.
+   44rem — примерно 75 знаков в строке шрифтом статьи. */
+.shell main { max-width: 44rem; margin: 0 auto; padding: 0; }
 
 /* Без размытия панель становится плотной: сквозь неё текст не читался бы. */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .shell, .user-menu ul { background: var(--panel-solid); }
+  .shell, .user-menu ul, .bottom span { background: var(--panel-solid); }
 }
 
-/* Липким делаем сам <details>, а не блок внутри него: содержимое <details> Chromium держит
-   в ::details-content с паинт-контейнментом, и липкому потомку там ехать некуда. Ход даёт
-   колонка — она тянется во всю высоту панели (выравнивание грида по умолчанию). */
 .sidebar { border-right: 1px solid var(--line); }
-.sidebar > details { position: sticky; top: 1rem; }
-.sidebar > details > summary { display: none; }
+/* Переключатель дерева нужен только узкому экрану. */
+.nav-switch { display: none; }
+/* Ход липкому блоку даёт колонка: она тянется во всю высоту панели (выравнивание грида
+   по умолчанию). */
 .sidebar-body {
+  position: sticky;
+  top: 1rem;
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
@@ -215,15 +232,19 @@ main { max-width: 44rem; margin: 0 auto; padding: 1rem 1.25rem 4rem; }
   .shell-plain:has(.login) { width: calc(100% - 1rem); }
   .shell main { padding: 0.5rem 0 1rem; }
   .sidebar { border-right: none; border-bottom: 1px solid var(--line); }
-  .sidebar > details { position: static; }
-  .sidebar > details > summary {
-    display: block;
+  .nav-switch { display: block; }
+  .nav-switch summary {
     cursor: pointer;
+    list-style: none;
     padding: 0.5rem 0;
     font-family: system-ui, sans-serif;
     font-weight: bold;
   }
-  .sidebar-body { max-height: none; padding: 0 0 0.75rem; }
+  .nav-switch summary::-webkit-details-marker { display: none; }
+  .nav-switch summary::before { content: "▸ "; }
+  .nav-switch[open] summary::before { content: "▾ "; }
+  .nav-switch:not([open]) + .sidebar-body { display: none; }
+  .sidebar-body { position: static; max-height: none; padding: 0 0 0.75rem; }
 }
 
 h1, h2, h3, h4 { font-family: system-ui, sans-serif; line-height: 1.25; }
@@ -335,12 +356,18 @@ blockquote { margin: 1.2rem 0; padding-left: 1rem; border-left: 4px solid var(--
 
 .tokens th, .tokens td { font-size: 0.9rem; }
 .tokens .inline-form, .links .inline-form { margin: 0; }
-/* «Отозвать» в обеих таблицах настроек: раньше правило видела только таблица токенов. */
-.tokens .inline-form button, .links .inline-form button {
+/* Кнопки в таблицах настроек — «Отозвать» и «Скопировать» — стоят рядом и должны быть одного
+   размера. Цвет разный: отзыв необратим, копирование — нет. */
+.tokens .inline-form button, .links .inline-form button, .copy-link {
   padding: 0.3rem 0.7rem; font: inherit; font-size: 0.85rem; cursor: pointer;
-  background: none; color: var(--danger); border: 1px solid var(--danger); border-radius: 4px;
+  background: none; border-radius: 4px;
+}
+.tokens .inline-form button, .links .inline-form button {
+  color: var(--danger); border: 1px solid var(--danger);
 }
 .tokens .inline-form button:hover, .links .inline-form button:hover { background: var(--danger); color: var(--bg); }
+.copy-link { color: var(--accent); border: 1px solid var(--accent); }
+.copy-link:hover { background: var(--accent); color: var(--bg); }
 
 .share { margin-top: 2rem; }
 .share > summary { cursor: pointer; }
