@@ -1,4 +1,6 @@
 using System.Net;
+using System.Net.Http.Headers;
+using System.Text;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -77,6 +79,38 @@ public class PageEndpointsTests : IDisposable
         });
         db.SaveChanges();
     }
+
+    // Bearer-клиент на тот же factory: нужен, чтобы прогнать PUT /api/articles рядом с cookie-чтением страницы.
+    HttpClient StartApiClient(WebApplicationFactory<Program> factory)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+        var owner = new UserRow
+        {
+            Login = $"owner-{Guid.NewGuid():N}",
+            PasswordHash = PasswordHasher.Hash("тайна"),
+            Role = UserRole.Owner,
+            CreatedAt = DateTimeOffset.UtcNow,
+        };
+        db.Users.Add(owner);
+        db.SaveChanges();
+
+        var token = ApiToken.Create();
+        db.ApiTokens.Add(new ApiTokenRow
+        {
+            UserId = owner.Id,
+            TokenHash = ApiToken.HashOf(token),
+            CreatedAt = DateTimeOffset.UtcNow,
+        });
+        db.SaveChanges();
+
+        var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        return client;
+    }
+
+    static MultipartFormDataContent Article(string markdown)
+        => new() { { new ByteArrayContent(Encoding.UTF8.GetBytes(markdown)), "index.md", "index.md" } };
 
     [Fact]
     public async Task Shows_article_page()
@@ -177,7 +211,7 @@ public class PageEndpointsTests : IDisposable
     }
 
     [Fact]
-    public async Task Same_file_fingerprint_serves_cached_page_without_rereading_content()
+    public async Task Article_row_unchanged_serves_cached_page_even_if_file_on_disk_changed()
     {
         WriteArticle("s", "---\ntitle: Old\n---\nold text \n");
         var path = Path.Combine(dataRoot, "articles", "s", "index.md");
@@ -189,7 +223,7 @@ public class PageEndpointsTests : IDisposable
         var before = await client.GetStringAsync("/s");
         Assert.Contains("Old", before);
 
-        // Same length in bytes as the original text, so the fingerprint (mtime + length) does not change.
+        // Edit bypasses PUT, so the row's content_hash (the cache key) never changes.
         File.WriteAllText(path, "---\ntitle: New\n---\nnew text \n");
         File.SetLastWriteTimeUtc(path, writeTime);
 
@@ -200,22 +234,28 @@ public class PageEndpointsTests : IDisposable
     }
 
     [Fact]
-    public async Task Changed_write_time_rebuilds_cached_page()
+    public async Task Put_with_unchanged_file_fingerprint_still_serves_new_content()
     {
-        WriteArticle("s", "---\ntitle: Old\n---\nтекст\n");
         var factory = StartFactory();
-        Register(factory, "s", "Old");
-        var client = LoginClient(factory);
+        var api = StartApiClient(factory);
+        var pagesClient = LoginClient(factory);
 
-        var before = await client.GetStringAsync("/s");
-        Assert.Contains("Old", before);
+        await api.PutAsync("/api/articles/s", Article("---\ntitle: T\n---\nversion one\n"));
+        var path = Path.Combine(dataRoot, "articles", "s", "index.md");
+        var writeTime = File.GetLastWriteTimeUtc(path);
 
-        await Task.Delay(20);
-        WriteArticle("s", "---\ntitle: New\n---\nтекст\n");
-        var after = await client.GetStringAsync("/s");
+        var first = await pagesClient.GetStringAsync("/s");
+        Assert.Contains("version one", first);
 
-        Assert.Contains("New", after);
-        Assert.DoesNotContain("Old", after);
+        await api.PutAsync("/api/articles/s", Article("---\ntitle: T\n---\nversion two\n"));
+        // "version two" is the same byte length as "version one" — force the mtime to collide too,
+        // imitating coarse filesystem time resolution after Replace's Directory.Move.
+        File.SetLastWriteTimeUtc(path, writeTime);
+
+        var second = await pagesClient.GetStringAsync("/s");
+
+        Assert.Contains("version two", second);
+        Assert.DoesNotContain("version one", second);
     }
 
     [Fact]

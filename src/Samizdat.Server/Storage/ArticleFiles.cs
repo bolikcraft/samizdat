@@ -17,14 +17,6 @@ public sealed class ArticleFiles(string dataRoot)
         return File.Exists(file) ? File.ReadAllText(file) : null;
     }
 
-    /// Отпечаток файла без чтения содержимого: время записи и длина. Ключ кэша страниц строится по нему.
-    public string? Fingerprint(string slug)
-    {
-        if (!IsValidSlug(slug)) return null;
-        var info = new FileInfo(Path.Combine(Folder(slug), "index.md"));
-        return info.Exists ? $"{info.LastWriteTimeUtc:O}|{info.Length}" : null;
-    }
-
     /// null, если имя выводит за каталог статьи — текстом или через симлинк на чужой файл.
     public string? AttachmentPath(string slug, string name)
     {

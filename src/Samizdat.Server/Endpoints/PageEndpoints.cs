@@ -48,12 +48,13 @@ public static class PageEndpoints
                 return NotFound(pages);
             }
 
-            var fingerprint = files.Fingerprint(slug);
-            if (fingerprint is null) return NotFound(pages);
+            var text = files.ReadMarkdown(slug);
+            if (text is null) return NotFound(pages);
 
-            var html = cache.GetOrBuild(slug, fingerprint, theme.Version, () =>
+            // Ключ кэша — content_hash из БД, а не отпечаток файла: PUT меняет хэш всегда,
+            // даже если mtime и длина файла на диске совпали со старой версией.
+            var html = cache.GetOrBuild(slug, row.ContentHash, theme.Version, () =>
             {
-                var text = files.ReadMarkdown(slug)!;
                 var parsed = FrontMatterParser.Parse(text);
                 var body = markdown.Render(parsed.Body, slug, articles);
 
