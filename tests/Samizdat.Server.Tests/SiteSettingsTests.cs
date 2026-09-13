@@ -194,7 +194,23 @@ public class SiteSettingsTests : IDisposable
 
         // Не Guid.NewGuid() и не что-то ещё случайное: тот же вид — тот же отпечаток,
         // иначе он не годится в ключ кэша, который проверяет Task 5.
-        Assert.Equal(settings.ViewFingerprint, settings.ViewFingerprint);
+        var first = settings.ViewFingerprint;
+        var second = settings.ViewFingerprint;
+        Assert.Equal(first, second);
+    }
+
+    [Fact]
+    public void View_fingerprint_stays_the_same_across_requests()
+    {
+        var factory = StartFactory();
+
+        // Кэш страниц смотрит на отпечаток из разных запросов — каждый в своём scope
+        // и со своим DbContext, поэтому стабильность внутри одного scope тут не показатель.
+        using var first = factory.Services.CreateScope();
+        var fingerprint = first.ServiceProvider.GetRequiredService<SiteSettings>().ViewFingerprint;
+
+        using var second = factory.Services.CreateScope();
+        Assert.Equal(fingerprint, second.ServiceProvider.GetRequiredService<SiteSettings>().ViewFingerprint);
     }
 
     [Fact]

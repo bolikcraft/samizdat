@@ -8,6 +8,7 @@ public sealed class SiteSettings(SamizdatDbContext db, IConfiguration configurat
     public string ColorScheme => Get("theme.color_scheme", configuration["Samizdat:ColorScheme"] ?? "system");
     public string BackgroundFileName => Get("theme.background", "");
 
+    /// В адрес идут только цифры версии, имя файла в шаблон не попадает — экранировать нечего.
     public string? BackgroundUrl
         => background.Version(BackgroundFileName) is { Length: > 0 } version ? $"/background?v={version}" : null;
 
