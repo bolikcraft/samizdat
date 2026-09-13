@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Samizdat.Server.Auth;
 using Samizdat.Server.Data;
+using Samizdat.Server.Storage;
 
 namespace Samizdat.Server.Tests;
 
@@ -183,6 +184,93 @@ public class SiteSettingsTests : IDisposable
 
         Assert.Contains("data-color-scheme=\"dark\"", after);
     }
+
+    [Fact]
+    public void View_fingerprint_stays_the_same_when_nothing_changed()
+    {
+        var factory = StartFactory();
+        using var scope = factory.Services.CreateScope();
+        var settings = scope.ServiceProvider.GetRequiredService<SiteSettings>();
+
+        // Не Guid.NewGuid() и не что-то ещё случайное: тот же вид — тот же отпечаток,
+        // иначе он не годится в ключ кэша, который проверяет Task 5.
+        Assert.Equal(settings.ViewFingerprint, settings.ViewFingerprint);
+    }
+
+    [Fact]
+    public void View_fingerprint_changes_with_the_color_scheme()
+    {
+        var factory = StartFactory();
+        using var scope = factory.Services.CreateScope();
+        var settings = scope.ServiceProvider.GetRequiredService<SiteSettings>();
+        var before = settings.ViewFingerprint;
+
+        settings.Set("theme.color_scheme", "dark");
+
+        Assert.NotEqual(before, settings.ViewFingerprint);
+    }
+
+    [Fact]
+    public void View_fingerprint_changes_with_the_theme_name()
+    {
+        var factory = StartFactory();
+        using var scope = factory.Services.CreateScope();
+        var settings = scope.ServiceProvider.GetRequiredService<SiteSettings>();
+        var before = settings.ViewFingerprint;
+
+        settings.Set("theme.name", "another-theme");
+
+        Assert.NotEqual(before, settings.ViewFingerprint);
+    }
+
+    [Fact]
+    public void View_fingerprint_changes_when_a_background_is_saved()
+    {
+        var factory = StartFactory();
+        using var scope = factory.Services.CreateScope();
+        var settings = scope.ServiceProvider.GetRequiredService<SiteSettings>();
+        var background = scope.ServiceProvider.GetRequiredService<BackgroundFile>();
+        var before = settings.ViewFingerprint;
+
+        var name = background.Save(new MemoryStream(Jpeg()), ".jpg");
+        settings.Set("theme.background", name);
+
+        Assert.NotEqual(before, settings.ViewFingerprint);
+    }
+
+    [Fact]
+    public void Background_url_is_null_until_a_background_is_saved()
+    {
+        var factory = StartFactory();
+        using var scope = factory.Services.CreateScope();
+
+        Assert.Null(scope.ServiceProvider.GetRequiredService<SiteSettings>().BackgroundUrl);
+    }
+
+    [Fact]
+    public void Background_url_points_at_the_saved_picture_and_changes_when_it_is_replaced()
+    {
+        var factory = StartFactory();
+        using var scope = factory.Services.CreateScope();
+        var settings = scope.ServiceProvider.GetRequiredService<SiteSettings>();
+        var background = scope.ServiceProvider.GetRequiredService<BackgroundFile>();
+
+        var name = background.Save(new MemoryStream(Jpeg()), ".jpg");
+        var path = Path.Combine(dataRoot, "background", name);
+        File.SetLastWriteTimeUtc(path, new DateTime(2026, 9, 13, 10, 0, 0, DateTimeKind.Utc));
+        settings.Set("theme.background", name);
+
+        var first = settings.BackgroundUrl;
+        Assert.Matches(@"^/background\?v=\d+$", first);
+
+        // Save кладёт файл под тем же именем — версия должна замениться, а не подтвердиться.
+        background.Save(new MemoryStream(Jpeg()), ".jpg");
+        File.SetLastWriteTimeUtc(path, new DateTime(2026, 9, 13, 11, 0, 0, DateTimeKind.Utc));
+
+        Assert.NotEqual(first, settings.BackgroundUrl);
+    }
+
+    static byte[] Jpeg() => [0xFF, 0xD8, 0xFF, 0xE0, 1, 2, 3, 4];
 
     sealed class CapturingLoggerProvider : ILoggerProvider
     {

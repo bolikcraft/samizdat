@@ -16,6 +16,7 @@ var builder = WebApplication.CreateBuilder(args);
 var dataRoot = builder.Configuration["Samizdat:DataRoot"] ?? "data";
 
 builder.Services.AddSingleton(new ArticleFiles(dataRoot));
+builder.Services.AddSingleton(new BackgroundFile(dataRoot));
 builder.Services.AddSingleton(services =>
     new ThemeFactory(dataRoot, services.GetRequiredService<ILogger<ThemeFactory>>()));
 builder.Services.AddScoped<SiteSettings>();

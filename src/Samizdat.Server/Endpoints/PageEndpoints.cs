@@ -132,6 +132,7 @@ public static class PageEndpoints
     {
         ["title"] = "Samizdat",
         ["color_scheme"] = settings.ColorScheme,
+        ["background_url"] = settings.BackgroundUrl,
     };
 
     internal static Dictionary<string, object?> UserModel(ClaimsPrincipal user) => new()
