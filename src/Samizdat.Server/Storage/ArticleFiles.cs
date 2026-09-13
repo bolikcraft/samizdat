@@ -34,6 +34,12 @@ public sealed class ArticleFiles(string dataRoot)
     public string? AttachmentPath(string slug, string name)
     {
         if (!IsValidSlug(slug)) return null;
+        // Вложения лежат в папке статьи плоско. Имя с каталогом отвергаем целиком: Path.GetFullPath
+        // не разворачивает симлинк каталога, и "d/tayna.txt" увёл бы за пределы папки.
+        if (name != Path.GetFileName(name)) return null;
+        // Исходник статьи отдаёт только /api: у гостя иначе утечёт фронтматтер.
+        if (name.Equals("index.md", StringComparison.OrdinalIgnoreCase)) return null;
+
         var folder = Path.GetFullPath(Folder(slug)) + Path.DirectorySeparatorChar;
         var full = Path.GetFullPath(Path.Combine(folder, name));
         if (!full.StartsWith(folder, StringComparison.Ordinal) || !File.Exists(full)) return null;

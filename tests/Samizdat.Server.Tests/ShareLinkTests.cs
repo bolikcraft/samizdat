@@ -301,6 +301,45 @@ public class ShareLinkTests : IDisposable
     }
 
     [Fact]
+    public async Task Folder_link_inside_the_article_does_not_give_a_foreign_file()
+    {
+        using var factory = StartFactory();
+        WriteArticle("statya", "Текст статьи.");
+        RegisterArticle(factory, "statya", "Про ежей");
+        var secret = Path.Combine(dataRoot, "secretdir");
+        Directory.CreateDirectory(secret);
+        File.WriteAllText(Path.Combine(secret, "tayna.txt"), "секрет");
+        Directory.CreateSymbolicLink(Path.Combine(dataRoot, "articles", "statya", "d"), secret);
+        var token = AddLink(factory, "statya");
+        var owner = await LoginClient(factory);
+
+        // Гостю такой адрес не даёт даже маршрута, поэтому проверяем не код, а само содержимое.
+        var guest = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        var byOwner = await owner.GetAsync("/statya/d/tayna.txt");
+        var byGuest = await guest.GetAsync($"/s/{token}/d/tayna.txt");
+
+        Assert.DoesNotContain("секрет", await byGuest.Content.ReadAsStringAsync());
+        Assert.NotEqual(HttpStatusCode.OK, byGuest.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, byOwner.StatusCode);
+    }
+
+    [Fact]
+    public async Task Nobody_downloads_the_markdown_source()
+    {
+        using var factory = StartFactory();
+        WriteArticle("statya", "---\ntitle: Про ежей\n---\n\nТекст статьи.");
+        RegisterArticle(factory, "statya", "Про ежей");
+        var token = AddLink(factory, "statya");
+        var owner = await LoginClient(factory);
+
+        var byOwner = await owner.GetAsync("/statya/index.md");
+        var byGuest = await factory.CreateClient().GetAsync($"/s/{token}/index.md");
+
+        Assert.Equal(HttpStatusCode.NotFound, byOwner.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, byGuest.StatusCode);
+    }
+
+    [Fact]
     public async Task Opening_a_picture_does_not_count_as_a_visit()
     {
         using var factory = StartFactory();

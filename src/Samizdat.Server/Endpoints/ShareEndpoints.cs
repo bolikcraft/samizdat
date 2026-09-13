@@ -64,7 +64,7 @@ public static class ShareEndpoints
         }).AllowAnonymous();
 
         // Счётчик открытий тут не трогаем: статья с тремя картинками дала бы четыре открытия.
-        app.MapGet("/s/{token}/{*file}", (string token, string file, SamizdatDbContext db, ArticleFiles files) =>
+        app.MapGet("/s/{token}/{file}", (string token, string file, SamizdatDbContext db, ArticleFiles files) =>
         {
             var link = db.ShareLinks.FirstOrDefault(row => row.Token == token);
             if (link is null || !link.IsAlive(DateTimeOffset.UtcNow)) return Results.NotFound();

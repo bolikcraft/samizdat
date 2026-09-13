@@ -53,6 +53,26 @@ public class ArticleFilesTests : IDisposable
     }
 
     [Fact]
+    public void Attachment_behind_a_folder_link_is_not_served()
+    {
+        files.Replace("st", "текст"u8.ToArray(), []);
+        var secret = Path.Combine(dataRoot, "secretdir");
+        Directory.CreateDirectory(secret);
+        File.WriteAllText(Path.Combine(secret, "tayna.txt"), "секрет");
+        Directory.CreateSymbolicLink(Path.Combine(files.Folder("st"), "d"), secret);
+
+        Assert.Null(files.AttachmentPath("st", "d/tayna.txt"));
+    }
+
+    [Fact]
+    public void Markdown_source_is_not_served_as_an_attachment()
+    {
+        files.Replace("st", "текст"u8.ToArray(), []);
+
+        Assert.Null(files.AttachmentPath("st", "index.md"));
+    }
+
+    [Fact]
     public void Failed_replace_leaves_no_staging_folder_behind()
     {
         // Имя с NUL — гарантированный сбой записи файла, не зависящий от файловой системы.
