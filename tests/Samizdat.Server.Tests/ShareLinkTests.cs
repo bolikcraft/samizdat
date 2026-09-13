@@ -203,8 +203,26 @@ public class ShareLinkTests : IDisposable
 
         Assert.DoesNotContain("nav-tree", html);
         Assert.DoesNotContain("user-menu", html);
-        Assert.DoesNotContain("chuzhaya", html);
         Assert.Contains("noindex", html);
+    }
+
+    [Fact]
+    public async Task Guest_page_does_not_show_other_slugs()
+    {
+        using var factory = StartFactory();
+        WriteArticle("statya", "см. [[chuzhaya]]");
+        RegisterArticle(factory, "statya", "Про ежей");
+        WriteArticle("chuzhaya", "Чужой текст.");
+        RegisterArticle(factory, "chuzhaya", "Чужая статья");
+        var token = AddLink(factory, "statya");
+        var owner = await LoginClient(factory);
+
+        var guestPage = await factory.CreateClient().GetStringAsync($"/s/{token}");
+        var ownerPage = await owner.GetStringAsync("/statya");
+
+        // У владельца та же вики-ссылка ведёт на статью — значит гостевой html проверяем не впустую.
+        Assert.Contains("href=\"/chuzhaya\"", ownerPage);
+        Assert.DoesNotContain("href=\"/chuzhaya\"", guestPage);
     }
 
     [Fact]
@@ -336,10 +354,15 @@ public class ShareLinkTests : IDisposable
         WriteAttachment("chuzhaya", "tayna.png", [9]);
         RegisterArticle(factory, "chuzhaya", "Чужая статья");
         var token = AddLink(factory, "statya");
+        var owner = await LoginClient(factory);
 
-        var response = await factory.CreateClient().GetAsync($"/s/{token}/../chuzhaya/tayna.png");
+        // Имя без "..": клиент такой адрес не правит, и до сервера доходит именно он.
+        var byGuest = await factory.CreateClient().GetAsync($"/s/{token}/tayna.png");
+        var byOwner = await owner.GetAsync("/chuzhaya/tayna.png");
 
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, byGuest.StatusCode);
+        // Файл есть и отдаётся по своему адресу — гостю его закрыл именно slug из ссылки.
+        Assert.Equal(HttpStatusCode.OK, byOwner.StatusCode);
     }
 
     [Fact]
@@ -507,13 +530,15 @@ public class ShareLinkTests : IDisposable
         WriteArticle("statya", "Текст статьи.");
         RegisterArticle(factory, "statya", "Про ежей");
 
-        var client = factory.CreateClient();
+        // Без автоперехода: иначе клиент сам сходит на страницу входа и тест увидит её 200.
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
         var response = await client.PostAsync("/share", new FormUrlEncodedContent(new Dictionary<string, string>
         {
             ["slug"] = "statya", ["days"] = "7",
         }));
 
-        Assert.NotEqual(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal("/login", response.Headers.Location!.AbsolutePath);
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
         Assert.Empty(db.ShareLinks);
