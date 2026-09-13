@@ -7,9 +7,16 @@ using Samizdat.Server.Data;
 namespace Samizdat.Server.Tests;
 
 [Collection("db")]
-public class AuthTests(DatabaseFixture database) : IDisposable
+public class AuthTests : IDisposable
 {
+    readonly DatabaseFixture database;
     readonly string dataRoot = Directory.CreateTempSubdirectory("samizdat-data").FullName;
+
+    public AuthTests(DatabaseFixture database)
+    {
+        this.database = database;
+        database.ResetDatabase();
+    }
 
     WebApplicationFactory<Program> StartServer() =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>

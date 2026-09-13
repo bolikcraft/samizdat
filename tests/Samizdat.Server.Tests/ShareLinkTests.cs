@@ -579,7 +579,9 @@ public class ShareLinkTests : IDisposable
         var response = await client.PutAsync($"/api/articles/{slug}", form);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        Assert.Contains(slug, await response.Content.ReadAsStringAsync());
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains("служебным маршрутом", body);
+        Assert.Contains(slug, body);
     }
 
     [Fact]

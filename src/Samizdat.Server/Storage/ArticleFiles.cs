@@ -10,8 +10,8 @@ public sealed class ArticleFiles(string dataRoot)
     public static bool IsValidSlug(string slug)
         => slug.Length > 0 && slug == Path.GetFileName(slug) && !slug.StartsWith('.');
 
-    // Литеральные маршруты (/s/, /login, /settings, /assets/, /background) всегда побеждают
-    // /{slug}: статья с таким именем была бы недоступна. Регистр не важен — маршруты его не различают.
+    // Первый сегмент маршрутов, у которых есть литеральный обработчик GET: там статья с таким
+    // именем была бы недоступна. Регистр не важен — маршруты его не различают.
     static readonly HashSet<string> ReservedSlugs =
         new(["s", "login", "settings", "assets", "background"], StringComparer.OrdinalIgnoreCase);
 
