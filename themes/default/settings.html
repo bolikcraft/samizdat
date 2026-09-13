@@ -31,6 +31,21 @@
     </fieldset>
     <button type="submit">Сохранить</button>
   </form>
+  <form method="post" action="/settings/background" class="settings-form" enctype="multipart/form-data">
+    {{ antiforgery }}
+    <label>Фон страницы
+      <input type="file" name="file" accept="image/jpeg,image/png,image/webp">
+    </label>
+    <p class="hint">Картинка jpeg, png или webp, не больше 8 МБ.</p>
+    <button type="submit">Загрузить фон</button>
+  </form>
+  {{ if site.background_url }}
+  <p><img class="background-preview" src="{{ site.background_url | html.escape }}" alt="Нынешний фон"></p>
+  <form method="post" action="/settings/background/remove" class="inline-form">
+    {{ antiforgery }}
+    <button type="submit">Убрать фон</button>
+  </form>
+  {{ end }}
 </section>
 
 <section class="settings-section">

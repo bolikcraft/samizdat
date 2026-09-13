@@ -4,11 +4,14 @@ using Samizdat.Core.Themes;
 using Samizdat.Server.Auth;
 using Samizdat.Server.Data;
 using Samizdat.Server.Rendering;
+using Samizdat.Server.Storage;
 
 namespace Samizdat.Server.Endpoints;
 
 public static class SettingsEndpoints
 {
+    const long MaxBackgroundBytes = 8 * 1024 * 1024;
+
     public static void MapSettings(this WebApplication app)
     {
         var group = app.MapGroup("/settings")
@@ -98,6 +101,32 @@ public static class SettingsEndpoints
             return Results.Redirect("/settings?ok=appearance");
         }).RequireValidToken();
 
+        group.MapPost("/background", async (HttpContext context, SiteSettings settings, BackgroundFile background) =>
+        {
+            var form = await context.Request.ReadFormAsync();
+            var upload = form.Files["file"];
+            if (upload is null || upload.Length == 0) return Results.Redirect("/settings?err=background_missing");
+            if (upload.Length > MaxBackgroundBytes) return Results.Redirect("/settings?err=background_too_big");
+
+            await using var stream = upload.OpenReadStream();
+            var head = new byte[BackgroundFile.HeadLength];
+            var read = await stream.ReadAtLeastAsync(head, head.Length, throwOnEndOfStream: false);
+            // Тип по первым байтам: расширение и Content-Type ставит браузер, им верить нельзя.
+            if (BackgroundFile.ExtensionOf(head.AsSpan(0, read)) is not { } extension)
+                return Results.Redirect("/settings?err=background_type");
+
+            stream.Position = 0;
+            settings.Set("theme.background", background.Save(stream, extension));
+            return Results.Redirect("/settings?ok=background");
+        }).RequireValidToken();
+
+        group.MapPost("/background/remove", (SiteSettings settings, BackgroundFile background) =>
+        {
+            background.Remove();
+            settings.Set("theme.background", "");
+            return Results.Redirect("/settings?ok=background_removed");
+        }).RequireValidToken();
+
         group.MapPost("/tokens/{id:int}/revoke", (int id, SamizdatDbContext db, ClaimsPrincipal user) =>
         {
             var owner = CurrentUser(db, user);
@@ -129,6 +158,9 @@ public static class SettingsEndpoints
         "wrong_password" => "Неверный текущий пароль.",
         "short_password" => "Новый пароль должен быть не короче 8 символов.",
         "password_mismatch" => "Новый пароль и повтор не совпадают.",
+        "background_missing" => "Файл не выбран.",
+        "background_type" => "Это не картинка. Подойдёт jpeg, png или webp.",
+        "background_too_big" => "Картинка больше 8 МБ.",
         not null => "Не удалось выполнить действие.",
         null => ok switch
         {
@@ -136,6 +168,8 @@ public static class SettingsEndpoints
             "appearance" => "Настройки внешнего вида сохранены.",
             "token_revoked" => "Токен отозван.",
             "link_revoked" => "Ссылка отозвана.",
+            "background" => "Фон загружен.",
+            "background_removed" => "Фон убран.",
             _ => null,
         },
     };

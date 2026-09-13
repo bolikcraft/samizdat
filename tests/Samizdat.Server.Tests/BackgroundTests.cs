@@ -1,4 +1,6 @@
 using System.Net;
+using System.Net.Http.Headers;
+using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Samizdat.Server.Auth;
@@ -132,5 +134,132 @@ public class BackgroundTests : IDisposable
         var response = await factory.CreateClient().GetAsync("/background");
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    static byte[] Png() => [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1, 2, 3, 4];
+
+    static (string Name, string Value) AntiforgeryToken(string html)
+    {
+        var match = Regex.Match(html, "<input type=\"hidden\" name=\"([^\"]+)\" value=\"([^\"]+)\">");
+        if (!match.Success) throw new InvalidOperationException("Antiforgery-поле не найдено на странице");
+        return (match.Groups[1].Value, match.Groups[2].Value);
+    }
+
+    async Task<HttpClient> OwnerClient(WebApplicationFactory<Program> factory)
+    {
+        AddOwner(factory, "aleks", "тайна");
+        var client = factory.CreateClient();
+        await client.PostAsync("/login", new FormUrlEncodedContent(
+            new Dictionary<string, string> { ["login"] = "aleks", ["password"] = "тайна" }));
+        return client;
+    }
+
+    static MultipartFormDataContent Upload(string tokenName, string tokenValue, byte[] bytes, string fileName)
+    {
+        var content = new MultipartFormDataContent { { new StringContent(tokenValue), tokenName } };
+        var file = new ByteArrayContent(bytes);
+        file.Headers.ContentType = new MediaTypeHeaderValue("image/jpeg");
+        content.Add(file, "file", fileName);
+        return content;
+    }
+
+    [Fact]
+    public async Task The_owner_uploads_a_background_and_sees_it_on_the_page()
+    {
+        var factory = StartFactory();
+        var client = await OwnerClient(factory);
+        var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
+
+        var response = await client.PostAsync("/settings/background", Upload(name, value, Png(), "wall.png"));
+
+        Assert.Contains("ok=background", response.RequestMessage!.RequestUri!.ToString());
+        Assert.Equal(Png(), await client.GetByteArrayAsync("/background"));
+    }
+
+    // Браузеру верить нельзя: расширение и Content-Type он ставит какие угодно.
+    [Fact]
+    public async Task A_file_that_is_not_a_picture_is_refused()
+    {
+        var factory = StartFactory();
+        var client = await OwnerClient(factory);
+        var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
+
+        var response = await client.PostAsync("/settings/background",
+            Upload(name, value, "MZ not a picture at all"u8.ToArray(), "wall.jpg"));
+
+        Assert.Contains("err=background_type", response.RequestMessage!.RequestUri!.ToString());
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/background")).StatusCode);
+    }
+
+    [Fact]
+    public async Task A_file_over_eight_megabytes_is_refused()
+    {
+        var factory = StartFactory();
+        var client = await OwnerClient(factory);
+        var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
+        var big = new byte[8 * 1024 * 1024 + 1];
+        Jpeg().CopyTo(big, 0);
+
+        var response = await client.PostAsync("/settings/background", Upload(name, value, big, "wall.jpg"));
+
+        Assert.Contains("err=background_too_big", response.RequestMessage!.RequestUri!.ToString());
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/background")).StatusCode);
+    }
+
+    [Fact]
+    public async Task An_empty_form_is_refused()
+    {
+        var factory = StartFactory();
+        var client = await OwnerClient(factory);
+        var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
+
+        var response = await client.PostAsync("/settings/background",
+            new MultipartFormDataContent { { new StringContent(value), name } });
+
+        Assert.Contains("err=background_missing", response.RequestMessage!.RequestUri!.ToString());
+    }
+
+    [Fact]
+    public async Task The_second_upload_replaces_the_first_one()
+    {
+        var factory = StartFactory();
+        var client = await OwnerClient(factory);
+        var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
+        await client.PostAsync("/settings/background", Upload(name, value, Jpeg(), "first.jpg"));
+
+        (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
+        await client.PostAsync("/settings/background", Upload(name, value, Png(), "second.png"));
+
+        Assert.Equal(Png(), await client.GetByteArrayAsync("/background"));
+        Assert.Single(Directory.EnumerateFiles(Path.Combine(dataRoot, "background")));
+    }
+
+    [Fact]
+    public async Task Removing_the_background_clears_the_file_and_the_setting()
+    {
+        var factory = StartFactory();
+        var client = await OwnerClient(factory);
+        var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
+        await client.PostAsync("/settings/background", Upload(name, value, Jpeg(), "wall.jpg"));
+
+        (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
+        var response = await client.PostAsync("/settings/background/remove", new FormUrlEncodedContent(
+            new Dictionary<string, string> { [name] = value }));
+
+        Assert.Contains("ok=background_removed", response.RequestMessage!.RequestUri!.ToString());
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/background")).StatusCode);
+        Assert.DoesNotContain("/background", await client.GetStringAsync("/"));
+    }
+
+    [Fact]
+    public async Task A_guest_cannot_upload_a_background()
+    {
+        var client = StartFactory().CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+
+        var response = await client.PostAsync("/settings/background",
+            new MultipartFormDataContent { { new ByteArrayContent(Jpeg()), "file", "wall.jpg" } });
+
+        Assert.NotEqual(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/background")).StatusCode);
     }
 }
