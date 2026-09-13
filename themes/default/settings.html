@@ -1,0 +1,61 @@
+<h1>Настройки</h1>
+{{ if message }}<p class="settings-message settings-message-{{ message_kind }}">{{ message | html.escape }}</p>{{ end }}
+
+<section class="settings-section">
+  <h2>Пароль</h2>
+  <form method="post" action="/settings/password" class="settings-form">
+    {{ antiforgery }}
+    <label>Текущий пароль <input type="password" name="current" autocomplete="current-password"></label>
+    <label>Новый пароль <input type="password" name="new" autocomplete="new-password"></label>
+    <label>Повторите новый пароль <input type="password" name="new2" autocomplete="new-password"></label>
+    <button type="submit">Сменить пароль</button>
+  </form>
+</section>
+
+<section class="settings-section">
+  <h2>Внешний вид</h2>
+  <form method="post" action="/settings/appearance" class="settings-form">
+    {{ antiforgery }}
+    <label>Тема
+      <select name="theme">
+        {{ for theme in themes }}
+        <option value="{{ theme.name | html.escape }}"{{ if theme.selected }} selected{{ end }}>{{ theme.name | html.escape }}</option>
+        {{ end }}
+      </select>
+    </label>
+    <fieldset class="color-scheme">
+      <legend>Цветовая схема</legend>
+      <label><input type="radio" name="color_scheme" value="light"{{ if color_scheme == "light" }} checked{{ end }}> Светлая</label>
+      <label><input type="radio" name="color_scheme" value="dark"{{ if color_scheme == "dark" }} checked{{ end }}> Тёмная</label>
+      <label><input type="radio" name="color_scheme" value="system"{{ if color_scheme == "system" }} checked{{ end }}> Как в системе</label>
+    </fieldset>
+    <button type="submit">Сохранить</button>
+  </form>
+</section>
+
+<section class="settings-section">
+  <h2>Токены CLI</h2>
+  <p class="hint">Новый токен создаётся на сервере командой <code>samizdat-server token new</code>.</p>
+  {{ if tokens.size > 0 }}
+  <table class="tokens">
+    <thead><tr><th>Заметка</th><th>Создан</th><th>Использован</th><th></th></tr></thead>
+    <tbody>
+    {{ for token in tokens }}
+    <tr>
+      <td>{{ if token.note }}{{ token.note | html.escape }}{{ else }}—{{ end }}</td>
+      <td>{{ token.created_at | html.escape }}</td>
+      <td>{{ if token.last_used_at }}{{ token.last_used_at | html.escape }}{{ else }}ещё не использован{{ end }}</td>
+      <td>
+        <form method="post" action="/settings/tokens/{{ token.id }}/revoke" class="inline-form">
+          {{ antiforgery }}
+          <button type="submit">Отозвать</button>
+        </form>
+      </td>
+    </tr>
+    {{ end }}
+    </tbody>
+  </table>
+  {{ else }}
+  <p>Токенов пока нет.</p>
+  {{ end }}
+</section>

@@ -33,13 +33,13 @@ public static class AuthEndpoints
                                       new ClaimsPrincipal(identity));
 
             return Results.Redirect("/");
-        }).AllowAnonymous();
+        }).AllowAnonymous().DisableAntiforgery();
 
         app.MapPost("/logout", async (HttpContext context) =>
         {
             await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
             return Results.Redirect("/login");
-        });
+        }).RequireValidToken();
     }
 
     static IResult LoginPage(PageRenderer pages, SiteSettings settings, string? error)

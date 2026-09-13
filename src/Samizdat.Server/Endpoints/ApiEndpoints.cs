@@ -10,10 +10,13 @@ public static class ApiEndpoints
 {
     public static void MapApi(this WebApplication app)
     {
+        // Bearer-токен, не cookie: antiforgery здесь неприменим в принципе, отключаем на всю группу
+        // разом, чтобы не забыть про новые маршруты.
         var api = app.MapGroup("/api")
             .RequireAuthorization(policy => policy
                 .AddAuthenticationSchemes(ApiToken.Scheme)
-                .RequireAuthenticatedUser());
+                .RequireAuthenticatedUser())
+            .DisableAntiforgery();
 
         api.MapGet("/state", (SamizdatDbContext db) =>
             Results.Ok(db.Articles.ToDictionary(article => article.Slug, article => article.ContentHash)));
@@ -69,7 +72,7 @@ public static class ApiEndpoints
             await db.SaveChangesAsync();
 
             return Results.Ok(new { slug, hash = row.ContentHash });
-        }).DisableAntiforgery();
+        });
 
         api.MapDelete("/articles/{slug}", async (string slug, ArticleFiles files, SamizdatDbContext db) =>
         {

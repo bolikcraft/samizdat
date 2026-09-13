@@ -224,3 +224,36 @@ blockquote { margin: 1.2rem 0; padding-left: 1rem; border-left: 4px solid var(--
   background: var(--accent); color: var(--bg); border: none; border-radius: 4px;
 }
 .error { color: var(--danger); }
+
+.settings-message { padding: 0.6rem 0.9rem; border-radius: 6px; font-family: system-ui, sans-serif; font-size: 0.95rem; }
+.settings-message-ok { background: var(--callout); color: var(--tip); }
+.settings-message-err { background: var(--callout); color: var(--danger); }
+
+.settings-section { margin: 2rem 0; padding-top: 1.5rem; border-top: 1px solid var(--line); }
+.settings-section:first-of-type { padding-top: 0; border-top: none; }
+.settings-section h2 { font-size: 1.1rem; }
+.settings-section .hint { color: var(--muted); font-size: 0.9rem; }
+
+.settings-form { display: grid; gap: 0.75rem; max-width: 24rem; }
+.settings-form label { display: grid; gap: 0.3rem; font-family: system-ui, sans-serif; font-size: 0.9rem; color: var(--muted); }
+.settings-form input, .settings-form select {
+  width: 100%; padding: 0.5rem; font: inherit; color: var(--fg);
+  background: var(--bg); border: 1px solid var(--line); border-radius: 4px;
+}
+.settings-form fieldset.color-scheme {
+  display: grid; gap: 0.3rem; border: 1px solid var(--line); border-radius: 4px; padding: 0.6rem 0.8rem;
+}
+.settings-form fieldset.color-scheme legend { font-family: system-ui, sans-serif; font-size: 0.85rem; color: var(--muted); padding: 0 0.3rem; }
+.settings-form fieldset.color-scheme label { display: flex; align-items: center; gap: 0.4rem; flex-direction: row; }
+.settings-form button {
+  justify-self: start; padding: 0.5rem 1rem; font: inherit; font-family: system-ui, sans-serif; cursor: pointer;
+  background: var(--accent); color: var(--bg); border: none; border-radius: 4px;
+}
+
+.tokens th, .tokens td { font-size: 0.9rem; }
+.tokens .inline-form { margin: 0; }
+.tokens .inline-form button {
+  padding: 0.3rem 0.7rem; font: inherit; font-size: 0.85rem; cursor: pointer;
+  background: none; color: var(--danger); border: 1px solid var(--danger); border-radius: 4px;
+}
+.tokens .inline-form button:hover { background: var(--danger); color: var(--bg); }

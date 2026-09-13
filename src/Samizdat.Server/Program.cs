@@ -51,6 +51,7 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
     })
     .AddScheme<AuthenticationSchemeOptions, ApiTokenAuthenticationHandler>(ApiToken.Scheme, _ => { });
 builder.Services.AddAuthorization();
+builder.Services.AddAntiforgery();
 
 var app = builder.Build();
 
@@ -63,9 +64,11 @@ app.UseForwardedHeaders();
 app.MapErrorHandling();
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseAntiforgery();
 app.MapAuth();
 app.MapPages().RequireAuthorization();
 app.MapApi();
+app.MapSettings();
 app.Run();
 
 public partial class Program; // нужен WebApplicationFactory в тестах

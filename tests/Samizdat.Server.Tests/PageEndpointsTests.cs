@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
+using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -229,9 +230,15 @@ public class PageEndpointsTests : IDisposable
 
         var after = await client.GetStringAsync("/s");
 
-        Assert.Equal(before, after);
+        // Cached html is byte-for-byte reused, but each response still gets a fresh real antiforgery
+        // token substituted in (see PageEndpoints) — strip it out before comparing the rest.
+        Assert.Equal(StripAntiforgeryToken(before), StripAntiforgeryToken(after));
         Assert.Contains("Old", after);
     }
+
+    static readonly Regex AntiforgeryInput = new("""<input type="hidden" name="[^"]+" value="[^"]+">""");
+
+    static string StripAntiforgeryToken(string html) => AntiforgeryInput.Replace(html, "");
 
     [Fact]
     public async Task Put_with_unchanged_file_fingerprint_still_serves_new_content()

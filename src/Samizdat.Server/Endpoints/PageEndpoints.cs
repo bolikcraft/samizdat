@@ -1,9 +1,11 @@
 using System.Security.Claims;
+using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.StaticFiles;
 using Samizdat.Core;
 using Samizdat.Core.Navigation;
 using Samizdat.Core.Rendering;
 using Samizdat.Core.Themes;
+using Samizdat.Server.Auth;
 using Samizdat.Server.Data;
 using Samizdat.Server.Rendering;
 using Samizdat.Server.Storage;
@@ -18,7 +20,8 @@ public static class PageEndpoints
     {
         var group = app.MapGroup("");
 
-        group.MapGet("/", (PageRenderer pages, SamizdatDbContext db, SiteSettings settings, ClaimsPrincipal user) =>
+        group.MapGet("/", (PageRenderer pages, SamizdatDbContext db, SiteSettings settings, ClaimsPrincipal user,
+                           IAntiforgery antiforgery, HttpContext context) =>
         {
             var rows = db.Articles.OrderByDescending(article => article.Date).ToList();
             var list = rows.Select(article => new Dictionary<string, object?>
@@ -36,23 +39,25 @@ public static class PageEndpoints
                 ["articles"] = list,
                 ["nav"] = Navigation(db, currentSlug: null),
                 ["user"] = UserModel(user),
+                ["antiforgery"] = AntiforgeryHtml.Field(antiforgery, context),
             }), "text/html; charset=utf-8");
         });
 
         group.MapGet("/{slug}", (string slug, PageRenderer pages, ArticleFiles files,
                                  ArticleRenderer markdown, IArticleLookup articles,
                                  PageCache cache, IThemeSource theme, SamizdatDbContext db,
-                                 SiteSettings settings, ClaimsPrincipal user, ILogger<Program> logger) =>
+                                 SiteSettings settings, ClaimsPrincipal user, ILogger<Program> logger,
+                                 IAntiforgery antiforgery, HttpContext context) =>
         {
             var row = db.Articles.Find(slug);
             if (row is null)
             {
                 if (files.ReadMarkdown(slug) is not null)
                     logger.LogWarning("Статья {Slug} есть на диске, но её нет в базе", slug);
-                return NotFound(pages, db, settings, user);
+                return NotFound(pages, db, settings, user, antiforgery, context);
             }
 
-            if (!files.MarkdownExists(slug)) return NotFound(pages, db, settings, user);
+            if (!files.MarkdownExists(slug)) return NotFound(pages, db, settings, user, antiforgery, context);
 
             // Ключ кэша — content_hash из БД, а не отпечаток файла: PUT меняет хэш всегда,
             // даже если mtime и длина файла на диске совпали со старой версией. Отпечаток каталога
@@ -78,17 +83,22 @@ public static class PageEndpoints
                     },
                     ["nav"] = Navigation(db, currentSlug: slug),
                     ["user"] = UserModel(user),
+                    // Плейсхолдер, не настоящий токен: страница кэшируется по slug и общая для всех
+                    // гостей, а токен привязан к cookie конкретной сессии — см. Replace ниже.
+                    ["antiforgery"] = AntiforgeryHtml.Placeholder,
                 });
             });
 
+            html = html.Replace(AntiforgeryHtml.Placeholder, AntiforgeryHtml.Field(antiforgery, context));
             return Results.Content(html, "text/html; charset=utf-8");
         });
 
         group.MapGet("/{slug}/{*file}", (string slug, string file, ArticleFiles files, PageRenderer pages,
-                                         SamizdatDbContext db, SiteSettings settings, ClaimsPrincipal user) =>
+                                         SamizdatDbContext db, SiteSettings settings, ClaimsPrincipal user,
+                                         IAntiforgery antiforgery, HttpContext context) =>
         {
             var path = files.AttachmentPath(slug, file);
-            if (path is null) return NotFound(pages, db, settings, user);
+            if (path is null) return NotFound(pages, db, settings, user, antiforgery, context);
 
             var type = ContentTypes.TryGetContentType(path, out var found) ? found : "application/octet-stream";
             return Results.File(path, type);
@@ -107,27 +117,29 @@ public static class PageEndpoints
         return group;
     }
 
-    static IResult NotFound(PageRenderer pages, SamizdatDbContext db, SiteSettings settings, ClaimsPrincipal user)
+    static IResult NotFound(PageRenderer pages, SamizdatDbContext db, SiteSettings settings, ClaimsPrincipal user,
+                            IAntiforgery antiforgery, HttpContext context)
         => Results.Content(pages.Render("404.html", new()
         {
             ["page_title"] = "Не найдено",
             ["site"] = SiteModel(settings),
             ["nav"] = Navigation(db, currentSlug: null),
             ["user"] = UserModel(user),
+            ["antiforgery"] = AntiforgeryHtml.Field(antiforgery, context),
         }), "text/html; charset=utf-8", statusCode: 404);
 
-    static Dictionary<string, object?> SiteModel(SiteSettings settings) => new()
+    internal static Dictionary<string, object?> SiteModel(SiteSettings settings) => new()
     {
         ["title"] = "Samizdat",
         ["color_scheme"] = settings.ColorScheme,
     };
 
-    static Dictionary<string, object?> UserModel(ClaimsPrincipal user) => new()
+    internal static Dictionary<string, object?> UserModel(ClaimsPrincipal user) => new()
     {
         ["login"] = user.Identity!.Name,
     };
 
-    static Dictionary<string, object?> Navigation(SamizdatDbContext db, string? currentSlug)
+    internal static Dictionary<string, object?> Navigation(SamizdatDbContext db, string? currentSlug)
     {
         var entries = db.Articles
             .OrderBy(article => article.Folder).ThenBy(article => article.Title)
