@@ -59,3 +59,47 @@
   <p>Токенов пока нет.</p>
   {{ end }}
 </section>
+
+<section class="settings-section">
+  <h2>Ссылки</h2>
+  <p class="hint">Ссылка создаётся кнопкой «Поделиться» на странице статьи.</p>
+  {{ if links.size > 0 }}
+  <table class="links">
+    <thead><tr><th>Статья</th><th>Ссылка</th><th>Кому</th><th>Срок</th><th>Открытий</th><th></th></tr></thead>
+    <tbody>
+    {{ for link in links }}
+    <tr id="link-{{ link.id }}"{{ if !link.alive }} class="dead-link"{{ end }}>
+      <td><a href="/{{ link.slug | html.escape }}">{{ link.title | html.escape }}</a></td>
+      <td>
+        <input class="link-url" type="text" readonly value="{{ link.url | html.escape }}">
+        <button type="button" class="copy-link" data-url="{{ link.url | html.escape }}">Скопировать</button>
+      </td>
+      <td>{{ if link.note }}{{ link.note | html.escape }}{{ else }}—{{ end }}</td>
+      <td>{{ if link.alive }}{{ if link.expires_at }}до {{ link.expires_at | html.escape }}{{ else }}без срока{{ end }}{{ else }}не работает{{ end }}</td>
+      <td>{{ link.opened_count }}{{ if link.last_opened_at }}, {{ link.last_opened_at | html.escape }}{{ end }}</td>
+      <td>
+        {{ if link.alive }}
+        <form method="post" action="/settings/links/{{ link.id }}/revoke" class="inline-form">
+          {{ antiforgery }}
+          <button type="submit">Отозвать</button>
+        </form>
+        {{ end }}
+      </td>
+    </tr>
+    {{ end }}
+    </tbody>
+  </table>
+  <script>
+    // Кнопка «Скопировать»: без неё поле всё равно выделяется руками.
+    document.querySelectorAll('.copy-link').forEach(function (button) {
+      button.addEventListener('click', function () {
+        navigator.clipboard.writeText(button.dataset.url).then(function () {
+          button.textContent = 'Скопировано';
+        });
+      });
+    });
+  </script>
+  {{ else }}
+  <p>Ссылок пока нет.</p>
+  {{ end }}
+</section>

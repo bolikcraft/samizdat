@@ -262,3 +262,8 @@ blockquote { margin: 1.2rem 0; padding-left: 1rem; border-left: 4px solid var(--
 .share > summary { cursor: pointer; }
 .share-form { display: flex; flex-wrap: wrap; gap: .75rem; align-items: end; margin-top: .75rem; }
 .share-form label { display: flex; flex-direction: column; gap: .25rem; }
+
+.links { width: 100%; border-collapse: collapse; }
+.links td, .links th { text-align: left; padding: .4rem .5rem; vertical-align: top; }
+.links .link-url { width: 18rem; max-width: 100%; }
+.dead-link { opacity: .55; }

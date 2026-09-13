@@ -22,6 +22,24 @@ public static class SettingsEndpoints
             var tokens = db.ApiTokens.Where(token => token.UserId == owner.Id)
                 .OrderByDescending(token => token.CreatedAt).ToList();
 
+            var now = DateTimeOffset.UtcNow;
+            var titles = db.Articles.ToDictionary(article => article.Slug, article => article.Title);
+            // Живые сверху: мёртвые строки остаются как след, но не мешают найти рабочую ссылку.
+            var links = db.ShareLinks.ToList()
+                .OrderByDescending(link => link.IsAlive(now)).ThenByDescending(link => link.CreatedAt)
+                .Select(link => new Dictionary<string, object?>
+                {
+                    ["id"] = link.Id,
+                    ["slug"] = link.Slug,
+                    ["title"] = titles.GetValueOrDefault(link.Slug, link.Slug),
+                    ["note"] = link.Note,
+                    ["url"] = $"{context.Request.Scheme}://{context.Request.Host}/s/{link.Token}",
+                    ["alive"] = link.IsAlive(now),
+                    ["expires_at"] = link.ExpiresAt?.ToString("yyyy-MM-dd HH:mm"),
+                    ["opened_count"] = link.OpenedCount,
+                    ["last_opened_at"] = link.LastOpenedAt?.ToString("yyyy-MM-dd HH:mm"),
+                }).ToList();
+
             return Results.Content(pages.Render("settings.html", new()
             {
                 ["page_title"] = "Настройки",
@@ -43,6 +61,7 @@ public static class SettingsEndpoints
                     ["created_at"] = token.CreatedAt.ToString("yyyy-MM-dd HH:mm"),
                     ["last_used_at"] = token.LastUsedAt?.ToString("yyyy-MM-dd HH:mm"),
                 }).ToList(),
+                ["links"] = links,
             }), "text/html; charset=utf-8");
         });
 
@@ -89,6 +108,17 @@ public static class SettingsEndpoints
             db.SaveChanges();
             return Results.Redirect("/settings?ok=token_revoked");
         }).RequireValidToken();
+
+        // Отзыв мягкий: строка остаётся, чтобы гость получил 410 «ссылка не работает», а не 404.
+        group.MapPost("/links/{id:int}/revoke", (int id, SamizdatDbContext db) =>
+        {
+            var link = db.ShareLinks.FirstOrDefault(row => row.Id == id && row.RevokedAt == null);
+            if (link is null) return Results.NotFound();
+
+            link.RevokedAt = DateTimeOffset.UtcNow;
+            db.SaveChanges();
+            return Results.Redirect("/settings?ok=link_revoked");
+        }).RequireValidToken();
     }
 
     static UserRow CurrentUser(SamizdatDbContext db, ClaimsPrincipal user)
@@ -105,6 +135,7 @@ public static class SettingsEndpoints
             "password" => "Пароль изменён.",
             "appearance" => "Настройки внешнего вида сохранены.",
             "token_revoked" => "Токен отозван.",
+            "link_revoked" => "Ссылка отозвана.",
             _ => null,
         },
     };

@@ -438,4 +438,63 @@ public class ShareLinkTests : IDisposable
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Contains("/s/", await response.Content.ReadAsStringAsync());
     }
+
+    [Fact]
+    public async Task Settings_page_shows_the_link_with_its_address()
+    {
+        using var factory = StartFactory();
+        WriteArticle("statya", "Текст статьи.");
+        RegisterArticle(factory, "statya", "Про ежей");
+        var token = AddLink(factory, "statya");
+        var client = await LoginClient(factory);
+
+        var html = await client.GetStringAsync("/settings");
+
+        Assert.Contains($"/s/{token}", html);
+        Assert.Contains("Про ежей", html);
+    }
+
+    [Fact]
+    public async Task Owner_revokes_a_link_and_the_guest_loses_access()
+    {
+        using var factory = StartFactory();
+        WriteArticle("statya", "Текст статьи.");
+        RegisterArticle(factory, "statya", "Про ежей");
+        var token = AddLink(factory, "statya");
+        var client = await LoginClient(factory);
+
+        var id = LinkByToken(factory, token).Id;
+        var antiforgery = AntiforgeryToken(await client.GetStringAsync("/settings"));
+        var revoke = await client.PostAsync($"/settings/links/{id}/revoke",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                [antiforgery.Name] = antiforgery.Value,
+            }));
+
+        var guest = await factory.CreateClient().GetAsync($"/s/{token}");
+
+        Assert.Equal(HttpStatusCode.Redirect, revoke.StatusCode);
+        Assert.Equal(HttpStatusCode.Gone, guest.StatusCode);
+        Assert.NotNull(LinkByToken(factory, token).RevokedAt);
+    }
+
+    [Fact]
+    public async Task Second_revoke_answers_404()
+    {
+        using var factory = StartFactory();
+        WriteArticle("statya", "Текст статьи.");
+        RegisterArticle(factory, "statya", "Про ежей");
+        var token = AddLink(factory, "statya", revokedAt: DateTimeOffset.UtcNow);
+        var client = await LoginClient(factory);
+
+        var id = LinkByToken(factory, token).Id;
+        var antiforgery = AntiforgeryToken(await client.GetStringAsync("/settings"));
+        var response = await client.PostAsync($"/settings/links/{id}/revoke",
+            new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                [antiforgery.Name] = antiforgery.Value,
+            }));
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
 }
