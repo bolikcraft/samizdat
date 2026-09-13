@@ -67,6 +67,23 @@ public class AuthTests(DatabaseFixture database) : IDisposable
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
+    // login.html строило свой site-словарь руками и теряло background_url — единственная
+    // страница без фона, вопреки дизайну. Проверяем, что теперь она берёт SiteModel как все.
+    [Fact]
+    public async Task Login_page_carries_the_background_link_when_one_is_set()
+    {
+        var factory = StartServer();
+        var folder = Path.Combine(dataRoot, "background");
+        Directory.CreateDirectory(folder);
+        await File.WriteAllBytesAsync(Path.Combine(folder, "background.jpg"), [0xFF, 0xD8, 0xFF, 0xE0, 1, 2, 3, 4]);
+        using (var scope = factory.Services.CreateScope())
+            scope.ServiceProvider.GetRequiredService<SiteSettings>().Set("theme.background", "background.jpg");
+
+        var html = await factory.CreateClient().GetStringAsync("/login");
+
+        Assert.Contains("<style>:root { --bg-image: url(\"/background?v=", html);
+    }
+
     [Fact]
     public async Task Theme_asset_is_open_but_article_is_not()
     {

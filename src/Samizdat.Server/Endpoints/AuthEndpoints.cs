@@ -48,11 +48,7 @@ public static class AuthEndpoints
             {
                 ["page_title"] = "Вход",
                 ["error"] = error,
-                ["site"] = new Dictionary<string, object?>
-                {
-                    ["title"] = "Samizdat",
-                    ["color_scheme"] = settings.ColorScheme,
-                },
+                ["site"] = PageEndpoints.SiteModel(settings),
             }),
             "text/html; charset=utf-8");
 }

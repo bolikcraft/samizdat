@@ -78,15 +78,54 @@ public class BackgroundTests : IDisposable
     }
 
     [Fact]
-    public async Task The_response_carries_an_etag_and_a_last_modified_header()
+    public async Task The_etag_is_strong_and_matches_the_files_write_time()
+    {
+        var factory = StartFactory();
+        PutBackground(factory, Jpeg(), "background.jpg");
+        var writeTime = File.GetLastWriteTimeUtc(Path.Combine(dataRoot, "background", "background.jpg"));
+
+        var response = await factory.CreateClient().GetAsync("/background");
+
+        Assert.NotNull(response.Headers.ETag);
+        // Без W/: картинка отдаётся байт в байт, слабая валидация тут ничего не выигрывает,
+        // а сильная разрешает Range-запросы, если они когда-нибудь понадобятся.
+        Assert.False(response.Headers.ETag!.IsWeak);
+        Assert.Equal($"\"{writeTime.Ticks}\"", response.Headers.ETag!.Tag);
+        // HTTP-дата хранит секунды, не тики — округляем ожидание так же, как это делает заголовок.
+        Assert.Equal(new DateTimeOffset(writeTime).ToUnixTimeSeconds(),
+            response.Content.Headers.LastModified?.ToUnixTimeSeconds());
+    }
+
+    [Fact]
+    public async Task The_response_is_cacheable_but_not_by_a_shared_cache()
     {
         var factory = StartFactory();
         PutBackground(factory, Jpeg(), "background.jpg");
 
         var response = await factory.CreateClient().GetAsync("/background");
 
-        Assert.NotNull(response.Headers.ETag);
-        Assert.NotNull(response.Content.Headers.LastModified);
+        var cache = response.Headers.CacheControl;
+        Assert.NotNull(cache);
+        Assert.True(cache!.Private);
+        Assert.False(cache.Public);
+        Assert.Equal(TimeSpan.FromDays(30), cache.MaxAge);
+    }
+
+    [Fact]
+    public async Task A_conditional_request_with_the_etag_gets_304_with_the_headers_kept()
+    {
+        var factory = StartFactory();
+        PutBackground(factory, Jpeg(), "background.jpg");
+        var client = factory.CreateClient();
+        var first = await client.GetAsync("/background");
+
+        var conditional = new HttpRequestMessage(HttpMethod.Get, "/background");
+        conditional.Headers.IfNoneMatch.Add(first.Headers.ETag!);
+        var second = await client.SendAsync(conditional);
+
+        Assert.Equal(HttpStatusCode.NotModified, second.StatusCode);
+        Assert.Equal(first.Headers.ETag, second.Headers.ETag);
+        Assert.Equal(first.Content.Headers.LastModified, second.Content.Headers.LastModified);
     }
 
     [Fact]
@@ -101,10 +140,10 @@ public class BackgroundTests : IDisposable
             new Dictionary<string, string> { ["login"] = "aleks", ["password"] = "тайна" }));
         var html = await client.GetStringAsync("/");
 
-        Assert.Contains("/background?v=", html);
-        // Комментарий про escape в layout.html должен быть комментарием Scriban ({{ # ... }}),
-        // а не HTML — иначе Scriban выведет его в разметку как есть.
-        Assert.DoesNotContain("Экранировать", html);
+        // Одна проверка вместо двух: подтверждает и что ссылка есть, и что вокруг нет ничего
+        // лишнего (скажем, утёкшего в разметку комментария темы) — так её нельзя обмануть,
+        // просто переформулировав соседний комментарий в layout.html.
+        Assert.Contains("<style>:root { --bg-image: url(\"/background?v=", html);
     }
 
     [Fact]

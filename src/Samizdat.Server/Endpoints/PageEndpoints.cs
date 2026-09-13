@@ -117,20 +117,30 @@ public static class PageEndpoints
 
         // Отдельный путь, не под /assets/: там уже стоит маршрут файлов темы.
         // Гостю по share-ссылке фон тоже нужен, поэтому без пароля.
-        app.MapGet("/background", (SiteSettings settings, BackgroundFile background) =>
+        app.MapGet("/background", (SiteSettings settings, BackgroundFile background, ILogger<Program> logger,
+                                   HttpContext context) =>
         {
             try
             {
                 if (background.Open(settings.BackgroundFileName) is not { } found) return Results.NotFound();
 
+                // Адрес несёт ?v=<mtime файла>, значит байты по одному адресу не меняются — кэшировать
+                // можно надолго. private, не public: сайт закрыт, общему кэшу перед ним (Апач, KeenDNS,
+                // в будущем CDN) картинка не нужна. Не immutable: версия — mtime, а не хэш содержимого,
+                // и восстановление фона из бэкапа с сохранением времени оставило бы в браузере старую
+                // картинку на год.
+                context.Response.Headers.CacheControl = "private, max-age=2592000";
+
                 return Results.Stream(found.Content, found.ContentType,
                     lastModified: found.LastWrite,
                     entityTag: new EntityTagHeaderValue($"\"{found.LastWrite.Ticks}\""));
             }
-            catch (IOException)
+            catch (IOException error)
             {
-                // Файл могли снести между File.Exists и File.OpenRead внутри Open — заменой фона
-                // или ручной чисткой. FileNotFoundException — тоже IOException, ловим оба случая.
+                // catch (IOException) — не только гонка File.Exists/File.OpenRead внутри Open (снесли
+                // заменой фона или вручную): сюда же попадёт и настоящий сбой диска. Гостю в обоих
+                // случаях отвечаем 404, но сбой стоит видеть в логе, а не терять молча.
+                logger.LogWarning(error, "Не удалось открыть фон {Name}", settings.BackgroundFileName);
                 return Results.NotFound();
             }
         }).AllowAnonymous();
