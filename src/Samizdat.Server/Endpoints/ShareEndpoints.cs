@@ -57,6 +57,20 @@ public static class ShareEndpoints
 
             return Results.Content(html.Replace(AttachmentBase, $"/s/{token}/"), "text/html; charset=utf-8");
         }).AllowAnonymous();
+
+        // Счётчик открытий тут не трогаем: статья с тремя картинками дала бы четыре открытия.
+        app.MapGet("/s/{token}/{*file}", (string token, string file, SamizdatDbContext db, ArticleFiles files) =>
+        {
+            var link = db.ShareLinks.FirstOrDefault(row => row.Token == token);
+            if (link is null || !link.IsAlive(DateTimeOffset.UtcNow)) return Results.NotFound();
+
+            // Slug берётся из ссылки, а не из запроса: по чужому файлу этот токен не пройдёт.
+            var path = files.AttachmentPath(link.Slug, file);
+            if (path is null) return Results.NotFound();
+
+            var type = ContentTypes.TryGetContentType(path, out var found) ? found : "application/octet-stream";
+            return Results.File(path, type);
+        }).AllowAnonymous();
     }
 
     // Base вложений в кэшированном html — плейсхолдер: html один на статью, а токен у каждой ссылки свой.

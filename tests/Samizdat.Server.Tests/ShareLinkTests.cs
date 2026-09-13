@@ -221,4 +221,68 @@ public class ShareLinkTests : IDisposable
         Assert.Equal(2, link.OpenedCount);
         Assert.NotNull(link.LastOpenedAt);
     }
+
+    [Fact]
+    public async Task Guest_gets_the_picture_of_the_shared_article()
+    {
+        using var factory = StartFactory();
+        WriteArticle("statya", "![[shema.png]]");
+        WriteAttachment("statya", "shema.png", [1, 2, 3]);
+        RegisterArticle(factory, "statya", "Про ежей");
+        var token = AddLink(factory, "statya");
+
+        var client = factory.CreateClient();
+        var html = await client.GetStringAsync($"/s/{token}");
+        var picture = await client.GetAsync($"/s/{token}/shema.png");
+
+        Assert.Contains($"src=\"/s/{token}/shema.png\"", html);
+        Assert.Equal(HttpStatusCode.OK, picture.StatusCode);
+        Assert.Equal([1, 2, 3], await picture.Content.ReadAsByteArrayAsync());
+    }
+
+    [Fact]
+    public async Task Link_of_one_article_does_not_open_files_of_another()
+    {
+        using var factory = StartFactory();
+        WriteArticle("statya", "Текст статьи.");
+        RegisterArticle(factory, "statya", "Про ежей");
+        WriteArticle("chuzhaya", "Чужой текст.");
+        WriteAttachment("chuzhaya", "tayna.png", [9]);
+        RegisterArticle(factory, "chuzhaya", "Чужая статья");
+        var token = AddLink(factory, "statya");
+
+        var response = await factory.CreateClient().GetAsync($"/s/{token}/../chuzhaya/tayna.png");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Opening_a_picture_does_not_count_as_a_visit()
+    {
+        using var factory = StartFactory();
+        WriteArticle("statya", "![[shema.png]]");
+        WriteAttachment("statya", "shema.png", [1]);
+        RegisterArticle(factory, "statya", "Про ежей");
+        var token = AddLink(factory, "statya");
+
+        var client = factory.CreateClient();
+        await client.GetAsync($"/s/{token}");
+        await client.GetAsync($"/s/{token}/shema.png");
+
+        Assert.Equal(1, LinkByToken(factory, token).OpenedCount);
+    }
+
+    [Fact]
+    public async Task Dead_link_does_not_give_pictures()
+    {
+        using var factory = StartFactory();
+        WriteArticle("statya", "Текст статьи.");
+        WriteAttachment("statya", "shema.png", [1]);
+        RegisterArticle(factory, "statya", "Про ежей");
+        var token = AddLink(factory, "statya", revokedAt: DateTimeOffset.UtcNow);
+
+        var response = await factory.CreateClient().GetAsync($"/s/{token}/shema.png");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
 }
