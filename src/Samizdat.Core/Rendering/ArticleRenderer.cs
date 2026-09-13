@@ -16,13 +16,16 @@ public sealed class ArticleRenderer
     /// (гостевая страница отдаёт вложения через свой маршрут).
     public string Render(string markdown, string slug, IArticleLookup articles, string? attachmentBase = null)
     {
+        var attachments = attachmentBase ?? $"/{slug}/";
+
         var document = Markdig.Markdown.Parse(markdown, pipeline);
         CalloutTransformer.Apply(document);
+        ImagePathTransformer.Apply(document, attachments);
 
         using var writer = new StringWriter();
         var renderer = new HtmlRenderer(writer);
         pipeline.Setup(renderer);
-        renderer.ObjectRenderers.Insert(0, new WikiLinkRenderer(slug, articles, attachmentBase));
+        renderer.ObjectRenderers.Insert(0, new WikiLinkRenderer(slug, articles, attachments));
         renderer.ObjectRenderers.Insert(0, new CalloutRenderer());
         renderer.Render(document);
         writer.Flush();

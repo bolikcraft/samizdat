@@ -65,4 +65,45 @@ public class EmbedTests
 
         Assert.Contains("""<img src="/statya/shema.png" alt="shema">""", html);
     }
+
+    [Fact]
+    public void Relative_markdown_image_points_to_article_folder()
+    {
+        var html = renderer.Render("![Ёжик](ezh.png)", "statya", NoArticles.Instance);
+
+        Assert.Contains("src=\"/statya/ezh.png\"", html);
+    }
+
+    [Fact]
+    public void Relative_markdown_image_uses_given_attachment_base()
+    {
+        var html = renderer.Render("![Ёжик](ezh.png)", "statya", NoArticles.Instance,
+                                   attachmentBase: "/s/abc/");
+
+        Assert.Contains("src=\"/s/abc/ezh.png\"", html);
+    }
+
+    [Fact]
+    public void External_markdown_image_stays_as_is()
+    {
+        var html = renderer.Render("![x](https://example.com/x.png)", "statya", NoArticles.Instance);
+
+        Assert.Contains("src=\"https://example.com/x.png\"", html);
+    }
+
+    [Fact]
+    public void Absolute_markdown_image_stays_as_is()
+    {
+        var html = renderer.Render("![x](/x.png)", "statya", NoArticles.Instance);
+
+        Assert.Contains("src=\"/x.png\"", html);
+    }
+
+    [Fact]
+    public void Relative_markdown_link_is_not_touched()
+    {
+        var html = renderer.Render("[текст](drugaya)", "statya", NoArticles.Instance);
+
+        Assert.Contains("href=\"drugaya\"", html);
+    }
 }
