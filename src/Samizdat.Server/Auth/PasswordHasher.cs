@@ -20,8 +20,19 @@ public static class PasswordHasher
         var parts = stored.Split('$');
         if (parts.Length != 3 || parts[0] != "argon2id") return false;
 
-        var salt = Convert.FromBase64String(parts[1]);
-        var expected = Convert.FromBase64String(parts[2]);
+        // Строка в базе могла испортиться (обрезка, ручная правка) — мусор здесь означает "не подошло",
+        // а не 500.
+        byte[] salt, expected;
+        try
+        {
+            salt = Convert.FromBase64String(parts[1]);
+            expected = Convert.FromBase64String(parts[2]);
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
+
         return CryptographicOperations.FixedTimeEquals(Derive(password, salt), expected);
     }
 
