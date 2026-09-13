@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.StaticFiles;
+using Microsoft.Net.Http.Headers;
 using Samizdat.Core;
 using Samizdat.Core.Navigation;
 using Samizdat.Core.Rendering;
@@ -112,6 +113,26 @@ public static class PageEndpoints
 
             var type = ContentTypes.TryGetContentType(file, out var found) ? found : "application/octet-stream";
             return Results.Stream(stream, type);
+        }).AllowAnonymous();
+
+        // Отдельный путь, не под /assets/: там уже стоит маршрут файлов темы.
+        // Гостю по share-ссылке фон тоже нужен, поэтому без пароля.
+        app.MapGet("/background", (SiteSettings settings, BackgroundFile background) =>
+        {
+            try
+            {
+                if (background.Open(settings.BackgroundFileName) is not { } found) return Results.NotFound();
+
+                return Results.Stream(found.Content, found.ContentType,
+                    lastModified: found.LastWrite,
+                    entityTag: new EntityTagHeaderValue($"\"{found.LastWrite.Ticks}\""));
+            }
+            catch (IOException)
+            {
+                // Файл могли снести между File.Exists и File.OpenRead внутри Open — заменой фона
+                // или ручной чисткой. FileNotFoundException — тоже IOException, ловим оба случая.
+                return Results.NotFound();
+            }
         }).AllowAnonymous();
 
         return group;
