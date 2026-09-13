@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Samizdat.Core.Rendering;
 using Samizdat.Core.Themes;
@@ -29,6 +30,14 @@ builder.Services.AddDbContext<SamizdatDbContext>(options =>
 
 builder.Services.AddScoped<IArticleLookup, DbArticleLookup>();
 
+// Апач-прокси стоит в соседнем контейнере, не на loopback — доверяем заголовку без ограничения по сети.
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedProto;
+    options.KnownIPNetworks.Clear();
+    options.KnownProxies.Clear();
+});
+
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
     {
@@ -49,6 +58,7 @@ if (await ServerCommands.TryRun(args, app.Services)) return;
 using (var scope = app.Services.CreateScope())
     scope.ServiceProvider.GetRequiredService<SamizdatDbContext>().Database.Migrate();
 
+app.UseForwardedHeaders();
 app.MapErrorHandling();
 app.UseAuthentication();
 app.UseAuthorization();

@@ -96,6 +96,37 @@ public class AuthTests(DatabaseFixture database) : IDisposable
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/")).StatusCode);
     }
 
+    // Сервер всегда видит http от прокси Apache — Secure появляется только если прокси сказал X-Forwarded-Proto: https.
+    [Fact]
+    public async Task Forwarded_https_header_marks_session_cookie_secure()
+    {
+        var factory = StartServer();
+        AddOwner(factory, "aleks", "тайна");
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        client.DefaultRequestHeaders.Add("X-Forwarded-Proto", "https");
+
+        var response = await client.PostAsync("/login", new FormUrlEncodedContent(
+            new Dictionary<string, string> { ["login"] = "aleks", ["password"] = "тайна" }));
+
+        var cookies = response.Headers.TryGetValues("Set-Cookie", out var values) ? values : [];
+        Assert.Contains(cookies, cookie => cookie.Contains("secure", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task Plain_http_request_gets_cookie_without_secure_and_login_still_works()
+    {
+        var factory = StartServer();
+        AddOwner(factory, "aleks", "тайна");
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+
+        var response = await client.PostAsync("/login", new FormUrlEncodedContent(
+            new Dictionary<string, string> { ["login"] = "aleks", ["password"] = "тайна" }));
+
+        var cookies = response.Headers.TryGetValues("Set-Cookie", out var values) ? values : [];
+        Assert.DoesNotContain(cookies, cookie => cookie.Contains("secure", StringComparison.OrdinalIgnoreCase));
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/")).StatusCode);
+    }
+
     [Fact]
     public async Task Wrong_password_shows_error_and_keeps_site_closed()
     {
