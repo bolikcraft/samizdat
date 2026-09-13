@@ -44,6 +44,15 @@ public class ArticleFilesTests : IDisposable
     }
 
     [Fact]
+    public void Attachment_outside_the_article_folder_is_not_served()
+    {
+        files.Replace("st", "текст"u8.ToArray(), []);
+        File.WriteAllText(Path.Combine(files.ArticlesRoot, "tayna.txt"), "секрет");
+
+        Assert.Null(files.AttachmentPath("st", "../tayna.txt"));
+    }
+
+    [Fact]
     public void Failed_replace_leaves_no_staging_folder_behind()
     {
         // Имя с NUL — гарантированный сбой записи файла, не зависящий от файловой системы.

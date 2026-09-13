@@ -167,9 +167,14 @@ public class PageEndpointsTests : IDisposable
     [Fact]
     public async Task Path_outside_article_folder_is_refused()
     {
+        // Путь с ".." сервер сводит к обычному ещё до маршрутизации, поэтому сюда файл не утечёт
+        // даже без проверки границ каталога. Саму границу проверяет
+        // ArticleFilesTests.Attachment_outside_the_article_folder_is_not_served.
+        WriteArticle("st", "---\ntitle: T\n---\nтекст\n");
+        File.WriteAllText(Path.Combine(dataRoot, "articles", "tayna.txt"), "секрет");
         var client = StartServer();
 
-        var response = await client.GetAsync("/st/..%2f..%2fappsettings.json");
+        var response = await client.GetAsync("/st/..%2ftayna.txt");
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
