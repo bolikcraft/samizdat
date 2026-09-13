@@ -208,6 +208,48 @@ public class ShareLinkTests : IDisposable
     }
 
     [Fact]
+    public async Task Guest_answers_are_never_stored_by_caches()
+    {
+        using var factory = StartFactory();
+        WriteArticle("statya", "Текст статьи.");
+        WriteAttachment("statya", "shema.png", [1]);
+        RegisterArticle(factory, "statya", "Про ежей");
+        var live = AddLink(factory, "statya");
+        var revoked = AddLink(factory, "statya", revokedAt: DateTimeOffset.UtcNow);
+
+        var client = factory.CreateClient();
+        var page = await client.GetAsync($"/s/{live}");
+        var picture = await client.GetAsync($"/s/{live}/shema.png");
+        var gone = await client.GetAsync($"/s/{revoked}");
+        var missing = await client.GetAsync("/s/ZZZZZZZZZZZZZZZZZZZZZZ");
+
+        foreach (var response in new[] { page, picture, gone, missing })
+            Assert.True(response.Headers.CacheControl?.NoStore == true,
+                        $"{response.RequestMessage!.RequestUri} -> {response.StatusCode}");
+    }
+
+    // Slug статьи может начинаться со слова share: ключи кэша владельца и гостя не должны пересечься.
+    [Fact]
+    public async Task Guest_page_keeps_its_own_cache_entry_next_to_a_share_named_article()
+    {
+        using var factory = StartFactory();
+        WriteArticle("statya", "Текст для гостя.");
+        RegisterArticle(factory, "statya", "Про ежей");
+        WriteArticle("share:statya", "Текст для владельца.");
+        RegisterArticle(factory, "share:statya", "Одноимённая");
+        var token = AddLink(factory, "statya");
+        var owner = await LoginClient(factory);
+
+        var ownerPage = await owner.GetStringAsync("/share:statya");
+        var guestPage = await factory.CreateClient().GetStringAsync($"/s/{token}");
+
+        Assert.Contains("Текст для владельца.", ownerPage);
+        Assert.DoesNotContain("Текст для гостя.", ownerPage);
+        Assert.Contains("Текст для гостя.", guestPage);
+        Assert.DoesNotContain("Текст для владельца.", guestPage);
+    }
+
+    [Fact]
     public async Task Expired_and_revoked_links_answer_410()
     {
         using var factory = StartFactory();

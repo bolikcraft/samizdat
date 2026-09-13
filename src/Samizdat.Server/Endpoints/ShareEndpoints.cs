@@ -18,8 +18,11 @@ public static class ShareEndpoints
     {
         app.MapGet("/s/{token}", (string token, SamizdatDbContext db, ArticleFiles files,
                                   PageRenderer pages, ArticleRenderer markdown, PageCache cache,
-                                  IThemeSource theme, SiteSettings settings) =>
+                                  IThemeSource theme, SiteSettings settings, HttpContext context) =>
         {
+            // Ставим до любого ответа: после отзыва ссылки страница не должна лежать в браузере или прокси.
+            context.Response.Headers.CacheControl = "no-store";
+
             var link = db.ShareLinks.FirstOrDefault(row => row.Token == token);
             if (link is null) return NotFound(pages, settings);
             if (!link.IsAlive(DateTimeOffset.UtcNow)) return Expired(pages, settings);
@@ -29,7 +32,8 @@ public static class ShareEndpoints
 
             // Отдельный ключ кэша: у гостя другой html, без дерева и меню. Отпечаток каталога
             // не нужен — на гостевой странице нет списка статей.
-            var html = cache.GetOrBuild($"share:{link.Slug}", row.ContentHash, theme.Version, "", () =>
+            // Разделитель "/" в slug запрещён, поэтому ключ гостя не может совпасть с ключом статьи.
+            var html = cache.GetOrBuild($"share/{link.Slug}", row.ContentHash, theme.Version, "", () =>
             {
                 var text = files.ReadMarkdown(link.Slug)!;
                 var parsed = FrontMatterParser.Parse(text);
@@ -64,8 +68,11 @@ public static class ShareEndpoints
         }).AllowAnonymous();
 
         // Счётчик открытий тут не трогаем: статья с тремя картинками дала бы четыре открытия.
-        app.MapGet("/s/{token}/{file}", (string token, string file, SamizdatDbContext db, ArticleFiles files) =>
+        app.MapGet("/s/{token}/{file}", (string token, string file, SamizdatDbContext db, ArticleFiles files,
+                                        HttpContext context) =>
         {
+            context.Response.Headers.CacheControl = "no-store";
+
             var link = db.ShareLinks.FirstOrDefault(row => row.Token == token);
             if (link is null || !link.IsAlive(DateTimeOffset.UtcNow)) return Results.NotFound();
 
