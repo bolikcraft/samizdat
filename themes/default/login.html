@@ -1,1 +1,7 @@
-<form method="post" action="/login"><input name="login"><input type="password" name="password"><button>Войти</button>{{ if error }}<p class="error">{{ error }}</p>{{ end }}</form>
+<form class="login" method="post" action="/login">
+  <h1>Вход</h1>
+  {{ if error }}<p class="error">{{ error | html.escape }}</p>{{ end }}
+  <label>Логин <input name="login" autofocus autocomplete="username"></label>
+  <label>Пароль <input type="password" name="password" autocomplete="current-password"></label>
+  <button type="submit">Войти</button>
+</form>

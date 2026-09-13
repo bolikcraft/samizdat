@@ -1,1 +1,103 @@
-body { font-family: system-ui, sans-serif; }
+:root {
+  --bg: #fdfdfc; --fg: #1a1a18; --muted: #6b6b66; --accent: #2f6f4f; --line: #e3e3df;
+  --callout: #f1f4f2; --code-bg: #f5f5f3;
+  --warn: #c98a2b; --danger: #c0503f; --tip: #2f8f5f;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #16171a; --fg: #e6e6e3; --muted: #9a9a94; --accent: #7fbf9a; --line: #2b2d31;
+    --callout: #1e2024; --code-bg: #1b1d21;
+    --warn: #d9a84e; --danger: #d97a68; --tip: #6fbf94;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 17px/1.6 Georgia, "Times New Roman", serif;
+}
+
+main { max-width: 44rem; margin: 0 auto; padding: 1rem 1.25rem 4rem; }
+.top, .bottom { max-width: 44rem; margin: 0 auto; padding: 1rem 1.25rem; color: var(--muted); }
+.top { border-bottom: 1px solid var(--line); }
+.top a { color: var(--fg); font-family: system-ui, sans-serif; font-weight: bold; text-decoration: none; }
+.bottom { border-top: 1px solid var(--line); font-size: 0.9rem; }
+
+h1, h2, h3, h4 { font-family: system-ui, sans-serif; line-height: 1.25; }
+p, li { overflow-wrap: break-word; }
+a { color: var(--accent); }
+.date { color: var(--muted); font-size: 0.9rem; }
+
+.articles { list-style: none; padding: 0; margin: 0; }
+.articles li { border-bottom: 1px solid var(--line); padding: 0.9rem 0; }
+.articles li:first-child { padding-top: 0; }
+.articles a { font-size: 1.1rem; font-weight: bold; text-decoration: none; }
+.articles a:hover { text-decoration: underline; }
+.articles p { margin: 0.3rem 0 0; color: var(--muted); }
+
+pre, code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 0.9rem; }
+pre {
+  background: var(--code-bg);
+  padding: 0.9rem;
+  overflow-x: auto;
+  border-radius: 6px;
+  margin: 1.2rem 0;
+  line-height: 1.5;
+}
+code { background: var(--code-bg); padding: 0.1rem 0.3rem; border-radius: 4px; }
+pre code { background: none; padding: 0; }
+
+/* Markdown.ColorCode красит блоки кода инлайновыми стилями своей тёмной VS-схемы
+   (тёмный фон, светлый текст) — не даём своему фону перекрыть их, иначе на светлой
+   схеме получается светлый текст на светлом фоне. */
+div[style] > pre {
+  background: none;
+  margin: 0;
+  border-radius: 0;
+}
+
+table {
+  display: block;
+  overflow-x: auto;
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1.2rem 0;
+}
+th, td { border: 1px solid var(--line); padding: 0.4rem 0.6rem; text-align: left; }
+th { font-family: system-ui, sans-serif; }
+
+img { max-width: 100%; height: auto; border-radius: 4px; }
+
+blockquote { margin: 1.2rem 0; padding-left: 1rem; border-left: 4px solid var(--line); color: var(--muted); }
+
+.callout {
+  background: var(--callout);
+  border-left: 4px solid var(--accent);
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  margin: 1.2rem 0;
+}
+.callout-title { font-family: system-ui, sans-serif; font-weight: 600; margin-bottom: 0.3rem; }
+.callout-body > :first-child { margin-top: 0; }
+.callout-body > :last-child { margin-bottom: 0; }
+.callout-warning, .callout-caution, .callout-attention { border-left-color: var(--warn); }
+.callout-danger, .callout-error, .callout-bug, .callout-failure, .callout-fail, .callout-missing {
+  border-left-color: var(--danger);
+}
+.callout-tip, .callout-success, .callout-check, .callout-done { border-left-color: var(--tip); }
+
+.login { max-width: 20rem; margin: 4rem auto; display: grid; gap: 0.75rem; padding: 0 1.25rem; }
+.login label { display: grid; gap: 0.3rem; font-family: system-ui, sans-serif; font-size: 0.9rem; color: var(--muted); }
+.login input {
+  width: 100%; padding: 0.5rem; font: inherit; color: var(--fg);
+  background: var(--bg); border: 1px solid var(--line); border-radius: 4px;
+}
+.login button {
+  padding: 0.6rem; font: inherit; font-family: system-ui, sans-serif; cursor: pointer;
+  background: var(--accent); color: var(--bg); border: none; border-radius: 4px;
+}
+.error { color: var(--danger); }

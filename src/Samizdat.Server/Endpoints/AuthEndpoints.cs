@@ -42,6 +42,11 @@ public static class AuthEndpoints
 
     static IResult LoginPage(PageRenderer pages, string? error)
         => Results.Content(
-            pages.Render("login.html", new() { ["page_title"] = "Вход", ["error"] = error }),
+            pages.Render("login.html", new()
+            {
+                ["page_title"] = "Вход",
+                ["error"] = error,
+                ["site"] = new Dictionary<string, object?> { ["title"] = "Samizdat" },
+            }),
             "text/html; charset=utf-8");
 }

@@ -1,1 +1,5 @@
-<article><h1>{{ article.title | html.escape }}</h1>{{ article.html }}</article>
+<article>
+<h1>{{ article.title | html.escape }}</h1>
+{{ if article.date }}<p class="date">{{ article.date | html.escape }}</p>{{ end }}
+{{ article.html }}
+</article>

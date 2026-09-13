@@ -99,6 +99,9 @@ public static class PageEndpoints
     }
 
     static IResult NotFound(PageRenderer pages)
-        => Results.Content(pages.Render("404.html", new() { ["page_title"] = "Не найдено" }),
-                           "text/html; charset=utf-8", statusCode: 404);
+        => Results.Content(pages.Render("404.html", new()
+        {
+            ["page_title"] = "Не найдено",
+            ["site"] = new Dictionary<string, object?> { ["title"] = "Samizdat" },
+        }), "text/html; charset=utf-8", statusCode: 404);
 }

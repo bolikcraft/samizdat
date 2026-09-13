@@ -1,4 +1,10 @@
 <!doctype html><html lang="ru"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{{ page_title | html.escape }}</title><link rel="stylesheet" href="/assets/style.css"></head>
-<body><main>{{ content }}</main></body></html>
+<title>{{ page_title | html.escape }}</title>
+{{ if description }}<meta name="description" content="{{ description | html.escape }}">{{ end }}
+<link rel="stylesheet" href="/assets/style.css"></head>
+<body>
+<header class="top"><a href="/">{{ site.title | html.escape }}</a></header>
+<main>{{ content }}</main>
+<footer class="bottom">Samizdat</footer>
+</body></html>

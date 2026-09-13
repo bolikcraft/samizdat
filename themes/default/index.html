@@ -1,1 +1,10 @@
-<h1>{{ site.title | html.escape }}</h1><ul>{{ for a in articles }}<li><a href="/{{ a.slug | html.escape }}">{{ a.title | html.escape }}</a></li>{{ end }}</ul>
+<h1>{{ site.title | html.escape }}</h1>
+<ul class="articles">
+{{ for item in articles }}
+  <li>
+    <a href="/{{ item.slug | html.escape }}">{{ item.title | html.escape }}</a>
+    {{ if item.date }}<span class="date">{{ item.date | html.escape }}</span>{{ end }}
+    {{ if item.description }}<p>{{ item.description | html.escape }}</p>{{ end }}
+  </li>
+{{ end }}
+</ul>
