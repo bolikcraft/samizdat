@@ -71,6 +71,32 @@ public class ThemeRenderTests : IDisposable
 
     public void Dispose() => Directory.Delete(dataRoot, recursive: true);
 
+    /// Отдаёт разметку внутри блока, который открывается тегом openTag, считая вложенные блоки.
+    static string SliceDiv(string html, string openTag)
+    {
+        var start = html.IndexOf(openTag, StringComparison.Ordinal);
+        Assert.True(start >= 0, $"в разметке нет {openTag}");
+
+        var depth = 0;
+        var at = start;
+        while (true)
+        {
+            var open = html.IndexOf("<div", at, StringComparison.Ordinal);
+            var close = html.IndexOf("</div>", at, StringComparison.Ordinal);
+            Assert.True(close >= 0, $"незакрытый {openTag}");
+            if (open >= 0 && open < close)
+            {
+                depth++;
+                at = open + "<div".Length;
+                continue;
+            }
+
+            depth--;
+            if (depth == 0) return html[(start + openTag.Length)..close];
+            at = close + "</div>".Length;
+        }
+    }
+
     [Fact]
     public async Task Article_page_has_title_meta_and_styles()
     {
@@ -118,12 +144,9 @@ public class ThemeRenderTests : IDisposable
 
         Assert.Contains("class=\"shell\"", html);
         Assert.DoesNotContain("shell-plain", html);
-        // Дерево и статья должны быть в одной обёртке, а не просто где-то на странице:
-        // .shell в разметке ровно один, всё между его открытием и футером — внутри него.
-        var shellStart = html.IndexOf("<div class=\"shell\">", StringComparison.Ordinal);
-        var shellEnd = html.IndexOf("<footer", shellStart, StringComparison.Ordinal);
-        Assert.True(shellStart >= 0 && shellEnd > shellStart);
-        var shell = html[shellStart..shellEnd];
+        // Дерево и статья лежат внутри панели, а не просто перед футером: берём содержимое
+        // панели до парного </div>, поэтому вынос дерева из обёртки тест уронит.
+        var shell = SliceDiv(html, "<div class=\"shell\">");
         Assert.Contains("nav-tree", shell);
         Assert.Contains("<main>", shell);
     }
@@ -135,5 +158,27 @@ public class ThemeRenderTests : IDisposable
 
         Assert.Contains("<div class=\"shell shell-plain\">", html);
         Assert.DoesNotContain("nav-tree", html);
+    }
+
+    [Fact]
+    public async Task The_stylesheet_answers_all_three_color_scheme_settings()
+    {
+        var css = await StartFactory().CreateClient().GetStringAsync("/assets/style.css");
+
+        // «Как в системе» — по настройке системы, но выбор «светлая» её перебивает.
+        Assert.Contains("prefers-color-scheme: dark", css);
+        Assert.Contains(":root:not([data-color-scheme=\"light\"])", css);
+        Assert.Contains(":root[data-color-scheme=\"dark\"]", css);
+    }
+
+    [Fact]
+    public async Task The_stylesheet_draws_the_panel_as_frosted_glass()
+    {
+        var css = await StartFactory().CreateClient().GetStringAsync("/assets/style.css");
+
+        Assert.Contains("--bg-image", css);
+        Assert.Contains("backdrop-filter", css);
+        // Запасной вид для браузеров без размытия: панель становится плотной.
+        Assert.Contains("@supports not", css);
     }
 }
