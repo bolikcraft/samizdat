@@ -1,1 +1,1 @@
-<h1>{{ site.title }}</h1><ul>{{ for a in articles }}<li><a href="/{{ a.slug }}">{{ a.title }}</a></li>{{ end }}</ul>
+<h1>{{ site.title | html.escape }}</h1><ul>{{ for a in articles }}<li><a href="/{{ a.slug | html.escape }}">{{ a.title | html.escape }}</a></li>{{ end }}</ul>

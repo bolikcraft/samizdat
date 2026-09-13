@@ -78,6 +78,77 @@ public class PageEndpointsTests : IDisposable
     }
 
     [Fact]
+    public async Task Symlinked_attachment_pointing_outside_article_folder_is_refused()
+    {
+        var secret = Path.Combine(Path.GetTempPath(), $"samizdat-secret-{Guid.NewGuid():N}.txt");
+        File.WriteAllText(secret, "чужие данные");
+        try
+        {
+            WriteArticle("s", "---\ntitle: T\n---\nтекст\n");
+            File.CreateSymbolicLink(Path.Combine(dataRoot, "articles", "s", "leak.txt"), secret);
+            var client = StartServer();
+
+            var response = await client.GetAsync("/s/leak.txt");
+
+            Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        }
+        finally
+        {
+            File.Delete(secret);
+        }
+    }
+
+    [Fact]
+    public async Task Article_title_with_markup_is_escaped()
+    {
+        WriteArticle("evil", "---\ntitle: \"</title><script>alert(1)</script>\"\n---\nтекст\n");
+        var client = StartServer();
+
+        var html = await client.GetStringAsync("/evil");
+
+        Assert.DoesNotContain("<script>", html);
+        Assert.Contains("&lt;script&gt;", html);
+    }
+
+    [Fact]
+    public async Task Same_file_fingerprint_serves_cached_page_without_rereading_content()
+    {
+        WriteArticle("s", "---\ntitle: Old\n---\nold text \n");
+        var path = Path.Combine(dataRoot, "articles", "s", "index.md");
+        var writeTime = File.GetLastWriteTimeUtc(path);
+        var client = StartServer();
+
+        var before = await client.GetStringAsync("/s");
+        Assert.Contains("Old", before);
+
+        // Same length in bytes as the original text, so the fingerprint (mtime + length) does not change.
+        File.WriteAllText(path, "---\ntitle: New\n---\nnew text \n");
+        File.SetLastWriteTimeUtc(path, writeTime);
+
+        var after = await client.GetStringAsync("/s");
+
+        Assert.Equal(before, after);
+        Assert.Contains("Old", after);
+    }
+
+    [Fact]
+    public async Task Changed_write_time_rebuilds_cached_page()
+    {
+        WriteArticle("s", "---\ntitle: Old\n---\nтекст\n");
+        var client = StartServer();
+
+        var before = await client.GetStringAsync("/s");
+        Assert.Contains("Old", before);
+
+        await Task.Delay(20);
+        WriteArticle("s", "---\ntitle: New\n---\nтекст\n");
+        var after = await client.GetStringAsync("/s");
+
+        Assert.Contains("New", after);
+        Assert.DoesNotContain("Old", after);
+    }
+
+    [Fact]
     public async Task Editing_theme_file_invalidates_cached_page()
     {
         WriteArticle("privet", "---\ntitle: Привет\n---\nтекст\n");

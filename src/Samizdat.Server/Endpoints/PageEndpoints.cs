@@ -1,4 +1,3 @@
-using System.Text;
 using Microsoft.AspNetCore.StaticFiles;
 using Samizdat.Core;
 using Samizdat.Core.Rendering;
@@ -34,12 +33,12 @@ public static class PageEndpoints
                                ArticleRenderer markdown, IArticleLookup articles,
                                PageCache cache, IThemeSource theme) =>
         {
-            var text = files.ReadMarkdown(slug);
-            if (text is null) return NotFound(pages);
+            var fingerprint = files.Fingerprint(slug);
+            if (fingerprint is null) return NotFound(pages);
 
-            var hash = ArticleHash.Compute(Encoding.UTF8.GetBytes(text), []);
-            var html = cache.GetOrBuild(slug, hash, theme.Version, () =>
+            var html = cache.GetOrBuild(slug, fingerprint, theme.Version, () =>
             {
+                var text = files.ReadMarkdown(slug)!;
                 var parsed = FrontMatterParser.Parse(text);
                 var body = markdown.Render(parsed.Body, slug, articles);
 

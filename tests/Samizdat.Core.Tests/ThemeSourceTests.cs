@@ -22,7 +22,7 @@ public class ThemeSourceTests : IDisposable
         var theme = new LayeredThemeSource(new DiskThemeSource(folder), new EmbeddedThemeSource());
 
         Assert.Equal("свой шаблон", theme.ReadText("article.html"));
-        Assert.Contains("{{ site.title }}", theme.ReadText("index.html"));
+        Assert.Contains("{{ site.title | html.escape }}", theme.ReadText("index.html"));
     }
 
     [Fact]
@@ -48,6 +48,25 @@ public class ThemeSourceTests : IDisposable
 
         Assert.Null(theme.ReadText("../../etc/passwd"));
         Assert.Null(theme.OpenRead("../../etc/passwd"));
+    }
+
+    [Fact]
+    public void Disk_source_refuses_symlink_pointing_outside_theme_folder()
+    {
+        var secret = Path.Combine(Path.GetTempPath(), $"samizdat-secret-{Guid.NewGuid():N}.txt");
+        File.WriteAllText(secret, "чужие данные");
+        try
+        {
+            File.CreateSymbolicLink(Path.Combine(folder, "leak.html"), secret);
+            var theme = new DiskThemeSource(folder);
+
+            Assert.Null(theme.ReadText("leak.html"));
+            Assert.Null(theme.OpenRead("leak.html"));
+        }
+        finally
+        {
+            File.Delete(secret);
+        }
     }
 
     public void Dispose() => Directory.Delete(folder, recursive: true);
