@@ -7,9 +7,9 @@ public sealed class PageCache
     readonly ConcurrentDictionary<string, (string Key, string Html)> pages = new();
 
     public string GetOrBuild(string slug, string version, string themeVersion, string catalogFingerprint,
-                              Func<string> build)
+                              string viewFingerprint, Func<string> build)
     {
-        var key = $"{version}|{themeVersion}|{catalogFingerprint}";
+        var key = $"{version}|{themeVersion}|{catalogFingerprint}|{viewFingerprint}";
         if (pages.TryGetValue(slug, out var found) && found.Key == key)
             return found.Html;
 

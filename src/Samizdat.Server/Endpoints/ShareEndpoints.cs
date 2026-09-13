@@ -33,7 +33,8 @@ public static class ShareEndpoints
             // Отдельный ключ кэша: у гостя другой html, без дерева и меню. Отпечаток каталога
             // не нужен — на гостевой странице нет списка статей.
             // Разделитель "/" в slug запрещён, поэтому ключ гостя не может совпасть с ключом статьи.
-            var html = cache.GetOrBuild($"share/{link.Slug}", row.ContentHash, theme.Version, "", () =>
+            var html = cache.GetOrBuild($"share/{link.Slug}", row.ContentHash, theme.Version, "",
+                                        settings.ViewFingerprint, () =>
             {
                 var text = files.ReadMarkdown(link.Slug)!;
                 var parsed = FrontMatterParser.Parse(text);

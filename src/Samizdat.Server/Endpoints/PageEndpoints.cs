@@ -63,7 +63,10 @@ public static class PageEndpoints
             // Ключ кэша — content_hash из БД, а не отпечаток файла: PUT меняет хэш всегда,
             // даже если mtime и длина файла на диске совпали со старой версией. Отпечаток каталога
             // сбрасывает кэш, когда меняется список статей: иначе дерево на старой странице не заметит.
-            var html = cache.GetOrBuild(slug, row.ContentHash, theme.Version, CatalogFingerprint.Of(db), () =>
+            // Отпечаток вида сбрасывает кэш при смене темы, схемы или фона: layout.html с ними
+            // отрисован внутри уже закэшированного html.
+            var html = cache.GetOrBuild(slug, row.ContentHash, theme.Version, CatalogFingerprint.Of(db),
+                                        settings.ViewFingerprint, () =>
             {
                 var text = files.ReadMarkdown(slug)!;
                 var parsed = FrontMatterParser.Parse(text);
