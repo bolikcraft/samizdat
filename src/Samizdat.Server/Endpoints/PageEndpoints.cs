@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.StaticFiles;
 using Samizdat.Core;
+using Samizdat.Core.Navigation;
 using Samizdat.Core.Rendering;
 using Samizdat.Core.Themes;
 using Samizdat.Server.Data;
@@ -32,6 +33,7 @@ public static class PageEndpoints
                 ["page_title"] = "Samizdat",
                 ["site"] = new Dictionary<string, object?> { ["title"] = "Samizdat" },
                 ["articles"] = list,
+                ["nav"] = Navigation(db, currentSlug: null),
             }), "text/html; charset=utf-8");
         });
 
@@ -45,14 +47,15 @@ public static class PageEndpoints
             {
                 if (files.ReadMarkdown(slug) is not null)
                     logger.LogWarning("Статья {Slug} есть на диске, но её нет в базе", slug);
-                return NotFound(pages);
+                return NotFound(pages, db);
             }
 
-            if (!files.MarkdownExists(slug)) return NotFound(pages);
+            if (!files.MarkdownExists(slug)) return NotFound(pages, db);
 
             // Ключ кэша — content_hash из БД, а не отпечаток файла: PUT меняет хэш всегда,
-            // даже если mtime и длина файла на диске совпали со старой версией.
-            var html = cache.GetOrBuild(slug, row.ContentHash, theme.Version, () =>
+            // даже если mtime и длина файла на диске совпали со старой версией. Отпечаток каталога
+            // сбрасывает кэш, когда меняется список статей: иначе дерево на старой странице не заметит.
+            var html = cache.GetOrBuild(slug, row.ContentHash, theme.Version, CatalogFingerprint.Of(db), () =>
             {
                 var text = files.ReadMarkdown(slug)!;
                 var parsed = FrontMatterParser.Parse(text);
@@ -71,16 +74,18 @@ public static class PageEndpoints
                         ["date"] = parsed.FrontMatter.Date?.ToString("yyyy-MM-dd"),
                         ["html"] = body,
                     },
+                    ["nav"] = Navigation(db, currentSlug: slug),
                 });
             });
 
             return Results.Content(html, "text/html; charset=utf-8");
         });
 
-        group.MapGet("/{slug}/{*file}", (string slug, string file, ArticleFiles files, PageRenderer pages) =>
+        group.MapGet("/{slug}/{*file}", (string slug, string file, ArticleFiles files, PageRenderer pages,
+                                         SamizdatDbContext db) =>
         {
             var path = files.AttachmentPath(slug, file);
-            if (path is null) return NotFound(pages);
+            if (path is null) return NotFound(pages, db);
 
             var type = ContentTypes.TryGetContentType(path, out var found) ? found : "application/octet-stream";
             return Results.File(path, type);
@@ -99,10 +104,35 @@ public static class PageEndpoints
         return group;
     }
 
-    static IResult NotFound(PageRenderer pages)
+    static IResult NotFound(PageRenderer pages, SamizdatDbContext db)
         => Results.Content(pages.Render("404.html", new()
         {
             ["page_title"] = "Не найдено",
             ["site"] = new Dictionary<string, object?> { ["title"] = "Samizdat" },
+            ["nav"] = Navigation(db, currentSlug: null),
         }), "text/html; charset=utf-8", statusCode: 404);
+
+    static Dictionary<string, object?> Navigation(SamizdatDbContext db, string? currentSlug)
+    {
+        var entries = db.Articles
+            .OrderBy(article => article.Folder).ThenBy(article => article.Title)
+            .Select(article => new ArticleEntry(article.Folder, article.Slug, article.Title))
+            .ToList();
+
+        return ToModel(ArticleTree.Build(entries, currentSlug));
+    }
+
+    static Dictionary<string, object?> ToModel(TreeNode node) => new()
+    {
+        ["name"] = node.Name,
+        ["path"] = node.Path,
+        ["has_current"] = node.HasCurrent,
+        ["folders"] = node.Folders.Select(ToModel).ToList(),
+        ["articles"] = node.Articles.Select(article => new Dictionary<string, object?>
+        {
+            ["slug"] = article.Slug,
+            ["title"] = article.Title,
+            ["is_current"] = article.IsCurrent,
+        }).ToList(),
+    };
 }

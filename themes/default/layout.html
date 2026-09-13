@@ -5,6 +5,25 @@
 <link rel="stylesheet" href="/assets/style.css"></head>
 <body>
 <header class="top"><a href="/">{{ site.title | html.escape }}</a></header>
+{{ if nav }}
+<!-- Черновая разметка дерева: Task 5 заменит её на боковик с рекурсивным include. -->
+<nav id="nav-tree">
+  <ul>
+  {{ for article in nav.articles }}
+    <li><a href="/{{ article.slug | html.escape }}"{{ if article.is_current }} aria-current="page"{{ end }}>{{ article.title | html.escape }}</a></li>
+  {{ end }}
+  {{ for folder in nav.folders }}
+    <li data-path="{{ folder.path | html.escape }}">{{ folder.name | html.escape }}
+      <ul>
+      {{ for article in folder.articles }}
+        <li><a href="/{{ article.slug | html.escape }}"{{ if article.is_current }} aria-current="page"{{ end }}>{{ article.title | html.escape }}</a></li>
+      {{ end }}
+      </ul>
+    </li>
+  {{ end }}
+  </ul>
+</nav>
+{{ end }}
 <main>{{ content }}</main>
 <footer class="bottom">Samizdat</footer>
 </body></html>
