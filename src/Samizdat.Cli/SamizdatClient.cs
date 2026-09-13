@@ -1,5 +1,6 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text;
 
 namespace Samizdat.Cli;
 
@@ -16,11 +17,12 @@ public sealed class SamizdatClient(HttpClient http)
         => await http.GetFromJsonAsync<Dictionary<string, string>>("/api/state") ?? [];
 
     public async Task PutArticleAsync(string slug, byte[] markdown,
-                                      IReadOnlyCollection<(string Name, byte[] Bytes)> attachments)
+                                      IReadOnlyCollection<(string Name, byte[] Bytes)> attachments, string folder)
     {
         using var content = new MultipartFormDataContent
         {
             { new ByteArrayContent(markdown), "index.md", "index.md" },
+            { new StringContent(folder, Encoding.UTF8), "folder" },
         };
         foreach (var (name, bytes) in attachments)
             content.Add(new ByteArrayContent(bytes), "attachments", name);

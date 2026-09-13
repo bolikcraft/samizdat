@@ -72,6 +72,42 @@ public class VaultScannerTests : IDisposable
         Assert.Empty(new VaultScanner(vault).Scan());
     }
 
+    [Fact]
+    public void Note_in_subfolder_reports_its_folder()
+    {
+        Note("PROXMOX/immich.md", "---\ntitle: Immich\npublish: true\n---\nx");
+
+        Assert.Equal("PROXMOX", new VaultScanner(vault).Scan().Single().Folder);
+    }
+
+    [Fact]
+    public void Note_in_root_reports_empty_folder()
+    {
+        Note("a.md", "---\ntitle: A\npublish: true\n---\nx");
+
+        Assert.Equal("", new VaultScanner(vault).Scan().Single().Folder);
+    }
+
+    [Fact]
+    public void Nested_folders_use_forward_slashes()
+    {
+        Note("База знаний/Linux/alt.md", "---\ntitle: Alt\npublish: true\n---\nx");
+
+        Assert.Equal("База знаний/Linux", new VaultScanner(vault).Scan().Single().Folder);
+    }
+
+    [Fact]
+    public void Moving_a_note_between_folders_changes_its_hash()
+    {
+        Note("A/x.md", "---\ntitle: X\nslug: x\npublish: true\n---\nтекст");
+        var before = new VaultScanner(vault).Scan().Single().Hash;
+
+        Directory.CreateDirectory(Path.Combine(vault, "B"));
+        File.Move(Path.Combine(vault, "A/x.md"), Path.Combine(vault, "B/x.md"));
+
+        Assert.NotEqual(before, new VaultScanner(vault).Scan().Single().Hash);
+    }
+
     [Theory]
     [InlineData("/admin")]
     [InlineData("admin/sub")]

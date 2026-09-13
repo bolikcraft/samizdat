@@ -8,9 +8,10 @@ public sealed record VaultNote(
     string Slug,
     string SourcePath,
     byte[] Markdown,
-    IReadOnlyList<(string Name, byte[] Bytes)> Attachments)
+    IReadOnlyList<(string Name, byte[] Bytes)> Attachments,
+    string Folder)
 {
-    public string Hash => ArticleHash.Compute(Markdown, Attachments);
+    public string Hash => ArticleHash.Compute(Markdown, Attachments, Folder);
 }
 
 public sealed partial class VaultScanner(string vaultPath)
@@ -47,7 +48,10 @@ public sealed partial class VaultScanner(string vaultPath)
                 throw new CliException($"Один slug «{slug}» у двух заметок: {other} и {file}");
             taken[slug] = file;
 
-            yield return new VaultNote(slug, file, Encoding.UTF8.GetBytes(text), FindAttachments(text));
+            var relative = Path.GetRelativePath(vaultPath, Path.GetDirectoryName(file)!);
+            var folder = relative == "." ? "" : relative.Replace(Path.DirectorySeparatorChar, '/');
+
+            yield return new VaultNote(slug, file, Encoding.UTF8.GetBytes(text), FindAttachments(text), folder);
         }
     }
 

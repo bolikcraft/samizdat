@@ -5,7 +5,7 @@ namespace Samizdat.Cli.Tests;
 public class PushPlanTests
 {
     static VaultNote Note(string slug, string text)
-        => new(slug, $"{slug}.md", System.Text.Encoding.UTF8.GetBytes(text), []);
+        => new(slug, $"{slug}.md", System.Text.Encoding.UTF8.GetBytes(text), [], "");
 
     [Fact]
     public void New_note_is_uploaded()

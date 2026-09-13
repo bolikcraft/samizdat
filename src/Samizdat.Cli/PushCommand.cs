@@ -44,7 +44,7 @@ public static class PushCommand
         {
             try
             {
-                await client.PutArticleAsync(note.Slug, note.Markdown, note.Attachments);
+                await client.PutArticleAsync(note.Slug, note.Markdown, note.Attachments, note.Folder);
                 Console.WriteLine($"выложено  {note.Slug}");
             }
             catch (CliException error)

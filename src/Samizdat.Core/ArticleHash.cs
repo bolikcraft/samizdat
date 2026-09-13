@@ -6,9 +6,8 @@ namespace Samizdat.Core;
 public static class ArticleHash
 {
     /// Хэш всей статьи: markdown, вложения и папка в вольте. По нему CLI решает, нужна ли выкладка.
-    // folder по умолчанию "" — вызовы из CLI (Task 2) продолжают работать без правки.
     public static string Compute(byte[] markdown, IReadOnlyCollection<(string Name, byte[] Bytes)> attachments,
-                                  string folder = "")
+                                  string folder)
     {
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
         hash.AppendData(markdown);
