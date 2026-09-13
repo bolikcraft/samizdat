@@ -54,4 +54,12 @@ public class FrontMatterParserTests
         Assert.Equal("T", result.FrontMatter.Title);
         Assert.Equal("тело\r\n", result.Body);
     }
+
+    [Fact]
+    public void Byte_order_mark_before_the_fence_is_ignored()
+    {
+        var result = FrontMatterParser.Parse("﻿---\ntitle: T\n---\nx");
+
+        Assert.Equal("T", result.FrontMatter.Title);
+    }
 }

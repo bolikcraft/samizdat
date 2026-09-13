@@ -13,6 +13,8 @@ public static class FrontMatterParser
 
     public static ParsedDocument Parse(string text)
     {
+        text = text.TrimStart('﻿');
+
         if (!StartsWithFence(text, out var afterOpening))
             return new ParsedDocument(new FrontMatter(), text);
 
