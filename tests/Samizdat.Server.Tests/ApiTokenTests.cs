@@ -139,6 +139,32 @@ public class ApiTokenTests(DatabaseFixture database) : IDisposable
         Assert.Equal(HttpStatusCode.Found, (await client.GetAsync("/")).StatusCode);
     }
 
+    // Владельца удалили, а токен ещё в ходу (например, между запросами) — авторизация должна отказать, а не упасть.
+    [Fact]
+    public async Task Token_of_deleted_owner_returns_401_not_500()
+    {
+        var factory = StartServer();
+        var owner = AddOwner(factory, $"owner-{Guid.NewGuid():N}", "x");
+        var token = ApiToken.Create();
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+            db.ApiTokens.Add(new ApiTokenRow
+            {
+                UserId = owner.Id, TokenHash = ApiToken.HashOf(token), CreatedAt = DateTimeOffset.UtcNow,
+            });
+            db.SaveChanges();
+
+            db.Users.Remove(db.Users.Single(item => item.Id == owner.Id));
+            db.SaveChanges();
+        }
+
+        var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/state")).StatusCode);
+    }
+
     [Fact]
     public async Task Token_new_without_owner_fails_gracefully()
     {

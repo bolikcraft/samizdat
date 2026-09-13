@@ -29,6 +29,8 @@ public sealed class SamizdatDbContext(DbContextOptions<SamizdatDbContext> option
         {
             token.ToTable("api_tokens");
             token.HasIndex(row => row.TokenHash).IsUnique();
+            // Каскад: удалили владельца — токены сироты быть не должно, а не 500 при авторизации по нему.
+            token.HasOne<UserRow>().WithMany().HasForeignKey(row => row.UserId).OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

@@ -39,7 +39,10 @@ public sealed class ApiTokenAuthenticationHandler(
         row.LastUsedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync();
 
-        var user = await db.Users.FirstAsync(item => item.Id == row.UserId);
+        // Владельца могли удалить, а токен остался (гонка до появления каскадного FK) — это отказ, не 500.
+        var user = await db.Users.FirstOrDefaultAsync(item => item.Id == row.UserId);
+        if (user is null) return AuthenticateResult.Fail("Владелец токена не найден");
+
         var identity = new ClaimsIdentity(
             [new Claim(ClaimTypes.Name, user.Login), new Claim(ClaimTypes.Role, user.Role.ToString())],
             ApiToken.Scheme);
