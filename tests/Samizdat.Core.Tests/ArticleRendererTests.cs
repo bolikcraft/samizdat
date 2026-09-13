@@ -47,9 +47,3 @@ public class ArticleRendererTests
         Assert.Contains("<span", html);
     }
 }
-
-public sealed class NoArticles : IArticleLookup
-{
-    public static readonly NoArticles Instance = new();
-    public bool Exists(string slug) => false;
-}

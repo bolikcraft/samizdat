@@ -48,6 +48,15 @@ public class WikiLinkTests
 
         Assert.Contains("[0]", html);
     }
+
+    [Fact]
+    public void Guest_render_turns_every_wiki_link_into_text()
+    {
+        var html = renderer.Render("[[drugaya-statya]]", "statya", NoArticles.Instance);
+
+        Assert.Contains("drugaya-statya", html);
+        Assert.DoesNotContain("<a href=", html);
+    }
 }
 
 public sealed class FakeLookup(params string[] slugs) : IArticleLookup
