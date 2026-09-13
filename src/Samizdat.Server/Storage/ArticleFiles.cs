@@ -17,6 +17,10 @@ public sealed class ArticleFiles(string dataRoot)
         return File.Exists(file) ? File.ReadAllText(file) : null;
     }
 
+    /// Проверка без чтения содержимого — для отбраковки осиротевшей в БД строки на горячем пути кэша.
+    public bool MarkdownExists(string slug)
+        => IsValidSlug(slug) && File.Exists(Path.Combine(Folder(slug), "index.md"));
+
     /// null, если имя выводит за каталог статьи — текстом или через симлинк на чужой файл.
     public string? AttachmentPath(string slug, string name)
     {
