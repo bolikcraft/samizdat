@@ -497,4 +497,27 @@ public class ShareLinkTests : IDisposable
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
+
+    [Fact]
+    public async Task Owner_and_guest_get_different_pages_of_one_article()
+    {
+        using var factory = StartFactory();
+        WriteArticle("statya", "![[shema.png]]");
+        WriteAttachment("statya", "shema.png", [1]);
+        RegisterArticle(factory, "statya", "Про ежей");
+        var first = AddLink(factory, "statya");
+        var second = AddLink(factory, "statya");
+        var owner = await LoginClient(factory);
+
+        var ownerPage = await owner.GetStringAsync("/statya");
+        var firstPage = await factory.CreateClient().GetStringAsync($"/s/{first}");
+        var secondPage = await factory.CreateClient().GetStringAsync($"/s/{second}");
+
+        Assert.Contains("user-menu", ownerPage);
+        Assert.Contains("src=\"/statya/shema.png\"", ownerPage);
+        Assert.DoesNotContain("user-menu", firstPage);
+        Assert.Contains($"src=\"/s/{first}/shema.png\"", firstPage);
+        Assert.Contains($"src=\"/s/{second}/shema.png\"", secondPage);
+        Assert.DoesNotContain("__SHARE_BASE__", firstPage);
+    }
 }
