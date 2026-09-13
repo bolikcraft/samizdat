@@ -30,11 +30,13 @@ public static class ShareEndpoints
             var row = db.Articles.Find(link.Slug);
             if (row is null || !files.MarkdownExists(link.Slug)) return NotFound(pages, settings);
 
-            // Отдельный ключ кэша: у гостя другой html, без дерева и меню. Отпечаток каталога
-            // не нужен — на гостевой странице нет списка статей.
+            // Отдельный ключ кэша: у гостя другой html, без дерева и меню. Catalog пуст — на гостевой
+            // странице нет списка статей. View нужен здесь так же, как на странице владельца:
+            // см. SiteSettings.ViewFingerprint.
             // Разделитель "/" в slug запрещён, поэтому ключ гостя не может совпасть с ключом статьи.
-            var html = cache.GetOrBuild($"share/{link.Slug}", row.ContentHash, theme.Version, "",
-                                        settings.ViewFingerprint, () =>
+            var key = new PageKey(Content: row.ContentHash, Theme: theme.Version,
+                                  Catalog: "", View: settings.ViewFingerprint);
+            var html = cache.GetOrBuild($"share/{link.Slug}", key, () =>
             {
                 var text = files.ReadMarkdown(link.Slug)!;
                 var parsed = FrontMatterParser.Parse(text);

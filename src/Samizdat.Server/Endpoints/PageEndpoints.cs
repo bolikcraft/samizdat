@@ -60,13 +60,12 @@ public static class PageEndpoints
 
             if (!files.MarkdownExists(slug)) return NotFound(pages, db, settings, user, antiforgery, context);
 
-            // Ключ кэша — content_hash из БД, а не отпечаток файла: PUT меняет хэш всегда,
-            // даже если mtime и длина файла на диске совпали со старой версией. Отпечаток каталога
-            // сбрасывает кэш, когда меняется список статей: иначе дерево на старой странице не заметит.
-            // Отпечаток вида сбрасывает кэш при смене темы, схемы или фона: layout.html с ними
-            // отрисован внутри уже закэшированного html.
-            var html = cache.GetOrBuild(slug, row.ContentHash, theme.Version, CatalogFingerprint.Of(db),
-                                        settings.ViewFingerprint, () =>
+            // Content — content_hash из БД, а не отпечаток файла: PUT меняет хэш всегда, даже если
+            // mtime и длина файла на диске совпали со старой версией. Catalog сбрасывает кэш, когда
+            // меняется список статей: иначе дерево на старой странице этого не заметит.
+            var key = new PageKey(Content: row.ContentHash, Theme: theme.Version,
+                                  Catalog: CatalogFingerprint.Of(db), View: settings.ViewFingerprint);
+            var html = cache.GetOrBuild(slug, key, () =>
             {
                 var text = files.ReadMarkdown(slug)!;
                 var parsed = FrontMatterParser.Parse(text);
