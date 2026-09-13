@@ -156,11 +156,11 @@ public class PublishApiTests(DatabaseFixture database) : IDisposable
     public async Task Put_replaces_previous_version_and_removes_old_attachments()
     {
         var (_, client) = StartWithToken();
-        await client.PutAsync("/api/articles/s", Article("v1", ("old.png", [1])));
+        await client.PutAsync("/api/articles/st", Article("v1", ("old.png", [1])));
 
-        await client.PutAsync("/api/articles/s", Article("v2", ("new.png", [2])));
+        await client.PutAsync("/api/articles/st", Article("v2", ("new.png", [2])));
 
-        var folder = Path.Combine(dataRoot, "articles", "s");
+        var folder = Path.Combine(dataRoot, "articles", "st");
         Assert.Equal("v2", File.ReadAllText(Path.Combine(folder, "index.md")));
         Assert.True(File.Exists(Path.Combine(folder, "new.png")));
         Assert.False(File.Exists(Path.Combine(folder, "old.png")));
@@ -170,37 +170,37 @@ public class PublishApiTests(DatabaseFixture database) : IDisposable
     public async Task State_returns_slug_to_hash()
     {
         var (_, client) = StartWithToken();
-        await client.PutAsync("/api/articles/s", Article("текст"));
+        await client.PutAsync("/api/articles/st", Article("текст"));
 
         var state = await client.GetFromJsonAsync<Dictionary<string, string>>("/api/state");
 
         Assert.NotNull(state);
-        Assert.True(state!.ContainsKey("s"));
+        Assert.True(state!.ContainsKey("st"));
     }
 
     [Fact]
     public async Task Delete_removes_file_and_row()
     {
         var (factory, client) = StartWithToken();
-        await client.PutAsync("/api/articles/s", Article("текст"));
+        await client.PutAsync("/api/articles/st", Article("текст"));
 
-        var response = await client.DeleteAsync("/api/articles/s");
+        var response = await client.DeleteAsync("/api/articles/st");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.False(Directory.Exists(Path.Combine(dataRoot, "articles", "s")));
+        Assert.False(Directory.Exists(Path.Combine(dataRoot, "articles", "st")));
 
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
-        Assert.Empty(db.Articles.Where(article => article.Slug == "s"));
+        Assert.Empty(db.Articles.Where(article => article.Slug == "st"));
     }
 
     [Fact]
     public async Task Get_markdown_returns_source()
     {
         var (_, client) = StartWithToken();
-        await client.PutAsync("/api/articles/s", Article("---\ntitle: T\n---\nтело\n"));
+        await client.PutAsync("/api/articles/st", Article("---\ntitle: T\n---\nтело\n"));
 
-        var text = await client.GetStringAsync("/api/articles/s.md");
+        var text = await client.GetStringAsync("/api/articles/st.md");
 
         Assert.Contains("тело", text);
     }
@@ -210,7 +210,7 @@ public class PublishApiTests(DatabaseFixture database) : IDisposable
     {
         var (_, client) = StartWithToken();
 
-        var response = await client.PutAsync("/api/articles/s", Article("---\ntitle: [\n---\nx"));
+        var response = await client.PutAsync("/api/articles/st", Article("---\ntitle: [\n---\nx"));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Contains("фронтматтер", await response.Content.ReadAsStringAsync());
@@ -271,12 +271,12 @@ public class PublishApiTests(DatabaseFixture database) : IDisposable
         var (factory, api, login, password) = StartWithTokenAndOwner();
         var pages = await LoginPageClient(factory, login, password);
 
-        await api.PutAsync("/api/articles/s", Article("---\ntitle: T\n---\nверсия раз\n"));
-        var first = await pages.GetStringAsync("/s");
+        await api.PutAsync("/api/articles/st", Article("---\ntitle: T\n---\nверсия раз\n"));
+        var first = await pages.GetStringAsync("/st");
         Assert.Contains("версия раз", first);
 
-        await api.PutAsync("/api/articles/s", Article("---\ntitle: T\n---\nверсия два\n"));
-        var second = await pages.GetStringAsync("/s");
+        await api.PutAsync("/api/articles/st", Article("---\ntitle: T\n---\nверсия два\n"));
+        var second = await pages.GetStringAsync("/st");
 
         Assert.Contains("версия два", second);
         Assert.DoesNotContain("версия раз", second);

@@ -152,13 +152,13 @@ public class PageEndpointsTests : IDisposable
     [Fact]
     public async Task Serves_attachment_from_article_folder()
     {
-        WriteArticle("s", "---\ntitle: T\n---\n![[pic.png]]");
-        File.WriteAllBytes(Path.Combine(dataRoot, "articles", "s", "pic.png"), [1, 2, 3]);
+        WriteArticle("st", "---\ntitle: T\n---\n![[pic.png]]");
+        File.WriteAllBytes(Path.Combine(dataRoot, "articles", "st", "pic.png"), [1, 2, 3]);
         var factory = StartFactory();
-        Register(factory, "s", "T");
+        Register(factory, "st", "T");
         var client = LoginClient(factory);
 
-        var response = await client.GetAsync("/s/pic.png");
+        var response = await client.GetAsync("/st/pic.png");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("image/png", response.Content.Headers.ContentType?.MediaType);
@@ -169,7 +169,7 @@ public class PageEndpointsTests : IDisposable
     {
         var client = StartServer();
 
-        var response = await client.GetAsync("/s/..%2f..%2fappsettings.json");
+        var response = await client.GetAsync("/st/..%2f..%2fappsettings.json");
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -181,13 +181,13 @@ public class PageEndpointsTests : IDisposable
         File.WriteAllText(secret, "чужие данные");
         try
         {
-            WriteArticle("s", "---\ntitle: T\n---\nтекст\n");
-            File.CreateSymbolicLink(Path.Combine(dataRoot, "articles", "s", "leak.txt"), secret);
+            WriteArticle("st", "---\ntitle: T\n---\nтекст\n");
+            File.CreateSymbolicLink(Path.Combine(dataRoot, "articles", "st", "leak.txt"), secret);
             var factory = StartFactory();
-            Register(factory, "s", "T");
+            Register(factory, "st", "T");
             var client = LoginClient(factory);
 
-            var response = await client.GetAsync("/s/leak.txt");
+            var response = await client.GetAsync("/st/leak.txt");
 
             Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         }
@@ -214,21 +214,21 @@ public class PageEndpointsTests : IDisposable
     [Fact]
     public async Task Article_row_unchanged_serves_cached_page_even_if_file_on_disk_changed()
     {
-        WriteArticle("s", "---\ntitle: Old\n---\nold text \n");
-        var path = Path.Combine(dataRoot, "articles", "s", "index.md");
+        WriteArticle("st", "---\ntitle: Old\n---\nold text \n");
+        var path = Path.Combine(dataRoot, "articles", "st", "index.md");
         var writeTime = File.GetLastWriteTimeUtc(path);
         var factory = StartFactory();
-        Register(factory, "s", "Old");
+        Register(factory, "st", "Old");
         var client = LoginClient(factory);
 
-        var before = await client.GetStringAsync("/s");
+        var before = await client.GetStringAsync("/st");
         Assert.Contains("Old", before);
 
         // Edit bypasses PUT, so the row's content_hash (the cache key) never changes.
         File.WriteAllText(path, "---\ntitle: New\n---\nnew text \n");
         File.SetLastWriteTimeUtc(path, writeTime);
 
-        var after = await client.GetStringAsync("/s");
+        var after = await client.GetStringAsync("/st");
 
         // Cached html is byte-for-byte reused, but each response still gets a fresh real antiforgery
         // token substituted in (see PageEndpoints) — strip it out before comparing the rest.
@@ -247,19 +247,19 @@ public class PageEndpointsTests : IDisposable
         var api = StartApiClient(factory);
         var pagesClient = LoginClient(factory);
 
-        await api.PutAsync("/api/articles/s", Article("---\ntitle: T\n---\nversion one\n"));
-        var path = Path.Combine(dataRoot, "articles", "s", "index.md");
+        await api.PutAsync("/api/articles/st", Article("---\ntitle: T\n---\nversion one\n"));
+        var path = Path.Combine(dataRoot, "articles", "st", "index.md");
         var writeTime = File.GetLastWriteTimeUtc(path);
 
-        var first = await pagesClient.GetStringAsync("/s");
+        var first = await pagesClient.GetStringAsync("/st");
         Assert.Contains("version one", first);
 
-        await api.PutAsync("/api/articles/s", Article("---\ntitle: T\n---\nversion two\n"));
+        await api.PutAsync("/api/articles/st", Article("---\ntitle: T\n---\nversion two\n"));
         // "version two" is the same byte length as "version one" — force the mtime to collide too,
         // imitating coarse filesystem time resolution after Replace's Directory.Move.
         File.SetLastWriteTimeUtc(path, writeTime);
 
-        var second = await pagesClient.GetStringAsync("/s");
+        var second = await pagesClient.GetStringAsync("/st");
 
         Assert.Contains("version two", second);
         Assert.DoesNotContain("version one", second);

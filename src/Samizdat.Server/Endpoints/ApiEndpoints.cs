@@ -25,6 +25,8 @@ public static class ApiEndpoints
                                               ArticleFiles files, SamizdatDbContext db) =>
         {
             if (!ArticleFiles.IsValidSlug(slug)) return Results.BadRequest("Плохой slug");
+            if (ArticleFiles.IsReservedSlug(slug))
+                return Results.BadRequest($"{slug}: адрес /s/ занят ссылками для гостей, задайте другой slug");
 
             var form = await request.ReadFormAsync();
             var folder = form["folder"].ToString();

@@ -67,7 +67,7 @@ public class ErrorHandlingTests(DatabaseFixture database) : IDisposable
 
         try
         {
-            var response = await client.PutAsync("/api/articles/s", Article("текст"));
+            var response = await client.PutAsync("/api/articles/st", Article("текст"));
             var body = await response.Content.ReadAsStringAsync();
 
             Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);

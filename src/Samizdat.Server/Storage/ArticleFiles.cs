@@ -10,6 +10,9 @@ public sealed class ArticleFiles(string dataRoot)
     public static bool IsValidSlug(string slug)
         => slug.Length > 0 && slug == Path.GetFileName(slug) && !slug.StartsWith('.');
 
+    /// Адрес /s/ отдан ссылкам для гостей: статья с таким slug была бы недоступна.
+    public static bool IsReservedSlug(string slug) => slug == "s";
+
     /// Путь папки в вольте: сегменты через "/", без выхода вверх и без пустых сегментов.
     public static bool IsValidFolder(string folder)
         => folder.Length == 0

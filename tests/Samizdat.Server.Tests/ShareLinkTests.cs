@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
@@ -47,6 +48,35 @@ public class ShareLinkTests : IDisposable
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
         await client.PostAsync("/login", new FormUrlEncodedContent(
             new Dictionary<string, string> { ["login"] = login, ["password"] = "тайна" }));
+        return client;
+    }
+
+    // Bearer-клиент на тот же factory: нужен, чтобы прогнать PUT /api/articles рядом с cookie-чтением страницы.
+    HttpClient StartApiClient(WebApplicationFactory<Program> factory)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+        var owner = new UserRow
+        {
+            Login = $"owner-{Guid.NewGuid():N}",
+            PasswordHash = PasswordHasher.Hash("тайна"),
+            Role = UserRole.Owner,
+            CreatedAt = DateTimeOffset.UtcNow,
+        };
+        db.Users.Add(owner);
+        db.SaveChanges();
+
+        var token = ApiToken.Create();
+        db.ApiTokens.Add(new ApiTokenRow
+        {
+            UserId = owner.Id,
+            TokenHash = ApiToken.HashOf(token),
+            CreatedAt = DateTimeOffset.UtcNow,
+        });
+        db.SaveChanges();
+
+        var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         return client;
     }
 
@@ -391,5 +421,21 @@ public class ShareLinkTests : IDisposable
         }));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Article_with_the_reserved_slug_is_refused()
+    {
+        using var factory = StartFactory();
+        var client = StartApiClient(factory);
+
+        var form = new MultipartFormDataContent
+        {
+            { new ByteArrayContent("---\ntitle: Про ежей\n---\nТекст."u8.ToArray()), "index.md", "index.md" },
+        };
+        var response = await client.PutAsync("/api/articles/s", form);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains("/s/", await response.Content.ReadAsStringAsync());
     }
 }
