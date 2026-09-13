@@ -9,6 +9,7 @@ public sealed class ArticleRenderer
     readonly MarkdownPipeline pipeline = new MarkdownPipelineBuilder()
         .UseAdvancedExtensions()
         .UseColorCode()
+        .Use<WikiLinkExtension>()
         .Build();
 
     /// slug нужен, чтобы собрать путь к вложениям статьи.
@@ -19,6 +20,7 @@ public sealed class ArticleRenderer
         using var writer = new StringWriter();
         var renderer = new HtmlRenderer(writer);
         pipeline.Setup(renderer);
+        renderer.ObjectRenderers.Insert(0, new WikiLinkRenderer(slug, articles));
         renderer.Render(document);
         writer.Flush();
         return writer.ToString();
