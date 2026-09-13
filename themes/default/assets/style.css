@@ -79,6 +79,8 @@ main { max-width: 44rem; margin: 0 auto; padding: 1rem 1.25rem 4rem; }
   gap: 2rem;
 }
 .shell main { max-width: none; margin: 0; padding: 1.5rem 0 4rem; }
+/* Без дерева нет первой колонки грида — пока фрост-стекло не пришло в Task 7, едем в один столбец. */
+.shell-plain { grid-template-columns: minmax(0, 1fr); }
 
 .sidebar { border-right: 1px solid var(--line); }
 .sidebar > details > summary { display: none; }

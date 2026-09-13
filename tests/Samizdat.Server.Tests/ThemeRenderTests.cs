@@ -107,4 +107,33 @@ public class ThemeRenderTests : IDisposable
         Assert.Contains(".callout", css);
         Assert.Contains("pre", css);
     }
+
+    [Fact]
+    public async Task The_page_with_navigation_puts_the_tree_and_the_article_in_one_panel()
+    {
+        var factory = StartFactory();
+        var client = LoginClient(factory);
+
+        var html = await client.GetStringAsync("/");
+
+        Assert.Contains("class=\"shell\"", html);
+        Assert.DoesNotContain("shell-plain", html);
+        // Дерево и статья должны быть в одной обёртке, а не просто где-то на странице:
+        // .shell в разметке ровно один, всё между его открытием и футером — внутри него.
+        var shellStart = html.IndexOf("<div class=\"shell\">", StringComparison.Ordinal);
+        var shellEnd = html.IndexOf("<footer", shellStart, StringComparison.Ordinal);
+        Assert.True(shellStart >= 0 && shellEnd > shellStart);
+        var shell = html[shellStart..shellEnd];
+        Assert.Contains("nav-tree", shell);
+        Assert.Contains("<main>", shell);
+    }
+
+    [Fact]
+    public async Task The_login_page_gets_the_same_panel_without_the_tree()
+    {
+        var html = await StartFactory().CreateClient().GetStringAsync("/login");
+
+        Assert.Contains("<div class=\"shell shell-plain\">", html);
+        Assert.DoesNotContain("nav-tree", html);
+    }
 }

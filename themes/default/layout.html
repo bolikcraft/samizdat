@@ -20,8 +20,9 @@
   </details>
   {{ end }}
 </header>
-{{ if nav }}
-<div class="shell">
+{{~## Панель есть на любой странице; без дерева она просто без бокового столбца — shell-plain. ##~}}
+<div class="shell{{ if !nav }} shell-plain{{ end }}">
+  {{ if nav }}
   <aside class="sidebar">
     <details open>
       <summary>Статьи</summary>
@@ -31,11 +32,9 @@
       </div>
     </details>
   </aside>
+  {{ end }}
   <main>{{ content }}</main>
 </div>
-{{ else }}
-<main>{{ content }}</main>
-{{ end }}
 <footer class="bottom">Samizdat</footer>
 <script src="/assets/sidebar.js" defer></script>
 </body></html>
