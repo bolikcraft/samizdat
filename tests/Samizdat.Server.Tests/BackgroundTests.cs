@@ -140,10 +140,9 @@ public class BackgroundTests : IDisposable
             new Dictionary<string, string> { ["login"] = "aleks", ["password"] = "тайна" }));
         var html = await client.GetStringAsync("/");
 
-        // Одна проверка вместо двух: подтверждает и что ссылка есть, и что вокруг нет ничего
-        // лишнего (скажем, утёкшего в разметку комментария темы) — так её нельзя обмануть,
-        // просто переформулировав соседний комментарий в layout.html.
-        Assert.Contains("<style>:root { --bg-image: url(\"/background?v=", html);
+        // Вместе с соседней строкой: комментарий темы, утёкший в разметку, встанет между ними
+        // и уронит проверку. Без этого Assert.Contains о том, что стоит перед <style>, молчит.
+        Assert.Contains("<link rel=\"stylesheet\" href=\"/assets/style.css\">\n<style>:root { --bg-image: url(\"/background?v=", html);
     }
 
     [Fact]
@@ -275,18 +274,19 @@ public class BackgroundTests : IDisposable
         Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/background")).StatusCode);
     }
 
-    // Тело намного больше даже многочастной обёртки: должно упасть на пределе Kestrel для этого
-    // маршрута (RequestSizeLimit), а не докатиться до ReadFormAsync и превратиться в 500.
+    // Картинка мала, а тело большое: отказ должен прийти от фильтра по Content-Length, до чтения
+    // формы. Проверку самого файла такой запрос проходит, так что зелёным тест остаётся только
+    // с фильтром — без него форма читается и фон сохраняется.
     [Fact]
-    public async Task A_body_far_past_the_wire_limit_still_lands_on_the_message_not_a_crash()
+    public async Task A_body_past_the_limit_is_refused_before_the_form_is_read()
     {
         var factory = StartFactory();
         var client = await OwnerClient(factory);
         var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
-        var huge = new byte[20 * 1024 * 1024];
-        Jpeg().CopyTo(huge, 0);
+        var content = Upload(name, value, Jpeg(), "wall.jpg");
+        content.Add(new StringContent(new string('x', 9 * 1024 * 1024)), "junk");
 
-        var response = await client.PostAsync("/settings/background", Upload(name, value, huge, "wall.jpg"));
+        var response = await client.PostAsync("/settings/background", content);
 
         Assert.Contains("err=background_too_big", response.RequestMessage!.RequestUri!.ToString());
         Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/background")).StatusCode);

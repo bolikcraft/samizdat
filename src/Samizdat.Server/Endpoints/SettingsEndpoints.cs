@@ -13,8 +13,8 @@ public static class SettingsEndpoints
 {
     const long MaxBackgroundBytes = 8 * 1024 * 1024;
 
-    // Многочастная форма добавляет к файлу границы и заголовки полей — запас с лихвой их перекрывает,
-    // но остаётся далеко ниже, чем стандартный предел Kestrel на тело запроса (30 МБ), от которого и защищаемся.
+    // Многочастная форма добавляет к файлу границы и заголовки полей — запас с лихвой их перекрывает.
+    // Предел стоит на всём теле: такое тело мы отказываемся буферизовать, даже не начиная читать.
     const long MaxBackgroundRequestBytes = MaxBackgroundBytes + 64 * 1024;
 
     public static void MapSettings(this WebApplication app)
@@ -114,10 +114,15 @@ public static class SettingsEndpoints
             {
                 form = await context.Request.ReadFormAsync();
             }
-            catch (Exception e) when (e is BadHttpRequestException or InvalidDataException)
+            catch (BadHttpRequestException)
             {
-                // Тело больше лимита: Kestrel обрывает чтение сам, не дав ReadFormAsync его додержать.
+                // Тело больше лимита: Kestrel обрывает чтение сам, не дав ReadFormAsync его дочитать.
                 return Results.Redirect("/settings?err=background_too_big");
+            }
+            catch (InvalidDataException)
+            {
+                // Форма нечитаема: оборванная граница, слишком много полей, слишком длинный ключ.
+                return Results.Redirect("/settings?err=background_form");
             }
 
             var upload = form.Files["file"];
@@ -133,7 +138,7 @@ public static class SettingsEndpoints
             stream.Position = 0;
             settings.Set("theme.background", background.Save(stream, extension));
             return Results.Redirect("/settings?ok=background");
-        }).RequireValidToken();
+        }).RefuseAnOversizedBody().RequireValidToken();
 
         group.MapPost("/background/remove", (SiteSettings settings, BackgroundFile background) =>
         {
@@ -164,6 +169,16 @@ public static class SettingsEndpoints
             return Results.Redirect("/settings?ok=link_revoked");
         }).RequireValidToken();
     }
+
+    /// Отсеивает слишком большое тело по Content-Length, ничего не читая.
+    // Обязан стоять до RequireValidToken: тот ради токена читает многочастную форму сам, Kestrel
+    // обрывает чтение прямо в нём, и владелец получает голый 400 вместо сообщения про 8 МБ.
+    // [RequestSizeLimit] на маршруте оставлен: он ловит тело без Content-Length (chunked).
+    static RouteHandlerBuilder RefuseAnOversizedBody(this RouteHandlerBuilder builder)
+        => builder.AddEndpointFilter(async (invocation, next) =>
+            invocation.HttpContext.Request.ContentLength > MaxBackgroundRequestBytes
+                ? Results.Redirect("/settings?err=background_too_big")
+                : await next(invocation));
 
     static UserRow CurrentUser(SamizdatDbContext db, ClaimsPrincipal user)
         => db.Users.First(row => row.Login == user.Identity!.Name);
