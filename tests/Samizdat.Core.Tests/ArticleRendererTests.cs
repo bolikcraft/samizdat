@@ -8,7 +8,28 @@ public class ArticleRendererTests
 
     [Fact]
     public void Renders_headings_and_paragraphs()
-        => Assert.Contains("<h1>Заголовок</h1>", renderer.Render("# Заголовок\n\nтекст", "s", NoArticles.Instance));
+    {
+        var html = renderer.Render("# Заголовок\n\nтекст", "s", NoArticles.Instance);
+
+        Assert.Contains("<h1", html);
+        Assert.Contains("Заголовок</h1>", html);
+    }
+
+    [Fact]
+    public void Renders_footnotes()
+    {
+        var html = renderer.Render("текст[^1]\n\n[^1]: примечание", "s", NoArticles.Instance);
+
+        Assert.Contains("href=\"#fn:1\"", html);
+    }
+
+    [Fact]
+    public void Renders_bare_urls_as_links()
+    {
+        var html = renderer.Render("см. https://example.com", "s", NoArticles.Instance);
+
+        Assert.Contains("<a href=\"https://example.com\"", html);
+    }
 
     [Fact]
     public void Renders_tables()

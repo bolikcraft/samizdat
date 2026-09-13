@@ -6,11 +6,8 @@ namespace Samizdat.Core.Rendering;
 
 public sealed class ArticleRenderer
 {
-    // Не UseAdvancedExtensions(): он тянет автогенерацию id для заголовков,
-    // а нам нужны только таблицы, списки задач и подсветка кода.
     readonly MarkdownPipeline pipeline = new MarkdownPipelineBuilder()
-        .UsePipeTables()
-        .UseTaskLists()
+        .UseAdvancedExtensions()
         .UseColorCode()
         .Build();
 
