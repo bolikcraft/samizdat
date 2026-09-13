@@ -257,3 +257,8 @@ blockquote { margin: 1.2rem 0; padding-left: 1rem; border-left: 4px solid var(--
   background: none; color: var(--danger); border: 1px solid var(--danger); border-radius: 4px;
 }
 .tokens .inline-form button:hover { background: var(--danger); color: var(--bg); }
+
+.share { margin-top: 2rem; }
+.share > summary { cursor: pointer; }
+.share-form { display: flex; flex-wrap: wrap; gap: .75rem; align-items: end; margin-top: .75rem; }
+.share-form label { display: flex; flex-direction: column; gap: .25rem; }

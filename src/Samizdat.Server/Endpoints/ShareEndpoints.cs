@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.StaticFiles;
 using Samizdat.Core;
 using Samizdat.Core.Rendering;
 using Samizdat.Core.Themes;
+using Samizdat.Server.Auth;
 using Samizdat.Server.Data;
 using Samizdat.Server.Rendering;
 using Samizdat.Server.Storage;
@@ -71,7 +72,36 @@ public static class ShareEndpoints
             var type = ContentTypes.TryGetContentType(path, out var found) ? found : "application/octet-stream";
             return Results.File(path, type);
         }).AllowAnonymous();
+
+        app.MapPost("/share", async (HttpContext context, SamizdatDbContext db) =>
+        {
+            var form = await context.Request.ReadFormAsync();
+            var slug = form["slug"].ToString();
+            var note = form["note"].ToString().Trim();
+
+            if (!int.TryParse(form["days"], out var days) || !AllowedDays.Contains(days))
+                return Results.BadRequest();
+            if (note.Length > 200) return Results.BadRequest();
+            if (db.Articles.Find(slug) is null) return Results.NotFound();
+
+            var link = new ShareLinkRow
+            {
+                Token = ShareToken.Create(),
+                Slug = slug,
+                Note = note.Length == 0 ? null : note,
+                CreatedAt = DateTimeOffset.UtcNow,
+                ExpiresAt = days == 0 ? null : DateTimeOffset.UtcNow.AddDays(days),
+            };
+            db.ShareLinks.Add(link);
+            db.SaveChanges();
+
+            // Готовый урл показываем в настройках: та страница не кэшируется, там же список и отзыв.
+            return Results.Redirect($"/settings#link-{link.Id}");
+        }).RequireAuthorization(policy => policy.RequireRole(nameof(UserRole.Owner))).RequireValidToken();
     }
+
+    // День, неделя, месяц, год и «без срока»: другие значения формой не выдаются и не принимаются.
+    static readonly int[] AllowedDays = [0, 1, 7, 30, 365];
 
     // Base вложений в кэшированном html — плейсхолдер: html один на статью, а токен у каждой ссылки свой.
     internal const string AttachmentBase = "__SHARE_BASE__/";

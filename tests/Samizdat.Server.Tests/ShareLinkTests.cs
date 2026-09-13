@@ -285,4 +285,111 @@ public class ShareLinkTests : IDisposable
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
+
+    [Fact]
+    public async Task Owner_creates_a_link_from_the_article_page()
+    {
+        using var factory = StartFactory();
+        WriteArticle("statya", "Текст статьи.");
+        RegisterArticle(factory, "statya", "Про ежей");
+        var client = await LoginClient(factory);
+
+        var page = await client.GetStringAsync("/statya");
+        var antiforgery = AntiforgeryToken(page);
+        var response = await client.PostAsync("/share", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            [antiforgery.Name] = antiforgery.Value,
+            ["slug"] = "statya",
+            ["days"] = "7",
+            ["note"] = "Пете",
+        }));
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+        var link = db.ShareLinks.Single();
+        Assert.Equal("statya", link.Slug);
+        Assert.Equal("Пете", link.Note);
+        Assert.NotNull(link.ExpiresAt);
+        Assert.InRange(link.ExpiresAt!.Value, DateTimeOffset.UtcNow.AddDays(6), DateTimeOffset.UtcNow.AddDays(8));
+        Assert.Equal($"/settings#link-{link.Id}", response.Headers.Location!.OriginalString);
+    }
+
+    [Fact]
+    public async Task Link_without_a_term_has_no_expiry()
+    {
+        using var factory = StartFactory();
+        WriteArticle("statya", "Текст статьи.");
+        RegisterArticle(factory, "statya", "Про ежей");
+        var client = await LoginClient(factory);
+
+        var antiforgery = AntiforgeryToken(await client.GetStringAsync("/statya"));
+        await client.PostAsync("/share", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            [antiforgery.Name] = antiforgery.Value,
+            ["slug"] = "statya",
+            ["days"] = "0",
+        }));
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+        Assert.Null(db.ShareLinks.Single().ExpiresAt);
+    }
+
+    [Fact]
+    public async Task Strange_term_and_unknown_article_are_refused()
+    {
+        using var factory = StartFactory();
+        WriteArticle("statya", "Текст статьи.");
+        RegisterArticle(factory, "statya", "Про ежей");
+        var client = await LoginClient(factory);
+        var antiforgery = AntiforgeryToken(await client.GetStringAsync("/statya"));
+
+        var strangeTerm = await client.PostAsync("/share", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            [antiforgery.Name] = antiforgery.Value, ["slug"] = "statya", ["days"] = "3",
+        }));
+        var unknownArticle = await client.PostAsync("/share", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            [antiforgery.Name] = antiforgery.Value, ["slug"] = "net-takoy", ["days"] = "7",
+        }));
+
+        Assert.Equal(HttpStatusCode.BadRequest, strangeTerm.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, unknownArticle.StatusCode);
+    }
+
+    [Fact]
+    public async Task Anonymous_cannot_create_a_link()
+    {
+        using var factory = StartFactory();
+        WriteArticle("statya", "Текст статьи.");
+        RegisterArticle(factory, "statya", "Про ежей");
+
+        var client = factory.CreateClient();
+        var response = await client.PostAsync("/share", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["slug"] = "statya", ["days"] = "7",
+        }));
+
+        Assert.NotEqual(HttpStatusCode.Redirect, response.StatusCode);
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+        Assert.Empty(db.ShareLinks);
+    }
+
+    [Fact]
+    public async Task Post_without_antiforgery_token_is_refused()
+    {
+        using var factory = StartFactory();
+        WriteArticle("statya", "Текст статьи.");
+        RegisterArticle(factory, "statya", "Про ежей");
+        var client = await LoginClient(factory);
+
+        var response = await client.PostAsync("/share", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["slug"] = "statya", ["days"] = "7",
+        }));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
 }
