@@ -9,8 +9,15 @@ public static class ServerCommands
     /// Вызывается до запуска веб-сервера. true — команда обработана, сервер стартовать не нужно.
     public static async Task<bool> TryRun(string[] args, IServiceProvider services)
     {
-        if (args is ["owner", "set", var login, var password])
+        if (args is ["owner", "set", ..])
         {
+            // После логина и пароля могут идти аргументы конфигурации, как у "token new".
+            if (args is not [_, _, var login, var password, ..])
+            {
+                Console.Error.WriteLine("owner set <логин> <пароль>");
+                return true;
+            }
+
             using var scope = services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
             await db.Database.MigrateAsync();
