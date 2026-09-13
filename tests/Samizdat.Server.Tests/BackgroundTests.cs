@@ -116,9 +116,9 @@ public class BackgroundTests : IDisposable
         Assert.DoesNotContain("/background", html);
     }
 
-    /// Настройка ещё указывает на файл, но его успели убрать между File.Exists и File.OpenRead
-    /// внутри BackgroundFile.Open (или его снесли конкурентной заменой фона) — маршрут должен
-    /// ответить 404, а не уронить запрос с 500.
+    /// Настройка указывает на файл, которого уже нет на диске. Тут отработает File.Exists внутри
+    /// Open, а не catch маршрута — саму гонку Exists/OpenRead юнит-тестом не воспроизвести детерминированно,
+    /// но catch (IOException) в маршруте остаётся защитой на этот случай.
     [Fact]
     public async Task A_file_removed_behind_the_servers_back_gives_not_found_not_a_crash()
     {
