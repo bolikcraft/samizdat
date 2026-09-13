@@ -27,6 +27,87 @@ main { max-width: 44rem; margin: 0 auto; padding: 1rem 1.25rem 4rem; }
 .top a { color: var(--fg); font-family: system-ui, sans-serif; font-weight: bold; text-decoration: none; }
 .bottom { border-top: 1px solid var(--line); font-size: 0.9rem; }
 
+/* Боковик: две колонки от 720px, ниже — одна колонка со сворачиваемым блоком сверху. */
+.shell {
+  max-width: 64rem;
+  margin: 0 auto;
+  padding: 0 1.25rem;
+  display: grid;
+  grid-template-columns: 16rem minmax(0, 1fr);
+  align-items: start;
+  gap: 2rem;
+}
+.shell main { max-width: none; margin: 0; padding: 1.5rem 0 4rem; }
+
+.sidebar { border-right: 1px solid var(--line); }
+.sidebar > details > summary { display: none; }
+.sidebar-body {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  max-height: 100vh;
+  padding: 1.5rem 1rem 1rem 0;
+}
+
+#nav-filter {
+  width: 100%;
+  padding: 0.4rem 0.6rem;
+  font: inherit;
+  font-size: 0.9rem;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+
+#nav-tree {
+  overflow-y: auto;
+  font-family: system-ui, sans-serif;
+  font-size: 0.92rem;
+}
+#nav-tree [hidden] { display: none; }
+
+.nav-folder summary {
+  cursor: pointer;
+  padding: 0.25rem 0;
+  list-style: none;
+  color: var(--muted);
+}
+.nav-folder summary::-webkit-details-marker { display: none; }
+.nav-folder summary::before { content: "▸ "; }
+.nav-folder[open] > summary::before { content: "▾ "; }
+.nav-folder .nav-folder, .nav-folder .nav-articles { padding-left: 0.9rem; }
+
+.nav-articles { list-style: none; margin: 0; padding: 0; }
+.nav-articles li { margin: 0.1rem 0; }
+.nav-articles a {
+  display: block;
+  padding: 0.15rem 0.35rem;
+  border-radius: 4px;
+  color: var(--fg);
+  text-decoration: none;
+  overflow-wrap: break-word;
+}
+.nav-articles a:hover { background: var(--callout); }
+/* Подсветка текущей статьи: акцентный фон, контраст держится и в светлой, и в тёмной палитре. */
+.nav-articles a[aria-current="page"] { background: var(--accent); color: var(--bg); font-weight: bold; }
+
+@media (max-width: 720px) {
+  .shell { display: block; padding: 0; max-width: none; }
+  .shell main { padding: 1rem 1.25rem 4rem; }
+  .sidebar { border-right: none; border-bottom: 1px solid var(--line); }
+  .sidebar > details > summary {
+    display: block;
+    cursor: pointer;
+    padding: 0.75rem 1.25rem;
+    font-family: system-ui, sans-serif;
+    font-weight: bold;
+  }
+  .sidebar-body { position: static; max-height: none; padding: 0 1.25rem 1rem; }
+}
+
 h1, h2, h3, h4 { font-family: system-ui, sans-serif; line-height: 1.25; }
 p, li { overflow-wrap: break-word; }
 a { color: var(--accent); }

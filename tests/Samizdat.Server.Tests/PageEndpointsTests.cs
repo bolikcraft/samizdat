@@ -262,21 +262,22 @@ public class PageEndpointsTests : IDisposable
     public async Task Editing_theme_file_invalidates_cached_page()
     {
         WriteArticle("privet", "---\ntitle: Привет\n---\nтекст\n");
-        WriteThemeFile("article.html", "old<h1>{{ article.title }}</h1>{{ article.html }}");
+        // Маркеры не должны быть словами из разметки макета (например, "placeholder" содержит "old").
+        WriteThemeFile("article.html", "markerOld<h1>{{ article.title }}</h1>{{ article.html }}");
         var factory = StartFactory();
         Register(factory, "privet", "Привет");
         var client = LoginClient(factory);
 
         var before = await client.GetStringAsync("/privet");
-        Assert.Contains("old", before);
+        Assert.Contains("markerOld", before);
 
         // File.GetLastWriteTimeUtc has 1-tick granularity on some filesystems; sleep to force a new value.
         await Task.Delay(20);
-        WriteThemeFile("article.html", "new<h1>{{ article.title }}</h1>{{ article.html }}");
+        WriteThemeFile("article.html", "markerNew<h1>{{ article.title }}</h1>{{ article.html }}");
         var after = await client.GetStringAsync("/privet");
 
-        Assert.Contains("new", after);
-        Assert.DoesNotContain("old", after);
+        Assert.Contains("markerNew", after);
+        Assert.DoesNotContain("markerOld", after);
     }
 
     public void Dispose() => Directory.Delete(dataRoot, recursive: true);

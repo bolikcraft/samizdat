@@ -232,5 +232,115 @@ public class NavigationTests : IDisposable
         Assert.DoesNotContain("Alpha", html);
     }
 
+    [Fact]
+    public async Task Sidebar_is_present_on_the_index_and_article_pages()
+    {
+        WriteArticle("a", "---\ntitle: Alpha\n---\nтекст\n");
+        var factory = StartFactory();
+        Register(factory, "a", "Alpha");
+        var client = LoginClient(factory);
+
+        var index = await client.GetStringAsync("/");
+        var article = await client.GetStringAsync("/a");
+
+        Assert.Contains("<aside class=\"sidebar\"", index);
+        Assert.Contains("<aside class=\"sidebar\"", article);
+    }
+
+    [Fact]
+    public async Task Folder_is_rendered_as_a_details_element()
+    {
+        WriteArticle("immich", "---\ntitle: Immich\n---\nтекст\n");
+        var factory = StartFactory();
+        Register(factory, "immich", "Immich", folder: "PROXMOX");
+        var client = LoginClient(factory);
+
+        var html = await client.GetStringAsync("/immich");
+
+        Assert.Contains("<details class=\"nav-folder\" data-path=\"PROXMOX\"", html);
+    }
+
+    [Fact]
+    public async Task Folder_holding_the_current_article_is_open()
+    {
+        WriteArticle("immich", "---\ntitle: Immich\n---\nтекст\n");
+        var factory = StartFactory();
+        Register(factory, "immich", "Immich", folder: "PROXMOX");
+        var client = LoginClient(factory);
+
+        var html = await client.GetStringAsync("/immich");
+
+        Assert.Contains("data-path=\"PROXMOX\" open>", html);
+    }
+
+    [Fact]
+    public async Task Folder_without_the_current_article_stays_closed()
+    {
+        WriteArticle("a", "---\ntitle: Alpha\n---\nтекст\n");
+        WriteArticle("immich", "---\ntitle: Immich\n---\nтекст\n");
+        var factory = StartFactory();
+        Register(factory, "a", "Alpha");
+        Register(factory, "immich", "Immich", folder: "PROXMOX");
+        var client = LoginClient(factory);
+
+        var html = await client.GetStringAsync("/a");
+
+        Assert.Contains("data-path=\"PROXMOX\">", html);
+        Assert.DoesNotContain("data-path=\"PROXMOX\" open>", html);
+    }
+
+    [Fact]
+    public async Task Sidebar_has_a_search_filter_field()
+    {
+        WriteArticle("a", "---\ntitle: Alpha\n---\nтекст\n");
+        var factory = StartFactory();
+        Register(factory, "a", "Alpha");
+        var client = LoginClient(factory);
+
+        var html = await client.GetStringAsync("/");
+
+        Assert.Contains("type=\"search\"", html);
+    }
+
+    [Fact]
+    public async Task Sidebar_script_is_linked_on_the_page()
+    {
+        WriteArticle("a", "---\ntitle: Alpha\n---\nтекст\n");
+        var factory = StartFactory();
+        Register(factory, "a", "Alpha");
+        var client = LoginClient(factory);
+
+        var html = await client.GetStringAsync("/");
+
+        Assert.Contains("/assets/sidebar.js", html);
+    }
+
+    [Fact]
+    public async Task Sidebar_script_file_is_served()
+    {
+        WriteArticle("a", "---\ntitle: Alpha\n---\nтекст\n");
+        var factory = StartFactory();
+        Register(factory, "a", "Alpha");
+        var client = LoginClient(factory);
+
+        var response = await client.GetAsync("/assets/sidebar.js");
+
+        Assert.Equal(System.Net.HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Article_title_is_escaped_in_the_menu()
+    {
+        WriteArticle("a", "---\ntitle: Alpha\n---\nтекст\n");
+        var factory = StartFactory();
+        Register(factory, "a", "<script>alert(1)</script>");
+        var client = LoginClient(factory);
+
+        var html = await client.GetStringAsync("/");
+
+        Assert.DoesNotContain("<script>alert(1)</script>", html);
+        Assert.Contains("&lt;script&gt;alert(1)&lt;/script&gt;", html);
+    }
+
     public void Dispose() => Directory.Delete(dataRoot, recursive: true);
 }

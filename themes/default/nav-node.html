@@ -1,0 +1,11 @@
+{{ for folder in $node.folders }}
+<details class="nav-folder" data-path="{{ folder.path | html.escape }}"{{ if folder.has_current }} open{{ end }}>
+  <summary>{{ folder.name | html.escape }}</summary>
+  {{ include 'nav-node' node: folder }}
+</details>
+{{ end }}
+<ul class="nav-articles">
+  {{ for article in $node.articles }}
+  <li><a href="/{{ article.slug | html.escape }}"{{ if article.is_current }} aria-current="page"{{ end }}>{{ article.title | html.escape }}</a></li>
+  {{ end }}
+</ul>

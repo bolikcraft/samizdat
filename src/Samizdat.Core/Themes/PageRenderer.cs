@@ -1,6 +1,8 @@
 using System.Collections.Concurrent;
 using Scriban;
+using Scriban.Parsing;
 using Scriban.Runtime;
+using Scriban.Syntax;
 
 namespace Samizdat.Core.Themes;
 
@@ -23,9 +25,18 @@ public sealed class PageRenderer(IThemeSource theme)
         var template = cache.GetOrAdd((name, theme.Version), key => Parse(key.Path));
 
         var script = ToScriptObject(model);
-        var context = new TemplateContext { MemberRenamer = member => member.Name };
+        var context = new TemplateContext { MemberRenamer = member => member.Name, TemplateLoader = new IncludeLoader(theme) };
         context.PushGlobal(script);
-        return template.Render(context);
+        try
+        {
+            return template.Render(context);
+        }
+        // Ошибка внутри include (файла нет, синтаксис сломан, рекурсия ушла за предел Scriban) —
+        // это тоже поломка темы, репортим так же, как ошибки самого верхнего шаблона.
+        catch (ScriptRuntimeException error)
+        {
+            throw new ThemeException($"Шаблон {name}: {error.OriginalMessage}");
+        }
     }
 
     // Scriban читает вложенные объекты только через ScriptObject/IScriptObject,
@@ -49,5 +60,22 @@ public sealed class PageRenderer(IThemeSource theme)
         if (template.HasErrors)
             throw new ThemeException($"Шаблон {name}: {string.Join("; ", template.Messages)}");
         return template;
+    }
+
+    // Отдаёт файлы темы функции include, чтобы шаблон мог звать себя же для вложенных папок
+    // (рекурсивное дерево). Расширение можно не указывать: сперва пробуем имя как есть.
+    // Глубина ограничена Scriban'ом (TemplateContext.RecursiveLimit) — зациклиться нельзя.
+    sealed class IncludeLoader(IThemeSource theme) : ITemplateLoader
+    {
+        public string? GetPath(TemplateContext context, SourceSpan callerSpan, string templateName)
+            => Resolve(templateName) is null ? null : templateName;
+
+        public string? Load(TemplateContext context, SourceSpan callerSpan, string templatePath)
+            => Resolve(templatePath);
+
+        public ValueTask<string?> LoadAsync(TemplateContext context, SourceSpan callerSpan, string templatePath)
+            => new(Load(context, callerSpan, templatePath));
+
+        string? Resolve(string name) => theme.ReadText(name) ?? theme.ReadText($"{name}.html");
     }
 }

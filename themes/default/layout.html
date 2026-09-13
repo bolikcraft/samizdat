@@ -6,24 +6,21 @@
 <body>
 <header class="top"><a href="/">{{ site.title | html.escape }}</a></header>
 {{ if nav }}
-<!-- Черновая разметка дерева: Task 5 заменит её на боковик с рекурсивным include. -->
-<nav id="nav-tree">
-  <ul>
-  {{ for article in nav.articles }}
-    <li><a href="/{{ article.slug | html.escape }}"{{ if article.is_current }} aria-current="page"{{ end }}>{{ article.title | html.escape }}</a></li>
-  {{ end }}
-  {{ for folder in nav.folders }}
-    <li data-path="{{ folder.path | html.escape }}">{{ folder.name | html.escape }}
-      <ul>
-      {{ for article in folder.articles }}
-        <li><a href="/{{ article.slug | html.escape }}"{{ if article.is_current }} aria-current="page"{{ end }}>{{ article.title | html.escape }}</a></li>
-      {{ end }}
-      </ul>
-    </li>
-  {{ end }}
-  </ul>
-</nav>
-{{ end }}
+<div class="shell">
+  <aside class="sidebar">
+    <details open>
+      <summary>Статьи</summary>
+      <div class="sidebar-body">
+        <input type="search" id="nav-filter" placeholder="Фильтр по заголовку" autocomplete="off">
+        <nav id="nav-tree">{{ include 'nav-node' node: nav }}</nav>
+      </div>
+    </details>
+  </aside>
+  <main>{{ content }}</main>
+</div>
+{{ else }}
 <main>{{ content }}</main>
+{{ end }}
 <footer class="bottom">Samizdat</footer>
+<script src="/assets/sidebar.js" defer></script>
 </body></html>
