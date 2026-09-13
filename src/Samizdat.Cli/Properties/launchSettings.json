@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "push --dry-run": {
+      "commandName": "Project",
+      "commandLineArgs": "push --dry-run"
+    },
+    "push": {
+      "commandName": "Project",
+      "commandLineArgs": "push"
+    },
+    "push --prune": {
+      "commandName": "Project",
+      "commandLineArgs": "push --prune"
+    },
+    "login": {
+      "commandName": "Project",
+      "commandLineArgs": "login"
+    }
+  }
+}

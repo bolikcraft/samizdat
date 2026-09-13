@@ -37,6 +37,7 @@ a { color: var(--accent); }
 .articles li:first-child { padding-top: 0; }
 .articles a { font-size: 1.1rem; font-weight: bold; text-decoration: none; }
 .articles a:hover { text-decoration: underline; }
+.articles .date { margin-top: 0.2rem; }
 .articles p { margin: 0.3rem 0 0; color: var(--muted); }
 
 pre, code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 0.9rem; }

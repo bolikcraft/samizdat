@@ -15,6 +15,7 @@ TestResults/
 appsettings.Development.json
 appsettings.Local.json
 .env
+.env.local
 *.pfx
 
 # Данные запуска: заметки, вложения, дампы

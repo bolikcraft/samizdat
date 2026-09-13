@@ -3,7 +3,7 @@
 {{ for item in articles }}
   <li>
     <a href="/{{ item.slug | html.escape }}">{{ item.title | html.escape }}</a>
-    {{ if item.date }}<span class="date">{{ item.date | html.escape }}</span>{{ end }}
+    {{ if item.date }}<div class="date">{{ item.date | html.escape }}</div>{{ end }}
     {{ if item.description }}<p>{{ item.description | html.escape }}</p>{{ end }}
   </li>
 {{ end }}
