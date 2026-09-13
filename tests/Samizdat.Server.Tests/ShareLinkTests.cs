@@ -442,6 +442,23 @@ public class ShareLinkTests : IDisposable
     }
 
     [Fact]
+    public async Task Share_without_a_slug_is_refused()
+    {
+        using var factory = StartFactory();
+        WriteArticle("statya", "Текст статьи.");
+        RegisterArticle(factory, "statya", "Про ежей");
+        var client = await LoginClient(factory);
+        var antiforgery = AntiforgeryToken(await client.GetStringAsync("/statya"));
+
+        var response = await client.PostAsync("/share", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            [antiforgery.Name] = antiforgery.Value, ["slug"] = "", ["days"] = "7",
+        }));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Anonymous_cannot_create_a_link()
     {
         using var factory = StartFactory();
@@ -476,8 +493,10 @@ public class ShareLinkTests : IDisposable
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
-    [Fact]
-    public async Task Article_with_the_reserved_slug_is_refused()
+    [Theory]
+    [InlineData("s")]
+    [InlineData("S")]
+    public async Task Article_with_the_reserved_slug_is_refused(string slug)
     {
         using var factory = StartFactory();
         var client = StartApiClient(factory);
@@ -486,7 +505,7 @@ public class ShareLinkTests : IDisposable
         {
             { new ByteArrayContent("---\ntitle: Про ежей\n---\nТекст."u8.ToArray()), "index.md", "index.md" },
         };
-        var response = await client.PutAsync("/api/articles/s", form);
+        var response = await client.PutAsync($"/api/articles/{slug}", form);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Contains("/s/", await response.Content.ReadAsStringAsync());

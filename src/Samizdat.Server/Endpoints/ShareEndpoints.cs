@@ -86,6 +86,8 @@ public static class ShareEndpoints
             if (!int.TryParse(form["days"], out var days) || !AllowedDays.Contains(days))
                 return Results.BadRequest();
             if (note.Length > 200) return Results.BadRequest();
+            // Пустой slug — испорченная форма, а не «статьи нет»: спека обещает тут 400.
+            if (slug.Length == 0) return Results.BadRequest();
             if (db.Articles.Find(slug) is null) return Results.NotFound();
 
             var link = new ShareLinkRow

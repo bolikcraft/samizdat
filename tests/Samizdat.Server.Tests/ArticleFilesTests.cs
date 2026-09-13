@@ -23,6 +23,12 @@ public class ArticleFilesTests : IDisposable
     [InlineData("Привет")]
     public void IsValidSlug_accepts_normal_values(string slug) => Assert.True(ArticleFiles.IsValidSlug(slug));
 
+    // Маршруты не различают регистр, поэтому "S" занимает адрес /s/ так же, как "s".
+    [Theory]
+    [InlineData("s")]
+    [InlineData("S")]
+    public void IsReservedSlug_covers_both_letter_cases(string slug) => Assert.True(ArticleFiles.IsReservedSlug(slug));
+
     [Fact]
     public void Staging_and_backup_folders_are_hidden_from_the_article_list()
     {

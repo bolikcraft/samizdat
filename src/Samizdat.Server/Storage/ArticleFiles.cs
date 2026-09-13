@@ -11,7 +11,8 @@ public sealed class ArticleFiles(string dataRoot)
         => slug.Length > 0 && slug == Path.GetFileName(slug) && !slug.StartsWith('.');
 
     /// Адрес /s/ отдан ссылкам для гостей: статья с таким slug была бы недоступна.
-    public static bool IsReservedSlug(string slug) => slug == "s";
+    /// Регистр не важен — маршруты его не различают, и "S" уехал бы в гостевой маршрут.
+    public static bool IsReservedSlug(string slug) => slug.Equals("s", StringComparison.OrdinalIgnoreCase);
 
     /// Путь папки в вольте: сегменты через "/", без выхода вверх и без пустых сегментов.
     public static bool IsValidFolder(string folder)
