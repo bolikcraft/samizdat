@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Samizdat.Server.Auth;
@@ -118,14 +119,6 @@ public class ThemeRenderTests : IDisposable
     }
 
     [Fact]
-    public async Task Dark_scheme_is_declared()
-    {
-        var css = await LoginClient(StartFactory()).GetStringAsync("/assets/style.css");
-
-        Assert.Contains("prefers-color-scheme: dark", css);
-    }
-
-    [Fact]
     public async Task Callout_and_code_have_styles()
     {
         var css = await LoginClient(StartFactory()).GetStringAsync("/assets/style.css");
@@ -156,7 +149,9 @@ public class ThemeRenderTests : IDisposable
     {
         var html = await StartFactory().CreateClient().GetStringAsync("/login");
 
-        Assert.Contains("<div class=\"shell shell-plain\">", html);
+        // Два отдельных условия: порядок классов в атрибуте ни на что не влияет.
+        Assert.Contains("class=\"shell", html);
+        Assert.Contains("shell-plain", html);
         Assert.DoesNotContain("nav-tree", html);
     }
 
@@ -169,6 +164,33 @@ public class ThemeRenderTests : IDisposable
         Assert.Contains("prefers-color-scheme: dark", css);
         Assert.Contains(":root:not([data-color-scheme=\"light\"])", css);
         Assert.Contains(":root[data-color-scheme=\"dark\"]", css);
+    }
+
+    /// Отдаёт объявления правила: всё между первой { после селектора и следующей }, пробелы сжаты.
+    static string Declarations(string css, string selector)
+    {
+        var start = css.IndexOf(selector, StringComparison.Ordinal);
+        Assert.True(start >= 0, $"в стилях нет {selector}");
+
+        var open = css.IndexOf('{', start + selector.Length);
+        var close = css.IndexOf('}', open + 1);
+        Assert.True(open >= 0 && close > open, $"у {selector} нет тела");
+
+        return Regex.Replace(css[(open + 1)..close], @"\s+", " ").Trim();
+    }
+
+    [Fact]
+    public async Task Both_dark_palette_blocks_hold_the_same_values()
+    {
+        var css = await StartFactory().CreateClient().GetStringAsync("/assets/style.css");
+
+        var bySystem = Declarations(css, ":root:not([data-color-scheme=\"light\"])");
+        var byChoice = Declarations(css, ":root[data-color-scheme=\"dark\"]");
+
+        // Набор повторён дважды: обычный CSS не умеет отдать один блок двум условиям. Разойдутся
+        // блоки — «тёмная» и «как в системе» начнут выглядеть по-разному, и заметить это нечем.
+        Assert.Contains("--muted", bySystem);
+        Assert.Equal(bySystem, byChoice);
     }
 
     [Fact]
