@@ -4,10 +4,13 @@ using Markdig.Renderers.Html;
 namespace Samizdat.Core.Rendering;
 
 /// Создаётся на каждый рендер: знает slug текущей статьи и список статей на сервере.
-public sealed class WikiLinkRenderer(string currentSlug, IArticleLookup articles)
+/// attachmentBase — префикс вложений; по умолчанию каталог самой статьи.
+public sealed class WikiLinkRenderer(string currentSlug, IArticleLookup articles, string? attachmentBase = null)
     : HtmlObjectRenderer<WikiLink>
 {
     static readonly string[] ImageExtensions = [".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".avif"];
+
+    readonly string attachmentBase = attachmentBase ?? $"/{currentSlug}/";
 
     protected override void Write(HtmlRenderer renderer, WikiLink link)
     {
@@ -19,7 +22,7 @@ public sealed class WikiLinkRenderer(string currentSlug, IArticleLookup articles
         {
             // Alt falls back to the file name without extension, not the technical ".png" suffix.
             var alt = link.Label ?? Path.GetFileNameWithoutExtension(fileName);
-            renderer.Write("<img src=\"/").WriteEscapeUrl($"{currentSlug}/{fileName}")
+            renderer.Write("<img src=\"").WriteEscapeUrl($"{this.attachmentBase}{fileName}")
                     .Write("\" alt=\"").WriteEscape(alt).Write("\">");
             return;
         }

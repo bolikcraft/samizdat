@@ -48,4 +48,21 @@ public class EmbedTests
         Assert.Contains("<img src=\"/s/secret.png\"", html);
         Assert.DoesNotContain("..", html);
     }
+
+    [Fact]
+    public void Embed_uses_given_attachment_base()
+    {
+        var html = renderer.Render("![[shema.png]]", "statya", NoArticles.Instance,
+                                   attachmentBase: "/s/abc/");
+
+        Assert.Contains("""<img src="/s/abc/shema.png" alt="shema">""", html);
+    }
+
+    [Fact]
+    public void Embed_without_attachment_base_points_to_article_folder()
+    {
+        var html = renderer.Render("![[shema.png]]", "statya", NoArticles.Instance);
+
+        Assert.Contains("""<img src="/statya/shema.png" alt="shema">""", html);
+    }
 }

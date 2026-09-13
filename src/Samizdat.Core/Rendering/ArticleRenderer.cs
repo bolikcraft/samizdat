@@ -12,8 +12,9 @@ public sealed class ArticleRenderer
         .Use<WikiLinkExtension>()
         .Build();
 
-    /// slug нужен, чтобы собрать путь к вложениям статьи.
-    public string Render(string markdown, string slug, IArticleLookup articles)
+    /// slug нужен, чтобы собрать путь к вложениям статьи; attachmentBase его подменяет
+    /// (гостевая страница отдаёт вложения через свой маршрут).
+    public string Render(string markdown, string slug, IArticleLookup articles, string? attachmentBase = null)
     {
         var document = Markdig.Markdown.Parse(markdown, pipeline);
         CalloutTransformer.Apply(document);
@@ -21,7 +22,7 @@ public sealed class ArticleRenderer
         using var writer = new StringWriter();
         var renderer = new HtmlRenderer(writer);
         pipeline.Setup(renderer);
-        renderer.ObjectRenderers.Insert(0, new WikiLinkRenderer(slug, articles));
+        renderer.ObjectRenderers.Insert(0, new WikiLinkRenderer(slug, articles, attachmentBase));
         renderer.ObjectRenderers.Insert(0, new CalloutRenderer());
         renderer.Render(document);
         writer.Flush();
