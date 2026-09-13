@@ -1,9 +1,11 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/Samizdat.Cli/Samizdat.Cli.csproj" />
     <Project Path="src/Samizdat.Core/Samizdat.Core.csproj" />
     <Project Path="src/Samizdat.Server/Samizdat.Server.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/Samizdat.Cli.Tests/Samizdat.Cli.Tests.csproj" />
     <Project Path="tests/Samizdat.Core.Tests/Samizdat.Core.Tests.csproj" />
     <Project Path="tests/Samizdat.Server.Tests/Samizdat.Server.Tests.csproj" />
   </Folder>
