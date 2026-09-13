@@ -253,6 +253,20 @@ public class ShareLinkTests : IDisposable
     }
 
     [Fact]
+    public async Task Parallel_visits_are_all_counted()
+    {
+        using var factory = StartFactory();
+        WriteArticle("statya", "Текст статьи.");
+        RegisterArticle(factory, "statya", "Про ежей");
+        var token = AddLink(factory, "statya");
+
+        var client = factory.CreateClient();
+        await Task.WhenAll(Enumerable.Range(0, 20).Select(_ => client.GetAsync($"/s/{token}")));
+
+        Assert.Equal(20, LinkByToken(factory, token).OpenedCount);
+    }
+
+    [Fact]
     public async Task Guest_gets_the_picture_of_the_shared_article()
     {
         using var factory = StartFactory();

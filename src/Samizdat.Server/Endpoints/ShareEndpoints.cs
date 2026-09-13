@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.StaticFiles;
+using Microsoft.EntityFrameworkCore;
 using Samizdat.Core;
 using Samizdat.Core.Rendering;
 using Samizdat.Core.Themes;
@@ -52,9 +53,12 @@ public static class ShareEndpoints
                 });
             });
 
-            link.OpenedCount++;
-            link.LastOpenedAt = DateTimeOffset.UtcNow;
-            db.SaveChanges();
+            // Одним запросом к базе, а не чтением и записью: параллельные открытия не теряют счёт.
+            var now = DateTimeOffset.UtcNow;
+            db.ShareLinks.Where(row => row.Id == link.Id)
+                .ExecuteUpdate(set => set
+                    .SetProperty(row => row.OpenedCount, row => row.OpenedCount + 1)
+                    .SetProperty(row => row.LastOpenedAt, now));
 
             return Results.Content(html.Replace(AttachmentBase, $"/s/{token}/"), "text/html; charset=utf-8");
         }).AllowAnonymous();
