@@ -1,0 +1,80 @@
+using Microsoft.AspNetCore.StaticFiles;
+using Samizdat.Core;
+using Samizdat.Core.Rendering;
+using Samizdat.Core.Themes;
+using Samizdat.Server.Data;
+using Samizdat.Server.Rendering;
+using Samizdat.Server.Storage;
+
+namespace Samizdat.Server.Endpoints;
+
+public static class ShareEndpoints
+{
+    static readonly FileExtensionContentTypeProvider ContentTypes = new();
+
+    public static void MapShare(this WebApplication app)
+    {
+        app.MapGet("/s/{token}", (string token, SamizdatDbContext db, ArticleFiles files,
+                                  PageRenderer pages, ArticleRenderer markdown, PageCache cache,
+                                  IThemeSource theme, SiteSettings settings) =>
+        {
+            var link = db.ShareLinks.FirstOrDefault(row => row.Token == token);
+            if (link is null) return NotFound(pages, settings);
+            if (!link.IsAlive(DateTimeOffset.UtcNow)) return Expired(pages, settings);
+
+            var row = db.Articles.Find(link.Slug);
+            if (row is null || !files.MarkdownExists(link.Slug)) return NotFound(pages, settings);
+
+            // Отдельный ключ кэша: у гостя другой html, без дерева и меню. Отпечаток каталога
+            // не нужен — на гостевой странице нет списка статей.
+            var html = cache.GetOrBuild($"share:{link.Slug}", row.ContentHash, theme.Version, "", () =>
+            {
+                var text = files.ReadMarkdown(link.Slug)!;
+                var parsed = FrontMatterParser.Parse(text);
+
+                return pages.Render("article.html", new()
+                {
+                    ["page_title"] = parsed.FrontMatter.Title ?? link.Slug,
+                    ["description"] = parsed.FrontMatter.Description,
+                    ["site"] = PageEndpoints.SiteModel(settings),
+                    ["noindex"] = true,
+                    ["article"] = new Dictionary<string, object?>
+                    {
+                        ["slug"] = link.Slug,
+                        ["title"] = parsed.FrontMatter.Title ?? link.Slug,
+                        ["description"] = parsed.FrontMatter.Description,
+                        ["date"] = parsed.FrontMatter.Date?.ToString("yyyy-MM-dd"),
+                        // NoArticles: любая вики-ссылка станет текстом, чужие slug не утекают.
+                        ["html"] = markdown.Render(parsed.Body, link.Slug, NoArticles.Instance, AttachmentBase),
+                    },
+                    // nav и user пусты: тема не рисует ни боковика, ни меню владельца.
+                });
+            });
+
+            link.OpenedCount++;
+            link.LastOpenedAt = DateTimeOffset.UtcNow;
+            db.SaveChanges();
+
+            return Results.Content(html.Replace(AttachmentBase, $"/s/{token}/"), "text/html; charset=utf-8");
+        }).AllowAnonymous();
+    }
+
+    // Base вложений в кэшированном html — плейсхолдер: html один на статью, а токен у каждой ссылки свой.
+    internal const string AttachmentBase = "__SHARE_BASE__/";
+
+    static IResult NotFound(PageRenderer pages, SiteSettings settings)
+        => Results.Content(pages.Render("404.html", new()
+        {
+            ["page_title"] = "Не найдено",
+            ["site"] = PageEndpoints.SiteModel(settings),
+            ["noindex"] = true,
+        }), "text/html; charset=utf-8", statusCode: 404);
+
+    static IResult Expired(PageRenderer pages, SiteSettings settings)
+        => Results.Content(pages.Render("share-expired.html", new()
+        {
+            ["page_title"] = "Ссылка не работает",
+            ["site"] = PageEndpoints.SiteModel(settings),
+            ["noindex"] = true,
+        }), "text/html; charset=utf-8", statusCode: 410);
+}

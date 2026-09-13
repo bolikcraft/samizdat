@@ -67,6 +67,7 @@ app.UseAuthorization();
 app.UseAntiforgery();
 app.MapAuth();
 app.MapPages().RequireAuthorization();
+app.MapShare();
 app.MapApi();
 app.MapSettings();
 app.Run();

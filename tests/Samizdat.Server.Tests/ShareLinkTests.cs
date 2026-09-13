@@ -142,4 +142,83 @@ public class ShareLinkTests : IDisposable
             Assert.Empty(db.ShareLinks.Where(row => row.Token == token));
         }
     }
+
+    [Fact]
+    public async Task Live_link_shows_the_article_to_anonymous()
+    {
+        using var factory = StartFactory();
+        WriteArticle("statya", "---\ntitle: Про ежей\n---\n\nТекст статьи.");
+        RegisterArticle(factory, "statya", "Про ежей");
+        var token = AddLink(factory, "statya");
+
+        var client = factory.CreateClient();
+        var response = await client.GetAsync($"/s/{token}");
+        var html = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("Текст статьи.", html);
+        Assert.Contains("Про ежей", html);
+    }
+
+    [Fact]
+    public async Task Guest_page_has_no_navigation_and_no_owner_menu()
+    {
+        using var factory = StartFactory();
+        WriteArticle("statya", "Текст статьи.");
+        RegisterArticle(factory, "statya", "Про ежей");
+        RegisterArticle(factory, "chuzhaya", "Чужая статья");
+        var token = AddLink(factory, "statya");
+
+        var html = await factory.CreateClient().GetStringAsync($"/s/{token}");
+
+        Assert.DoesNotContain("nav-tree", html);
+        Assert.DoesNotContain("user-menu", html);
+        Assert.DoesNotContain("chuzhaya", html);
+        Assert.Contains("noindex", html);
+    }
+
+    [Fact]
+    public async Task Expired_and_revoked_links_answer_410()
+    {
+        using var factory = StartFactory();
+        WriteArticle("statya", "Текст статьи.");
+        RegisterArticle(factory, "statya", "Про ежей");
+        var expired = AddLink(factory, "statya", expiresAt: DateTimeOffset.UtcNow.AddMinutes(-1));
+        var revoked = AddLink(factory, "statya", revokedAt: DateTimeOffset.UtcNow);
+
+        var client = factory.CreateClient();
+        var first = await client.GetAsync($"/s/{expired}");
+        var second = await client.GetAsync($"/s/{revoked}");
+
+        Assert.Equal(HttpStatusCode.Gone, first.StatusCode);
+        Assert.Equal(HttpStatusCode.Gone, second.StatusCode);
+        Assert.Contains("больше не работает", await first.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task Unknown_token_answers_404()
+    {
+        using var factory = StartFactory();
+
+        var response = await factory.CreateClient().GetAsync("/s/ZZZZZZZZZZZZZZZZZZZZZZ");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Opening_the_page_counts_the_visit()
+    {
+        using var factory = StartFactory();
+        WriteArticle("statya", "Текст статьи.");
+        RegisterArticle(factory, "statya", "Про ежей");
+        var token = AddLink(factory, "statya");
+
+        var client = factory.CreateClient();
+        await client.GetAsync($"/s/{token}");
+        await client.GetAsync($"/s/{token}");
+
+        var link = LinkByToken(factory, token);
+        Assert.Equal(2, link.OpenedCount);
+        Assert.NotNull(link.LastOpenedAt);
+    }
 }
