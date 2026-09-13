@@ -1,7 +1,9 @@
+using System.Text;
 using Microsoft.AspNetCore.StaticFiles;
 using Samizdat.Core;
 using Samizdat.Core.Rendering;
 using Samizdat.Core.Themes;
+using Samizdat.Server.Rendering;
 using Samizdat.Server.Storage;
 
 namespace Samizdat.Server.Endpoints;
@@ -29,27 +31,35 @@ public static class PageEndpoints
         });
 
         app.MapGet("/{slug}", (string slug, PageRenderer pages, ArticleFiles files,
-                               ArticleRenderer markdown, IArticleLookup articles) =>
+                               ArticleRenderer markdown, IArticleLookup articles,
+                               PageCache cache, IThemeSource theme) =>
         {
             var text = files.ReadMarkdown(slug);
             if (text is null) return NotFound(pages);
 
-            var parsed = FrontMatterParser.Parse(text);
-            var html = markdown.Render(parsed.Body, slug, articles);
-
-            return Results.Content(pages.Render("article.html", new()
+            var hash = ArticleHash.Compute(Encoding.UTF8.GetBytes(text), []);
+            var html = cache.GetOrBuild(slug, hash, theme.Version, () =>
             {
-                ["page_title"] = parsed.FrontMatter.Title ?? slug,
-                ["site"] = new Dictionary<string, object?> { ["title"] = "Samizdat" },
-                ["article"] = new Dictionary<string, object?>
+                var parsed = FrontMatterParser.Parse(text);
+                var body = markdown.Render(parsed.Body, slug, articles);
+
+                return pages.Render("article.html", new()
                 {
-                    ["slug"] = slug,
-                    ["title"] = parsed.FrontMatter.Title ?? slug,
+                    ["page_title"] = parsed.FrontMatter.Title ?? slug,
                     ["description"] = parsed.FrontMatter.Description,
-                    ["date"] = parsed.FrontMatter.Date?.ToString("yyyy-MM-dd"),
-                    ["html"] = html,
-                },
-            }), "text/html; charset=utf-8");
+                    ["site"] = new Dictionary<string, object?> { ["title"] = "Samizdat" },
+                    ["article"] = new Dictionary<string, object?>
+                    {
+                        ["slug"] = slug,
+                        ["title"] = parsed.FrontMatter.Title ?? slug,
+                        ["description"] = parsed.FrontMatter.Description,
+                        ["date"] = parsed.FrontMatter.Date?.ToString("yyyy-MM-dd"),
+                        ["html"] = body,
+                    },
+                });
+            });
+
+            return Results.Content(html, "text/html; charset=utf-8");
         });
 
         app.MapGet("/{slug}/{*file}", (string slug, string file, ArticleFiles files, PageRenderer pages) =>

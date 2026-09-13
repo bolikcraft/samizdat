@@ -16,6 +16,14 @@ public class PageEndpointsTests : IDisposable
         return factory.CreateClient();
     }
 
+    // data/themes/default — каталог темы на диске, который переопределяет встроенную (см. Program.cs).
+    void WriteThemeFile(string relativePath, string text)
+    {
+        var path = Path.Combine(dataRoot, "themes", "default", relativePath);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.WriteAllText(path, text);
+    }
+
     void WriteArticle(string slug, string text)
     {
         var folder = Path.Combine(dataRoot, "articles", slug);
@@ -67,6 +75,25 @@ public class PageEndpointsTests : IDisposable
         var response = await client.GetAsync("/s/..%2f..%2fappsettings.json");
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Editing_theme_file_invalidates_cached_page()
+    {
+        WriteArticle("privet", "---\ntitle: Привет\n---\nтекст\n");
+        WriteThemeFile("article.html", "old<h1>{{ article.title }}</h1>{{ article.html }}");
+        var client = StartServer();
+
+        var before = await client.GetStringAsync("/privet");
+        Assert.Contains("old", before);
+
+        // File.GetLastWriteTimeUtc has 1-tick granularity on some filesystems; sleep to force a new value.
+        await Task.Delay(20);
+        WriteThemeFile("article.html", "new<h1>{{ article.title }}</h1>{{ article.html }}");
+        var after = await client.GetStringAsync("/privet");
+
+        Assert.Contains("new", after);
+        Assert.DoesNotContain("old", after);
     }
 
     public void Dispose() => Directory.Delete(dataRoot, recursive: true);

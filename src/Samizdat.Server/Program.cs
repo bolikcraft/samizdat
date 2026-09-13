@@ -1,6 +1,7 @@
 using Samizdat.Core.Rendering;
 using Samizdat.Core.Themes;
 using Samizdat.Server.Endpoints;
+using Samizdat.Server.Rendering;
 using Samizdat.Server.Storage;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -16,6 +17,7 @@ builder.Services.AddSingleton(services => new PageRenderer(services.GetRequiredS
 builder.Services.AddSingleton<ArticleRenderer>();
 builder.Services.AddSingleton<IArticleLookup>(services =>
     new FolderArticleLookup(services.GetRequiredService<ArticleFiles>()));
+builder.Services.AddSingleton<PageCache>();
 
 var app = builder.Build();
 app.MapPages();
