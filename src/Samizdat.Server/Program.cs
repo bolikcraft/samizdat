@@ -1,6 +1,8 @@
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
 using Samizdat.Core.Rendering;
 using Samizdat.Core.Themes;
+using Samizdat.Server.Commands;
 using Samizdat.Server.Data;
 using Samizdat.Server.Endpoints;
 using Samizdat.Server.Rendering;
@@ -25,12 +27,29 @@ builder.Services.AddDbContext<SamizdatDbContext>(options =>
 
 builder.Services.AddScoped<IArticleLookup, DbArticleLookup>();
 
+builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(options =>
+    {
+        options.LoginPath = "/login";
+        options.Cookie.HttpOnly = true;
+        options.Cookie.SameSite = SameSiteMode.Lax;
+        options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+        options.ExpireTimeSpan = TimeSpan.FromDays(30);
+        options.SlidingExpiration = true;
+    });
+builder.Services.AddAuthorization();
+
 var app = builder.Build();
+
+if (await ServerCommands.TryRun(args, app.Services)) return;
 
 using (var scope = app.Services.CreateScope())
     scope.ServiceProvider.GetRequiredService<SamizdatDbContext>().Database.Migrate();
 
-app.MapPages();
+app.UseAuthentication();
+app.UseAuthorization();
+app.MapAuth();
+app.MapPages().RequireAuthorization();
 app.Run();
 
 public partial class Program; // нужен WebApplicationFactory в тестах

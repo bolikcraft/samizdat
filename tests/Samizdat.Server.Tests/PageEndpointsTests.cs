@@ -2,6 +2,7 @@ using System.Net;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Samizdat.Server.Auth;
 using Samizdat.Server.Data;
 
 namespace Samizdat.Server.Tests;
@@ -18,13 +19,37 @@ public class PageEndpointsTests : IDisposable
         database.ResetDatabase();
     }
 
-    WebApplicationFactory<Program> StartServer()
+    WebApplicationFactory<Program> StartFactory()
     {
         return new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseSetting("Samizdat:DataRoot", dataRoot);
             builder.UseSetting("ConnectionStrings:Postgres", database.ConnectionString);
         });
+    }
+
+    HttpClient StartServer() => LoginClient(StartFactory());
+
+    HttpClient LoginClient(WebApplicationFactory<Program> factory)
+    {
+        var login = $"owner-{Guid.NewGuid():N}";
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+            db.Users.Add(new UserRow
+            {
+                Login = login,
+                PasswordHash = PasswordHasher.Hash("тайна"),
+                Role = UserRole.Owner,
+                CreatedAt = DateTimeOffset.UtcNow,
+            });
+            db.SaveChanges();
+        }
+
+        var client = factory.CreateClient();
+        client.PostAsync("/login", new FormUrlEncodedContent(
+            new Dictionary<string, string> { ["login"] = login, ["password"] = "тайна" })).Wait();
+        return client;
     }
 
     // data/themes/default — каталог темы на диске, который переопределяет встроенную (см. Program.cs).
@@ -57,9 +82,9 @@ public class PageEndpointsTests : IDisposable
     public async Task Shows_article_page()
     {
         WriteArticle("privet", "---\ntitle: Привет\n---\n# Привет\n\nтекст\n");
-        var factory = StartServer();
+        var factory = StartFactory();
         Register(factory, "privet", "Привет");
-        var client = factory.CreateClient();
+        var client = LoginClient(factory);
 
         var html = await client.GetStringAsync("/privet");
 
@@ -70,7 +95,7 @@ public class PageEndpointsTests : IDisposable
     [Fact]
     public async Task Unknown_slug_returns_404_page()
     {
-        var client = StartServer().CreateClient();
+        var client = StartServer();
 
         var response = await client.GetAsync("/нет-такой");
 
@@ -82,7 +107,7 @@ public class PageEndpointsTests : IDisposable
     public async Task Article_file_without_database_row_is_not_shown()
     {
         WriteArticle("сирота", "---\ntitle: Сирота\n---\nтекст\n");
-        var client = StartServer().CreateClient();
+        var client = StartServer();
 
         var response = await client.GetAsync("/сирота");
 
@@ -94,9 +119,9 @@ public class PageEndpointsTests : IDisposable
     {
         WriteArticle("s", "---\ntitle: T\n---\n![[pic.png]]");
         File.WriteAllBytes(Path.Combine(dataRoot, "articles", "s", "pic.png"), [1, 2, 3]);
-        var factory = StartServer();
+        var factory = StartFactory();
         Register(factory, "s", "T");
-        var client = factory.CreateClient();
+        var client = LoginClient(factory);
 
         var response = await client.GetAsync("/s/pic.png");
 
@@ -107,7 +132,7 @@ public class PageEndpointsTests : IDisposable
     [Fact]
     public async Task Path_outside_article_folder_is_refused()
     {
-        var client = StartServer().CreateClient();
+        var client = StartServer();
 
         var response = await client.GetAsync("/s/..%2f..%2fappsettings.json");
 
@@ -123,9 +148,9 @@ public class PageEndpointsTests : IDisposable
         {
             WriteArticle("s", "---\ntitle: T\n---\nтекст\n");
             File.CreateSymbolicLink(Path.Combine(dataRoot, "articles", "s", "leak.txt"), secret);
-            var factory = StartServer();
+            var factory = StartFactory();
             Register(factory, "s", "T");
-            var client = factory.CreateClient();
+            var client = LoginClient(factory);
 
             var response = await client.GetAsync("/s/leak.txt");
 
@@ -141,9 +166,9 @@ public class PageEndpointsTests : IDisposable
     public async Task Article_title_with_markup_is_escaped()
     {
         WriteArticle("evil", "---\ntitle: \"</title><script>alert(1)</script>\"\n---\nтекст\n");
-        var factory = StartServer();
+        var factory = StartFactory();
         Register(factory, "evil", "</title><script>alert(1)</script>");
-        var client = factory.CreateClient();
+        var client = LoginClient(factory);
 
         var html = await client.GetStringAsync("/evil");
 
@@ -157,9 +182,9 @@ public class PageEndpointsTests : IDisposable
         WriteArticle("s", "---\ntitle: Old\n---\nold text \n");
         var path = Path.Combine(dataRoot, "articles", "s", "index.md");
         var writeTime = File.GetLastWriteTimeUtc(path);
-        var factory = StartServer();
+        var factory = StartFactory();
         Register(factory, "s", "Old");
-        var client = factory.CreateClient();
+        var client = LoginClient(factory);
 
         var before = await client.GetStringAsync("/s");
         Assert.Contains("Old", before);
@@ -178,9 +203,9 @@ public class PageEndpointsTests : IDisposable
     public async Task Changed_write_time_rebuilds_cached_page()
     {
         WriteArticle("s", "---\ntitle: Old\n---\nтекст\n");
-        var factory = StartServer();
+        var factory = StartFactory();
         Register(factory, "s", "Old");
-        var client = factory.CreateClient();
+        var client = LoginClient(factory);
 
         var before = await client.GetStringAsync("/s");
         Assert.Contains("Old", before);
@@ -198,9 +223,9 @@ public class PageEndpointsTests : IDisposable
     {
         WriteArticle("privet", "---\ntitle: Привет\n---\nтекст\n");
         WriteThemeFile("article.html", "old<h1>{{ article.title }}</h1>{{ article.html }}");
-        var factory = StartServer();
+        var factory = StartFactory();
         Register(factory, "privet", "Привет");
-        var client = factory.CreateClient();
+        var client = LoginClient(factory);
 
         var before = await client.GetStringAsync("/privet");
         Assert.Contains("old", before);

@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Samizdat.Server.Auth;
 using Samizdat.Server.Data;
 
 namespace Samizdat.Server.Tests;
@@ -17,17 +18,39 @@ public class ArticleCatalogTests : IDisposable
         database.ResetDatabase();
     }
 
-    WebApplicationFactory<Program> StartServer() =>
+    WebApplicationFactory<Program> StartFactory() =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseSetting("Samizdat:DataRoot", dataRoot);
             builder.UseSetting("ConnectionStrings:Postgres", database.ConnectionString);
         });
 
+    HttpClient LoginClient(WebApplicationFactory<Program> factory)
+    {
+        var login = $"owner-{Guid.NewGuid():N}";
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+            db.Users.Add(new UserRow
+            {
+                Login = login,
+                PasswordHash = PasswordHasher.Hash("тайна"),
+                Role = UserRole.Owner,
+                CreatedAt = DateTimeOffset.UtcNow,
+            });
+            db.SaveChanges();
+        }
+
+        var client = factory.CreateClient();
+        client.PostAsync("/login", new FormUrlEncodedContent(
+            new Dictionary<string, string> { ["login"] = login, ["password"] = "тайна" })).Wait();
+        return client;
+    }
+
     [Fact]
     public async Task Migrations_create_all_tables()
     {
-        using var scope = StartServer().Services.CreateScope();
+        using var scope = StartFactory().Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
 
         Assert.Empty(await db.Articles.ToListAsync());
@@ -38,7 +61,7 @@ public class ArticleCatalogTests : IDisposable
     [Fact]
     public async Task Index_page_lists_articles_from_database()
     {
-        var factory = StartServer();
+        var factory = StartFactory();
         using (var scope = factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
@@ -49,7 +72,7 @@ public class ArticleCatalogTests : IDisposable
             await db.SaveChangesAsync();
         }
 
-        var html = await factory.CreateClient().GetStringAsync("/");
+        var html = await LoginClient(factory).GetStringAsync("/");
 
         Assert.Contains("/privet", html);
         Assert.Contains("Привет", html);
@@ -58,7 +81,7 @@ public class ArticleCatalogTests : IDisposable
     [Fact]
     public async Task Wiki_link_to_article_in_database_becomes_link()
     {
-        var factory = StartServer();
+        var factory = StartFactory();
         Directory.CreateDirectory(Path.Combine(dataRoot, "articles", "s"));
         File.WriteAllText(Path.Combine(dataRoot, "articles", "s", "index.md"), "[[privet]]");
         using (var scope = factory.Services.CreateScope())
@@ -75,7 +98,7 @@ public class ArticleCatalogTests : IDisposable
             await db.SaveChangesAsync();
         }
 
-        var html = await factory.CreateClient().GetStringAsync("/s");
+        var html = await LoginClient(factory).GetStringAsync("/s");
 
         Assert.Contains("<a href=\"/privet\">", html);
     }

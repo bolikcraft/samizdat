@@ -12,9 +12,11 @@ public static class PageEndpoints
 {
     static readonly FileExtensionContentTypeProvider ContentTypes = new();
 
-    public static void MapPages(this WebApplication app)
+    public static RouteGroupBuilder MapPages(this WebApplication app)
     {
-        app.MapGet("/", (PageRenderer pages, SamizdatDbContext db) =>
+        var group = app.MapGroup("");
+
+        group.MapGet("/", (PageRenderer pages, SamizdatDbContext db) =>
         {
             var rows = db.Articles.OrderByDescending(article => article.Date).ToList();
             var list = rows.Select(article => new Dictionary<string, object?>
@@ -33,10 +35,10 @@ public static class PageEndpoints
             }), "text/html; charset=utf-8");
         });
 
-        app.MapGet("/{slug}", (string slug, PageRenderer pages, ArticleFiles files,
-                               ArticleRenderer markdown, IArticleLookup articles,
-                               PageCache cache, IThemeSource theme, SamizdatDbContext db,
-                               ILogger<Program> logger) =>
+        group.MapGet("/{slug}", (string slug, PageRenderer pages, ArticleFiles files,
+                                 ArticleRenderer markdown, IArticleLookup articles,
+                                 PageCache cache, IThemeSource theme, SamizdatDbContext db,
+                                 ILogger<Program> logger) =>
         {
             var row = db.Articles.Find(slug);
             if (row is null)
@@ -74,7 +76,7 @@ public static class PageEndpoints
             return Results.Content(html, "text/html; charset=utf-8");
         });
 
-        app.MapGet("/{slug}/{*file}", (string slug, string file, ArticleFiles files, PageRenderer pages) =>
+        group.MapGet("/{slug}/{*file}", (string slug, string file, ArticleFiles files, PageRenderer pages) =>
         {
             var path = files.AttachmentPath(slug, file);
             if (path is null) return NotFound(pages);
@@ -83,6 +85,7 @@ public static class PageEndpoints
             return Results.File(path, type);
         });
 
+        // Вне группы и без авторизации: css нужен странице входа.
         app.MapGet("/assets/{*file}", (string file, IThemeSource theme) =>
         {
             var stream = theme.OpenRead($"assets/{file}");
@@ -90,7 +93,9 @@ public static class PageEndpoints
 
             var type = ContentTypes.TryGetContentType(file, out var found) ? found : "application/octet-stream";
             return Results.Stream(stream, type);
-        });
+        }).AllowAnonymous();
+
+        return group;
     }
 
     static IResult NotFound(PageRenderer pages)
