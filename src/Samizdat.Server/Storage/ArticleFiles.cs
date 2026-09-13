@@ -10,6 +10,12 @@ public sealed class ArticleFiles(string dataRoot)
     public static bool IsValidSlug(string slug)
         => slug.Length > 0 && slug == Path.GetFileName(slug) && !slug.StartsWith('.');
 
+    /// Путь папки в вольте: сегменты через "/", без выхода вверх и без пустых сегментов.
+    public static bool IsValidFolder(string folder)
+        => folder.Length == 0
+           || (!folder.StartsWith('/') && !folder.EndsWith('/') && !folder.Contains('\\')
+               && folder.Split('/').All(part => part.Length > 0 && part != "." && part != ".."));
+
     public string? ReadMarkdown(string slug)
     {
         if (!IsValidSlug(slug)) return null;

@@ -16,6 +16,7 @@ public sealed class SamizdatDbContext(DbContextOptions<SamizdatDbContext> option
             article.HasKey(row => row.Slug);
             article.Property(row => row.Slug).HasMaxLength(200);
             article.Property(row => row.Title).HasMaxLength(500);
+            article.Property(row => row.Folder).HasMaxLength(1000).HasDefaultValue("");
         });
 
         model.Entity<UserRow>(user =>

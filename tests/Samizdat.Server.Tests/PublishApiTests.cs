@@ -97,6 +97,61 @@ public class PublishApiTests(DatabaseFixture database) : IDisposable
         Assert.NotEmpty(row.ContentHash);
     }
 
+    // Статьи в этом файле делят строку по slug в общей базе (коллекция "db"): свой slug на тест,
+    // иначе проверка "строки нет" ловит чужую строку, оставленную другим тестом.
+    static string UniqueSlug() => $"folder-{Guid.NewGuid():N}";
+
+    [Fact]
+    public async Task Put_stores_the_folder_field()
+    {
+        var (factory, client) = StartWithToken();
+        var slug = UniqueSlug();
+        var content = Article("---\ntitle: Привет\n---\nтекст\n");
+        content.Add(new StringContent("Заметки/PROXMOX"), "folder");
+
+        var response = await client.PutAsync($"/api/articles/{slug}", content);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+        Assert.Equal("Заметки/PROXMOX", db.Articles.Single(article => article.Slug == slug).Folder);
+    }
+
+    [Fact]
+    public async Task Put_without_folder_field_stores_empty_folder()
+    {
+        var (factory, client) = StartWithToken();
+        var slug = UniqueSlug();
+
+        var response = await client.PutAsync($"/api/articles/{slug}", Article("текст"));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+        Assert.Equal("", db.Articles.Single(article => article.Slug == slug).Folder);
+    }
+
+    [Theory]
+    [InlineData("../секрет")]
+    [InlineData("/корень")]
+    [InlineData("Заметки//пусто")]
+    [InlineData("Заметки\\x")]
+    public async Task Put_with_bad_folder_is_refused_and_article_is_not_written(string folder)
+    {
+        var (factory, client) = StartWithToken();
+        var slug = UniqueSlug();
+        var content = Article("текст");
+        content.Add(new StringContent(folder), "folder");
+
+        var response = await client.PutAsync($"/api/articles/{slug}", content);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.False(Directory.Exists(Path.Combine(dataRoot, "articles", slug)));
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+        Assert.Empty(db.Articles.Where(article => article.Slug == slug));
+    }
+
     [Fact]
     public async Task Put_replaces_previous_version_and_removes_old_attachments()
     {

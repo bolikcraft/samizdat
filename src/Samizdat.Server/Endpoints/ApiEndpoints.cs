@@ -24,6 +24,9 @@ public static class ApiEndpoints
             if (!ArticleFiles.IsValidSlug(slug)) return Results.BadRequest("Плохой slug");
 
             var form = await request.ReadFormAsync();
+            var folder = form["folder"].ToString();
+            if (!ArticleFiles.IsValidFolder(folder)) return Results.BadRequest($"{slug}: плохая папка");
+
             var source = form.Files.GetFile("index.md");
             if (source is null) return Results.BadRequest("Нет файла index.md");
 
@@ -57,10 +60,11 @@ public static class ApiEndpoints
             }).Entity;
 
             row.Title = parsed.FrontMatter.Title ?? slug;
+            row.Folder = folder;
             row.Description = parsed.FrontMatter.Description;
             row.Date = parsed.FrontMatter.Date;
             row.Theme = parsed.FrontMatter.Theme;
-            row.ContentHash = ArticleHash.Compute(markdown, attachments);
+            row.ContentHash = ArticleHash.Compute(markdown, attachments, folder);
             row.UpdatedAt = DateTimeOffset.UtcNow;
             await db.SaveChangesAsync();
 

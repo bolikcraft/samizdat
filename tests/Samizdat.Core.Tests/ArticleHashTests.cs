@@ -32,4 +32,14 @@ public class ArticleHashTests
 
         Assert.Equal(first, second);
     }
+
+    [Fact]
+    public void Folder_changes_hash()
+        => Assert.NotEqual(ArticleHash.Compute(Bytes("a"), [], "Заметки"),
+                           ArticleHash.Compute(Bytes("a"), [], "Другое"));
+
+    [Fact]
+    public void Same_folder_keeps_hash()
+        => Assert.Equal(ArticleHash.Compute(Bytes("a"), [], "Заметки"),
+                        ArticleHash.Compute(Bytes("a"), [], "Заметки"));
 }
