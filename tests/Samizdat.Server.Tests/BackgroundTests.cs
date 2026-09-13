@@ -100,6 +100,9 @@ public class BackgroundTests : IDisposable
         var html = await client.GetStringAsync("/");
 
         Assert.Contains("/background?v=", html);
+        // Комментарий про escape в layout.html должен быть комментарием Scriban ({{ # ... }}),
+        // а не HTML — иначе Scriban выведет его в разметку как есть.
+        Assert.DoesNotContain("Экранировать", html);
     }
 
     [Fact]

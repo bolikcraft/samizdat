@@ -4,8 +4,7 @@
 <title>{{ page_title | html.escape }}</title>
 {{ if description }}<meta name="description" content="{{ description | html.escape }}">{{ end }}
 <link rel="stylesheet" href="/assets/style.css">
-{{ if site.background_url }}<!-- Экранировать нельзя: внутри <style> HTML-сущности не раскрываются, escape испортит адрес.
-     Значение безопасно и так — путь литерал, версия только цифры из времени файла, пользовательских данных тут нет. -->
+{{ if site.background_url }}{{ # Экранировать нельзя: внутри <style> HTML-сущности не раскрываются, escape испортит адрес. Значение безопасно и так — путь литерал, версия только цифры из времени файла, пользовательских данных тут нет. ~}}
 <style>:root { --bg-image: url("{{ site.background_url }}"); }</style>{{ end }}</head>
 <body>
 <header class="top">
