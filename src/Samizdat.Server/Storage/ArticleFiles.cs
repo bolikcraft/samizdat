@@ -6,8 +6,13 @@ public sealed class ArticleFiles(string dataRoot)
 
     public string Folder(string slug) => Path.Combine(ArticlesRoot, slug);
 
+    /// Без слэшей, без "..", не начинается с точки — точка отделяет служебные .tmp-/.old- каталоги.
+    public static bool IsValidSlug(string slug)
+        => slug.Length > 0 && slug == Path.GetFileName(slug) && !slug.StartsWith('.');
+
     public string? ReadMarkdown(string slug)
     {
+        if (!IsValidSlug(slug)) return null;
         var file = Path.Combine(Folder(slug), "index.md");
         return File.Exists(file) ? File.ReadAllText(file) : null;
     }
@@ -15,6 +20,7 @@ public sealed class ArticleFiles(string dataRoot)
     /// Отпечаток файла без чтения содержимого: время записи и длина. Ключ кэша страниц строится по нему.
     public string? Fingerprint(string slug)
     {
+        if (!IsValidSlug(slug)) return null;
         var info = new FileInfo(Path.Combine(Folder(slug), "index.md"));
         return info.Exists ? $"{info.LastWriteTimeUtc:O}|{info.Length}" : null;
     }
@@ -22,6 +28,7 @@ public sealed class ArticleFiles(string dataRoot)
     /// null, если имя выводит за каталог статьи — текстом или через симлинк на чужой файл.
     public string? AttachmentPath(string slug, string name)
     {
+        if (!IsValidSlug(slug)) return null;
         var folder = Path.GetFullPath(Folder(slug)) + Path.DirectorySeparatorChar;
         var full = Path.GetFullPath(Path.Combine(folder, name));
         if (!full.StartsWith(folder, StringComparison.Ordinal) || !File.Exists(full)) return null;
@@ -34,6 +41,44 @@ public sealed class ArticleFiles(string dataRoot)
 
     public IEnumerable<string> AllSlugs()
         => Directory.Exists(ArticlesRoot)
-            ? Directory.EnumerateDirectories(ArticlesRoot).Select(dir => Path.GetFileName(dir)!)
+            ? Directory.EnumerateDirectories(ArticlesRoot).Select(dir => Path.GetFileName(dir)!).Where(IsValidSlug)
             : [];
+
+    /// Кладём новую версию рядом и переносим одним движением: читатель не видит половину статьи.
+    public void Replace(string slug, byte[] markdown, IReadOnlyCollection<(string Name, byte[] Bytes)> attachments)
+    {
+        if (!IsValidSlug(slug)) throw new ArgumentException("Плохой slug", nameof(slug));
+
+        var target = Folder(slug);
+        var staging = Path.Combine(ArticlesRoot, $".tmp-{slug}-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(staging);
+
+        try
+        {
+            File.WriteAllBytes(Path.Combine(staging, "index.md"), markdown);
+            foreach (var (name, bytes) in attachments)
+            {
+                var safe = Path.GetFileName(name);
+                if (safe.Length == 0 || safe is "." or "..") continue;
+                File.WriteAllBytes(Path.Combine(staging, safe), bytes);
+            }
+        }
+        catch
+        {
+            Directory.Delete(staging, recursive: true);
+            throw;
+        }
+
+        var old = Path.Combine(ArticlesRoot, $".old-{slug}-{Guid.NewGuid():N}");
+        if (Directory.Exists(target)) Directory.Move(target, old);
+        Directory.Move(staging, target);
+        if (Directory.Exists(old)) Directory.Delete(old, recursive: true);
+    }
+
+    public void Remove(string slug)
+    {
+        if (!IsValidSlug(slug)) return;
+        var folder = Folder(slug);
+        if (Directory.Exists(folder)) Directory.Delete(folder, recursive: true);
+    }
 }
