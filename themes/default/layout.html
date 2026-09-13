@@ -1,10 +1,21 @@
-<!doctype html><html lang="ru"><head><meta charset="utf-8">
+<!doctype html><html lang="ru"{{ if site.color_scheme }} data-color-scheme="{{ site.color_scheme | html.escape }}"{{ end }}><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{ page_title | html.escape }}</title>
 {{ if description }}<meta name="description" content="{{ description | html.escape }}">{{ end }}
 <link rel="stylesheet" href="/assets/style.css"></head>
 <body>
-<header class="top"><a href="/">{{ site.title | html.escape }}</a></header>
+<header class="top">
+  <a href="/">{{ site.title | html.escape }}</a>
+  {{ if user }}
+  <details class="user-menu">
+    <summary>{{ user.login | html.escape }}</summary>
+    <ul>
+      <li><a href="/settings">Настройки</a></li>
+      <li><form method="post" action="/logout">{{ antiforgery }}<button type="submit">Выход</button></form></li>
+    </ul>
+  </details>
+  {{ end }}
+</header>
 {{ if nav }}
 <div class="shell">
   <aside class="sidebar">

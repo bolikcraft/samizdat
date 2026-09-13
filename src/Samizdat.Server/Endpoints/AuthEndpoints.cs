@@ -12,9 +12,11 @@ public static class AuthEndpoints
 {
     public static void MapAuth(this WebApplication app)
     {
-        app.MapGet("/login", (PageRenderer pages) => LoginPage(pages, null)).AllowAnonymous();
+        app.MapGet("/login", (PageRenderer pages, SiteSettings settings) => LoginPage(pages, settings, null))
+            .AllowAnonymous();
 
-        app.MapPost("/login", async (HttpContext context, SamizdatDbContext db, PageRenderer pages) =>
+        app.MapPost("/login", async (HttpContext context, SamizdatDbContext db, PageRenderer pages,
+                                     SiteSettings settings) =>
         {
             var form = await context.Request.ReadFormAsync();
             var login = form["login"].ToString();
@@ -22,7 +24,7 @@ public static class AuthEndpoints
 
             var user = await db.Users.FirstOrDefaultAsync(row => row.Login == login);
             if (user is null || !PasswordHasher.Verify(password, user.PasswordHash))
-                return LoginPage(pages, "Неверный логин или пароль");
+                return LoginPage(pages, settings, "Неверный логин или пароль");
 
             var identity = new ClaimsIdentity(
                 [new Claim(ClaimTypes.Name, user.Login), new Claim(ClaimTypes.Role, user.Role.ToString())],
@@ -40,13 +42,17 @@ public static class AuthEndpoints
         });
     }
 
-    static IResult LoginPage(PageRenderer pages, string? error)
+    static IResult LoginPage(PageRenderer pages, SiteSettings settings, string? error)
         => Results.Content(
             pages.Render("login.html", new()
             {
                 ["page_title"] = "Вход",
                 ["error"] = error,
-                ["site"] = new Dictionary<string, object?> { ["title"] = "Samizdat" },
+                ["site"] = new Dictionary<string, object?>
+                {
+                    ["title"] = "Samizdat",
+                    ["color_scheme"] = settings.ColorScheme,
+                },
             }),
             "text/html; charset=utf-8");
 }

@@ -23,9 +23,50 @@ body {
 
 main { max-width: 44rem; margin: 0 auto; padding: 1rem 1.25rem 4rem; }
 .top, .bottom { max-width: 44rem; margin: 0 auto; padding: 1rem 1.25rem; color: var(--muted); }
-.top { border-bottom: 1px solid var(--line); }
+.top { border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
 .top a { color: var(--fg); font-family: system-ui, sans-serif; font-weight: bold; text-decoration: none; }
 .bottom { border-top: 1px solid var(--line); font-size: 0.9rem; }
+
+/* Меню владельца: <details> без js, раскрывается вправо под именем. */
+.user-menu { position: relative; font-family: system-ui, sans-serif; font-size: 0.9rem; }
+.user-menu summary {
+  cursor: pointer;
+  list-style: none;
+  color: var(--fg);
+  font-weight: bold;
+  padding: 0.3rem 0.5rem;
+}
+.user-menu summary::-webkit-details-marker { display: none; }
+.user-menu[open] summary { color: var(--accent); }
+.user-menu ul {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  margin: 0.25rem 0 0;
+  padding: 0.35rem;
+  min-width: 9rem;
+  list-style: none;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+.user-menu li { margin: 0; }
+.user-menu a, .user-menu button {
+  display: block;
+  width: 100%;
+  padding: 0.4rem 0.5rem;
+  border: none;
+  background: none;
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.user-menu a:hover, .user-menu button:hover { background: var(--callout); }
+.user-menu form { margin: 0; }
 
 /* Боковик: две колонки от 720px, ниже — одна колонка со сворачиваемым блоком сверху. */
 .shell {

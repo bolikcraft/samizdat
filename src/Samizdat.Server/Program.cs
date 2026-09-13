@@ -14,13 +14,14 @@ using Samizdat.Server.Storage;
 var builder = WebApplication.CreateBuilder(args);
 
 var dataRoot = builder.Configuration["Samizdat:DataRoot"] ?? "data";
-var themeName = builder.Configuration["Samizdat:Theme"] ?? "default";
 
 builder.Services.AddSingleton(new ArticleFiles(dataRoot));
-builder.Services.AddSingleton<IThemeSource>(new LayeredThemeSource(
-    new DiskThemeSource(Path.Combine(dataRoot, "themes", themeName)),
-    new EmbeddedThemeSource()));
-builder.Services.AddSingleton(services => new PageRenderer(services.GetRequiredService<IThemeSource>()));
+builder.Services.AddSingleton(services =>
+    new ThemeFactory(dataRoot, services.GetRequiredService<ILogger<ThemeFactory>>()));
+builder.Services.AddScoped<SiteSettings>();
+builder.Services.AddScoped<IThemeSource>(services =>
+    services.GetRequiredService<ThemeFactory>().Get(services.GetRequiredService<SiteSettings>().ThemeName));
+builder.Services.AddScoped(services => new PageRenderer(services.GetRequiredService<IThemeSource>()));
 builder.Services.AddSingleton<ArticleRenderer>();
 builder.Services.AddSingleton<PageCache>();
 

@@ -7,6 +7,7 @@ public sealed class SamizdatDbContext(DbContextOptions<SamizdatDbContext> option
     public DbSet<ArticleRow> Articles => Set<ArticleRow>();
     public DbSet<UserRow> Users => Set<UserRow>();
     public DbSet<ApiTokenRow> ApiTokens => Set<ApiTokenRow>();
+    public DbSet<SettingRow> Settings => Set<SettingRow>();
 
     protected override void OnModelCreating(ModelBuilder model)
     {
@@ -32,6 +33,14 @@ public sealed class SamizdatDbContext(DbContextOptions<SamizdatDbContext> option
             token.HasIndex(row => row.TokenHash).IsUnique();
             // Каскад: удалили владельца — токены сироты быть не должно, а не 500 при авторизации по нему.
             token.HasOne<UserRow>().WithMany().HasForeignKey(row => row.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        model.Entity<SettingRow>(setting =>
+        {
+            setting.ToTable("site_settings");
+            setting.HasKey(row => row.Key);
+            setting.Property(row => row.Key).HasMaxLength(100);
+            setting.Property(row => row.Value).HasMaxLength(500);
         });
     }
 }
