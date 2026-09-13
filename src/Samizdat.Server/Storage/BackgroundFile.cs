@@ -25,7 +25,7 @@ public sealed class BackgroundFile(string dataRoot)
     {
         if (head.Length >= 3 && head[0] == 0xFF && head[1] == 0xD8 && head[2] == 0xFF) return ".jpg";
         if (head.Length >= 8 && head[..8].SequenceEqual(PngSignature)) return ".png";
-        if (head.Length >= 12 && head[..4].SequenceEqual("RIFF"u8) && head[8..12].SequenceEqual("WEBP"u8))
+        if (head.Length >= HeadLength && head[..4].SequenceEqual("RIFF"u8) && head[8..HeadLength].SequenceEqual("WEBP"u8))
             return ".webp";
         return null;
     }
@@ -40,7 +40,8 @@ public sealed class BackgroundFile(string dataRoot)
         Directory.CreateDirectory(root);
         var name = $"background{extension}";
         var target = Path.Combine(root, name);
-        var tmp = target + ".tmp";
+        // Суффикс делает имя уникальным: два одновременных сохранения не столкнутся на File.Create.
+        var tmp = $"{target}.{Guid.NewGuid():N}.tmp";
 
         try
         {
@@ -49,7 +50,8 @@ public sealed class BackgroundFile(string dataRoot)
         }
         catch
         {
-            File.Delete(tmp);
+            // Сбой уборки временного файла не должен заслонить настоящую причину падения.
+            try { File.Delete(tmp); } catch { }
             throw;
         }
 

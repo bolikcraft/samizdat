@@ -48,10 +48,21 @@ public class BackgroundFileTests : IDisposable
         Assert.Null(BackgroundFile.ExtensionOf("MZ this is not a picture"u8));
     }
 
-    [Fact]
-    public void A_file_shorter_than_the_signature_has_no_extension()
+    [Theory]
+    [InlineData(".jpg")]
+    [InlineData(".png")]
+    [InlineData(".webp")]
+    public void A_file_shorter_than_the_signature_has_no_extension(string kind)
     {
-        Assert.Null(BackgroundFile.ExtensionOf(Webp()[..(BackgroundFile.HeadLength - 1)]));
+        // Каждая проверка на длину — отдельная граница: ослабление любой из них должно валить тест.
+        var head = kind switch
+        {
+            ".jpg" => Jpeg()[..2],
+            ".png" => Png()[..7],
+            _ => Webp()[..(BackgroundFile.HeadLength - 1)],
+        };
+
+        Assert.Null(BackgroundFile.ExtensionOf(head));
     }
 
     [Fact]
