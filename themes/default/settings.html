@@ -31,6 +31,7 @@
     </fieldset>
     <button type="submit">Сохранить</button>
   </form>
+  <h3>Фон</h3>
   <form method="post" action="/settings/background" class="settings-form" enctype="multipart/form-data">
     {{ antiforgery }}
     <label>Фон страницы
@@ -40,7 +41,7 @@
     <button type="submit">Загрузить фон</button>
   </form>
   {{ if site.background_url }}
-  <p><img class="background-preview" src="{{ site.background_url | html.escape }}" alt="Нынешний фон"></p>
+  <p><img class="background-preview" src="{{ site.background_url | html.escape }}" alt="Текущий фон"></p>
   <form method="post" action="/settings/background/remove" class="inline-form">
     {{ antiforgery }}
     <button type="submit">Убрать фон</button>

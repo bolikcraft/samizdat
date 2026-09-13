@@ -193,6 +193,7 @@ public class BackgroundTests : IDisposable
         return client;
     }
 
+    // Content-Type всегда image/jpeg, каким бы ни было содержимое: сервер должен судить по байтам, не по заголовку.
     static MultipartFormDataContent Upload(string tokenName, string tokenValue, byte[] bytes, string fileName)
     {
         var content = new MultipartFormDataContent { { new StringContent(tokenValue), tokenName } };
@@ -215,7 +216,6 @@ public class BackgroundTests : IDisposable
         Assert.Equal(Png(), await client.GetByteArrayAsync("/background"));
     }
 
-    // Браузеру верить нельзя: расширение и Content-Type он ставит какие угодно.
     [Fact]
     public async Task A_file_that_is_not_a_picture_is_refused()
     {
@@ -231,6 +231,36 @@ public class BackgroundTests : IDisposable
     }
 
     [Fact]
+    public async Task A_refused_upload_leaves_an_existing_background_in_place()
+    {
+        var factory = StartFactory();
+        var client = await OwnerClient(factory);
+        var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
+        await client.PostAsync("/settings/background", Upload(name, value, Jpeg(), "wall.jpg"));
+
+        (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
+        await client.PostAsync("/settings/background",
+            Upload(name, value, "MZ not a picture at all"u8.ToArray(), "wall.jpg"));
+
+        Assert.Equal(Jpeg(), await client.GetByteArrayAsync("/background"));
+        Assert.Single(Directory.EnumerateFiles(Path.Combine(dataRoot, "background")));
+    }
+
+    [Fact]
+    public async Task A_file_exactly_at_eight_megabytes_is_accepted()
+    {
+        var factory = StartFactory();
+        var client = await OwnerClient(factory);
+        var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
+        var atLimit = new byte[8 * 1024 * 1024];
+        Jpeg().CopyTo(atLimit, 0);
+
+        var response = await client.PostAsync("/settings/background", Upload(name, value, atLimit, "wall.jpg"));
+
+        Assert.Contains("ok=background", response.RequestMessage!.RequestUri!.ToString());
+    }
+
+    [Fact]
     public async Task A_file_over_eight_megabytes_is_refused()
     {
         var factory = StartFactory();
@@ -240,6 +270,23 @@ public class BackgroundTests : IDisposable
         Jpeg().CopyTo(big, 0);
 
         var response = await client.PostAsync("/settings/background", Upload(name, value, big, "wall.jpg"));
+
+        Assert.Contains("err=background_too_big", response.RequestMessage!.RequestUri!.ToString());
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/background")).StatusCode);
+    }
+
+    // Тело намного больше даже многочастной обёртки: должно упасть на пределе Kestrel для этого
+    // маршрута (RequestSizeLimit), а не докатиться до ReadFormAsync и превратиться в 500.
+    [Fact]
+    public async Task A_body_far_past_the_wire_limit_still_lands_on_the_message_not_a_crash()
+    {
+        var factory = StartFactory();
+        var client = await OwnerClient(factory);
+        var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
+        var huge = new byte[20 * 1024 * 1024];
+        Jpeg().CopyTo(huge, 0);
+
+        var response = await client.PostAsync("/settings/background", Upload(name, value, huge, "wall.jpg"));
 
         Assert.Contains("err=background_too_big", response.RequestMessage!.RequestUri!.ToString());
         Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/background")).StatusCode);
@@ -298,7 +345,8 @@ public class BackgroundTests : IDisposable
         var response = await client.PostAsync("/settings/background",
             new MultipartFormDataContent { { new ByteArrayContent(Jpeg()), "file", "wall.jpg" } });
 
-        Assert.NotEqual(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Found, response.StatusCode);
+        Assert.StartsWith("/login", response.Headers.Location?.PathAndQuery);
         Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/background")).StatusCode);
     }
 }

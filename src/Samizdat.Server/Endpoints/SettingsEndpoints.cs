@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Antiforgery;
+using Microsoft.AspNetCore.Mvc;
 using Samizdat.Core.Themes;
 using Samizdat.Server.Auth;
 using Samizdat.Server.Data;
@@ -11,6 +12,10 @@ namespace Samizdat.Server.Endpoints;
 public static class SettingsEndpoints
 {
     const long MaxBackgroundBytes = 8 * 1024 * 1024;
+
+    // Многочастная форма добавляет к файлу границы и заголовки полей — запас с лихвой их перекрывает,
+    // но остаётся далеко ниже, чем стандартный предел Kestrel на тело запроса (30 МБ), от которого и защищаемся.
+    const long MaxBackgroundRequestBytes = MaxBackgroundBytes + 64 * 1024;
 
     public static void MapSettings(this WebApplication app)
     {
@@ -101,9 +106,20 @@ public static class SettingsEndpoints
             return Results.Redirect("/settings?ok=appearance");
         }).RequireValidToken();
 
-        group.MapPost("/background", async (HttpContext context, SiteSettings settings, BackgroundFile background) =>
+        group.MapPost("/background", [RequestSizeLimit(MaxBackgroundRequestBytes)]
+            async (HttpContext context, SiteSettings settings, BackgroundFile background) =>
         {
-            var form = await context.Request.ReadFormAsync();
+            IFormCollection form;
+            try
+            {
+                form = await context.Request.ReadFormAsync();
+            }
+            catch (Exception e) when (e is BadHttpRequestException or InvalidDataException)
+            {
+                // Тело больше лимита: Kestrel обрывает чтение сам, не дав ReadFormAsync его додержать.
+                return Results.Redirect("/settings?err=background_too_big");
+            }
+
             var upload = form.Files["file"];
             if (upload is null || upload.Length == 0) return Results.Redirect("/settings?err=background_missing");
             if (upload.Length > MaxBackgroundBytes) return Results.Redirect("/settings?err=background_too_big");
@@ -111,7 +127,6 @@ public static class SettingsEndpoints
             await using var stream = upload.OpenReadStream();
             var head = new byte[BackgroundFile.HeadLength];
             var read = await stream.ReadAtLeastAsync(head, head.Length, throwOnEndOfStream: false);
-            // Тип по первым байтам: расширение и Content-Type ставит браузер, им верить нельзя.
             if (BackgroundFile.ExtensionOf(head.AsSpan(0, read)) is not { } extension)
                 return Results.Redirect("/settings?err=background_type");
 

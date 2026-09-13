@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Samizdat.Server.Auth;
 using Samizdat.Server.Data;
+using Samizdat.Server.Storage;
 
 namespace Samizdat.Server.Tests;
 
@@ -76,6 +77,23 @@ public class SettingsPageTests : IDisposable
         File.WriteAllText(path, text);
     }
 
+    void PutBackground(WebApplicationFactory<Program> factory, byte[] bytes, string name)
+    {
+        var folder = Path.Combine(dataRoot, "background");
+        Directory.CreateDirectory(folder);
+        File.WriteAllBytes(Path.Combine(folder, name), bytes);
+
+        using var scope = factory.Services.CreateScope();
+        scope.ServiceProvider.GetRequiredService<SiteSettings>().Set("theme.background", name);
+    }
+
+    void RemoveBackground(WebApplicationFactory<Program> factory)
+    {
+        using var scope = factory.Services.CreateScope();
+        scope.ServiceProvider.GetRequiredService<BackgroundFile>().Remove();
+        scope.ServiceProvider.GetRequiredService<SiteSettings>().Set("theme.background", "");
+    }
+
     // Форма достаёт свой antiforgery-токен со страницы — сервер требует его на каждом небезопасном POST.
     static (string Name, string Value) AntiforgeryToken(string html)
     {
@@ -110,7 +128,32 @@ public class SettingsPageTests : IDisposable
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Contains("action=\"/settings/password\"", html);
         Assert.Contains("action=\"/settings/appearance\"", html);
+        Assert.Contains("action=\"/settings/background\"", html);
+        Assert.Contains("enctype=\"multipart/form-data\"", html);
+        Assert.Contains("name=\"file\"", html);
         Assert.Contains("token new", html);
+    }
+
+    [Fact]
+    public async Task The_background_preview_and_remove_button_appear_only_while_a_background_is_set()
+    {
+        var factory = StartFactory();
+        AddOwner(factory, "aleks", "тайна");
+        var client = await LoginClient(factory, "aleks", "тайна");
+
+        var before = await client.GetStringAsync("/settings");
+        Assert.DoesNotContain("background-preview", before);
+        Assert.DoesNotContain("action=\"/settings/background/remove\"", before);
+
+        PutBackground(factory, [0xFF, 0xD8, 0xFF, 0xE0, 1, 2, 3, 4], "background.jpg");
+        var withBackground = await client.GetStringAsync("/settings");
+        Assert.Contains("background-preview", withBackground);
+        Assert.Contains("action=\"/settings/background/remove\"", withBackground);
+
+        RemoveBackground(factory);
+        var after = await client.GetStringAsync("/settings");
+        Assert.DoesNotContain("background-preview", after);
+        Assert.DoesNotContain("action=\"/settings/background/remove\"", after);
     }
 
     [Fact]
