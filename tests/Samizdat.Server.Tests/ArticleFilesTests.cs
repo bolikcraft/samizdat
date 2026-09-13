@@ -29,6 +29,20 @@ public class ArticleFilesTests : IDisposable
     [InlineData("S")]
     public void IsReservedSlug_covers_both_letter_cases(string slug) => Assert.True(ArticleFiles.IsReservedSlug(slug));
 
+    // Все эти сегменты — литеральные маршруты, которые побеждают /{slug}: статья с таким именем
+    // была бы недоступна за своим адресом.
+    [Theory]
+    [InlineData("login")]
+    [InlineData("Login")]
+    [InlineData("settings")]
+    [InlineData("assets")]
+    [InlineData("background")]
+    [InlineData("Background")]
+    public void IsReservedSlug_covers_every_literal_route(string slug) => Assert.True(ArticleFiles.IsReservedSlug(slug));
+
+    [Fact]
+    public void IsReservedSlug_leaves_ordinary_slugs_alone() => Assert.False(ArticleFiles.IsReservedSlug("privet-mir"));
+
     [Fact]
     public void Staging_and_backup_folders_are_hidden_from_the_article_list()
     {

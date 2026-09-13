@@ -563,6 +563,10 @@ public class ShareLinkTests : IDisposable
     [Theory]
     [InlineData("s")]
     [InlineData("S")]
+    [InlineData("login")]
+    [InlineData("settings")]
+    [InlineData("assets")]
+    [InlineData("background")]
     public async Task Article_with_the_reserved_slug_is_refused(string slug)
     {
         using var factory = StartFactory();
@@ -575,7 +579,7 @@ public class ShareLinkTests : IDisposable
         var response = await client.PutAsync($"/api/articles/{slug}", form);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        Assert.Contains("/s/", await response.Content.ReadAsStringAsync());
+        Assert.Contains(slug, await response.Content.ReadAsStringAsync());
     }
 
     [Fact]
