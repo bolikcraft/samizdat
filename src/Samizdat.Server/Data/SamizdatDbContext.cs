@@ -8,6 +8,7 @@ public sealed class SamizdatDbContext(DbContextOptions<SamizdatDbContext> option
     public DbSet<UserRow> Users => Set<UserRow>();
     public DbSet<ApiTokenRow> ApiTokens => Set<ApiTokenRow>();
     public DbSet<SettingRow> Settings => Set<SettingRow>();
+    public DbSet<ShareLinkRow> ShareLinks => Set<ShareLinkRow>();
 
     protected override void OnModelCreating(ModelBuilder model)
     {
@@ -41,6 +42,17 @@ public sealed class SamizdatDbContext(DbContextOptions<SamizdatDbContext> option
             setting.HasKey(row => row.Key);
             setting.Property(row => row.Key).HasMaxLength(100);
             setting.Property(row => row.Value).HasMaxLength(500);
+        });
+
+        model.Entity<ShareLinkRow>(link =>
+        {
+            link.ToTable("share_links");
+            link.HasIndex(row => row.Token).IsUnique();
+            link.Property(row => row.Token).HasMaxLength(22);
+            link.Property(row => row.Slug).HasMaxLength(200);
+            link.Property(row => row.Note).HasMaxLength(200);
+            // Каскад: статью снесли через push --prune — её ссылки не должны пережить статью.
+            link.HasOne<ArticleRow>().WithMany().HasForeignKey(row => row.Slug).OnDelete(DeleteBehavior.Cascade);
         });
     }
 }
