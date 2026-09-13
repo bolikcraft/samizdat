@@ -36,6 +36,34 @@ public static class ServerCommands
             return true;
         }
 
+        if (args is ["token", "new", ..])
+        {
+            using var scope = services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+            await db.Database.MigrateAsync();
+
+            var owner = await db.Users.FirstOrDefaultAsync(user => user.Role == UserRole.Owner);
+            if (owner is null)
+            {
+                Console.Error.WriteLine("Сначала заведите владельца: owner set <логин> <пароль>");
+                return true;
+            }
+
+            var token = ApiToken.Create();
+            db.ApiTokens.Add(new ApiTokenRow
+            {
+                UserId = owner.Id,
+                TokenHash = ApiToken.HashOf(token),
+                Note = args.Length > 2 ? args[2] : null,
+                CreatedAt = DateTimeOffset.UtcNow,
+            });
+            await db.SaveChangesAsync();
+
+            Console.WriteLine(token);
+            Console.Error.WriteLine("Токен показан один раз, сохраните его.");
+            return true;
+        }
+
         return false;
     }
 }

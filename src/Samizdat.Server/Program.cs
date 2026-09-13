@@ -1,7 +1,9 @@
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
 using Samizdat.Core.Rendering;
 using Samizdat.Core.Themes;
+using Samizdat.Server.Auth;
 using Samizdat.Server.Commands;
 using Samizdat.Server.Data;
 using Samizdat.Server.Endpoints;
@@ -36,7 +38,8 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
         options.ExpireTimeSpan = TimeSpan.FromDays(30);
         options.SlidingExpiration = true;
-    });
+    })
+    .AddScheme<AuthenticationSchemeOptions, ApiTokenAuthenticationHandler>(ApiToken.Scheme, _ => { });
 builder.Services.AddAuthorization();
 
 var app = builder.Build();
@@ -50,6 +53,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapAuth();
 app.MapPages().RequireAuthorization();
+app.MapApi();
 app.Run();
 
 public partial class Program; // нужен WebApplicationFactory в тестах
