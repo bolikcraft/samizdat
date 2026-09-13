@@ -2,18 +2,29 @@ using System.Net;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Samizdat.Server.Data;
 
 namespace Samizdat.Server.Tests;
 
+[Collection("db")]
 public class PageEndpointsTests : IDisposable
 {
+    readonly DatabaseFixture database;
     readonly string dataRoot = Directory.CreateTempSubdirectory("samizdat-data").FullName;
 
-    HttpClient StartServer()
+    public PageEndpointsTests(DatabaseFixture database)
     {
-        var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
-            builder.UseSetting("Samizdat:DataRoot", dataRoot));
-        return factory.CreateClient();
+        this.database = database;
+        database.ResetDatabase();
+    }
+
+    WebApplicationFactory<Program> StartServer()
+    {
+        return new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("Samizdat:DataRoot", dataRoot);
+            builder.UseSetting("ConnectionStrings:Postgres", database.ConnectionString);
+        });
     }
 
     // data/themes/default — каталог темы на диске, который переопределяет встроенную (см. Program.cs).
@@ -31,11 +42,24 @@ public class PageEndpointsTests : IDisposable
         File.WriteAllText(Path.Combine(folder, "index.md"), text);
     }
 
+    void Register(WebApplicationFactory<Program> factory, string slug, string title)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+        db.Articles.Add(new ArticleRow
+        {
+            Slug = slug, Title = title, ContentHash = "x", UpdatedAt = DateTimeOffset.UtcNow,
+        });
+        db.SaveChanges();
+    }
+
     [Fact]
     public async Task Shows_article_page()
     {
         WriteArticle("privet", "---\ntitle: Привет\n---\n# Привет\n\nтекст\n");
-        var client = StartServer();
+        var factory = StartServer();
+        Register(factory, "privet", "Привет");
+        var client = factory.CreateClient();
 
         var html = await client.GetStringAsync("/privet");
 
@@ -46,7 +70,7 @@ public class PageEndpointsTests : IDisposable
     [Fact]
     public async Task Unknown_slug_returns_404_page()
     {
-        var client = StartServer();
+        var client = StartServer().CreateClient();
 
         var response = await client.GetAsync("/нет-такой");
 
@@ -55,11 +79,24 @@ public class PageEndpointsTests : IDisposable
     }
 
     [Fact]
+    public async Task Article_file_without_database_row_is_not_shown()
+    {
+        WriteArticle("сирота", "---\ntitle: Сирота\n---\nтекст\n");
+        var client = StartServer().CreateClient();
+
+        var response = await client.GetAsync("/сирота");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Serves_attachment_from_article_folder()
     {
         WriteArticle("s", "---\ntitle: T\n---\n![[pic.png]]");
         File.WriteAllBytes(Path.Combine(dataRoot, "articles", "s", "pic.png"), [1, 2, 3]);
-        var client = StartServer();
+        var factory = StartServer();
+        Register(factory, "s", "T");
+        var client = factory.CreateClient();
 
         var response = await client.GetAsync("/s/pic.png");
 
@@ -70,7 +107,7 @@ public class PageEndpointsTests : IDisposable
     [Fact]
     public async Task Path_outside_article_folder_is_refused()
     {
-        var client = StartServer();
+        var client = StartServer().CreateClient();
 
         var response = await client.GetAsync("/s/..%2f..%2fappsettings.json");
 
@@ -86,7 +123,9 @@ public class PageEndpointsTests : IDisposable
         {
             WriteArticle("s", "---\ntitle: T\n---\nтекст\n");
             File.CreateSymbolicLink(Path.Combine(dataRoot, "articles", "s", "leak.txt"), secret);
-            var client = StartServer();
+            var factory = StartServer();
+            Register(factory, "s", "T");
+            var client = factory.CreateClient();
 
             var response = await client.GetAsync("/s/leak.txt");
 
@@ -102,7 +141,9 @@ public class PageEndpointsTests : IDisposable
     public async Task Article_title_with_markup_is_escaped()
     {
         WriteArticle("evil", "---\ntitle: \"</title><script>alert(1)</script>\"\n---\nтекст\n");
-        var client = StartServer();
+        var factory = StartServer();
+        Register(factory, "evil", "</title><script>alert(1)</script>");
+        var client = factory.CreateClient();
 
         var html = await client.GetStringAsync("/evil");
 
@@ -116,7 +157,9 @@ public class PageEndpointsTests : IDisposable
         WriteArticle("s", "---\ntitle: Old\n---\nold text \n");
         var path = Path.Combine(dataRoot, "articles", "s", "index.md");
         var writeTime = File.GetLastWriteTimeUtc(path);
-        var client = StartServer();
+        var factory = StartServer();
+        Register(factory, "s", "Old");
+        var client = factory.CreateClient();
 
         var before = await client.GetStringAsync("/s");
         Assert.Contains("Old", before);
@@ -135,7 +178,9 @@ public class PageEndpointsTests : IDisposable
     public async Task Changed_write_time_rebuilds_cached_page()
     {
         WriteArticle("s", "---\ntitle: Old\n---\nтекст\n");
-        var client = StartServer();
+        var factory = StartServer();
+        Register(factory, "s", "Old");
+        var client = factory.CreateClient();
 
         var before = await client.GetStringAsync("/s");
         Assert.Contains("Old", before);
@@ -153,7 +198,9 @@ public class PageEndpointsTests : IDisposable
     {
         WriteArticle("privet", "---\ntitle: Привет\n---\nтекст\n");
         WriteThemeFile("article.html", "old<h1>{{ article.title }}</h1>{{ article.html }}");
-        var client = StartServer();
+        var factory = StartServer();
+        Register(factory, "privet", "Привет");
+        var client = factory.CreateClient();
 
         var before = await client.GetStringAsync("/privet");
         Assert.Contains("old", before);

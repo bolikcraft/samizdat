@@ -1,5 +1,7 @@
+using Microsoft.EntityFrameworkCore;
 using Samizdat.Core.Rendering;
 using Samizdat.Core.Themes;
+using Samizdat.Server.Data;
 using Samizdat.Server.Endpoints;
 using Samizdat.Server.Rendering;
 using Samizdat.Server.Storage;
@@ -15,18 +17,20 @@ builder.Services.AddSingleton<IThemeSource>(new LayeredThemeSource(
     new EmbeddedThemeSource()));
 builder.Services.AddSingleton(services => new PageRenderer(services.GetRequiredService<IThemeSource>()));
 builder.Services.AddSingleton<ArticleRenderer>();
-builder.Services.AddSingleton<IArticleLookup>(services =>
-    new FolderArticleLookup(services.GetRequiredService<ArticleFiles>()));
 builder.Services.AddSingleton<PageCache>();
 
+builder.Services.AddDbContext<SamizdatDbContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("Postgres")
+                      ?? "Host=localhost;Database=samizdat;Username=samizdat"));
+
+builder.Services.AddScoped<IArticleLookup, DbArticleLookup>();
+
 var app = builder.Build();
+
+using (var scope = app.Services.CreateScope())
+    scope.ServiceProvider.GetRequiredService<SamizdatDbContext>().Database.Migrate();
+
 app.MapPages();
 app.Run();
-
-/// Временно: список статей берётся с диска. Task 12 заменит его на базу.
-public sealed class FolderArticleLookup(ArticleFiles files) : IArticleLookup
-{
-    public bool Exists(string slug) => Directory.Exists(files.Folder(slug));
-}
 
 public partial class Program; // нужен WebApplicationFactory в тестах

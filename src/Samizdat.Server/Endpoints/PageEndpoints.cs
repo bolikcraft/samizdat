@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.StaticFiles;
 using Samizdat.Core;
 using Samizdat.Core.Rendering;
 using Samizdat.Core.Themes;
+using Samizdat.Server.Data;
 using Samizdat.Server.Rendering;
 using Samizdat.Server.Storage;
 
@@ -13,12 +14,15 @@ public static class PageEndpoints
 
     public static void MapPages(this WebApplication app)
     {
-        app.MapGet("/", (PageRenderer pages, ArticleFiles files) =>
+        app.MapGet("/", (PageRenderer pages, SamizdatDbContext db) =>
         {
-            var list = files.AllSlugs().Order().Select(slug => new Dictionary<string, object?>
+            var rows = db.Articles.OrderByDescending(article => article.Date).ToList();
+            var list = rows.Select(article => new Dictionary<string, object?>
             {
-                ["slug"] = slug,
-                ["title"] = FrontMatterParser.Parse(files.ReadMarkdown(slug) ?? "").FrontMatter.Title ?? slug,
+                ["slug"] = article.Slug,
+                ["title"] = article.Title,
+                ["description"] = article.Description,
+                ["date"] = article.Date.HasValue ? article.Date.Value.ToString("yyyy-MM-dd") : null,
             }).ToList();
 
             return Results.Content(pages.Render("index.html", new()
@@ -31,8 +35,17 @@ public static class PageEndpoints
 
         app.MapGet("/{slug}", (string slug, PageRenderer pages, ArticleFiles files,
                                ArticleRenderer markdown, IArticleLookup articles,
-                               PageCache cache, IThemeSource theme) =>
+                               PageCache cache, IThemeSource theme, SamizdatDbContext db,
+                               ILogger<Program> logger) =>
         {
+            var row = db.Articles.Find(slug);
+            if (row is null)
+            {
+                if (files.ReadMarkdown(slug) is not null)
+                    logger.LogWarning("Статья {Slug} есть на диске, но её нет в базе", slug);
+                return NotFound(pages);
+            }
+
             var fingerprint = files.Fingerprint(slug);
             if (fingerprint is null) return NotFound(pages);
 
