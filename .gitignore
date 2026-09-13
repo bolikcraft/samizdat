@@ -1,0 +1,25 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+artifacts/
+TestResults/
+
+# Rider / VS Code
+.idea/
+.vscode/
+
+# Секреты и локальные настройки
+appsettings.Development.json
+appsettings.Local.json
+.env
+*.pfx
+
+# Данные запуска: заметки, вложения, дампы
+data/
+*.db
+
+# Спеки и планы остаются на диске, в историю не идут
+docs/superpowers/
