@@ -49,6 +49,7 @@ if (await ServerCommands.TryRun(args, app.Services)) return;
 using (var scope = app.Services.CreateScope())
     scope.ServiceProvider.GetRequiredService<SamizdatDbContext>().Database.Migrate();
 
+app.MapErrorHandling();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapAuth();
