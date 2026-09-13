@@ -24,3 +24,6 @@ data/
 
 # Спеки и планы остаются на диске, в историю не идут
 docs/superpowers/
+
+# Макеты сессий brainstorming
+.superpowers/
