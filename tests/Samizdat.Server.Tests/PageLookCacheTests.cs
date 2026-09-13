@@ -5,12 +5,12 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Samizdat.Server.Auth;
 using Samizdat.Server.Data;
+using Samizdat.Server.Rendering;
 
 namespace Samizdat.Server.Tests;
 
-/// Проверяет, что Task 5 действительно заставляет кэш страниц замечать смену вида
-/// (тему, схему, фон): без ViewFingerprint в ключе старый html из PageCache пережил бы
-/// правку настроек. Хелперы — копия из BackgroundTests.cs, дублирование осознанное.
+/// Кэш страниц должен замечать смену вида (тему, схему, фон): без ViewFingerprint в ключе
+/// старый html из PageCache пережил бы правку настроек.
 [Collection("db")]
 public class PageLookCacheTests : IDisposable
 {
@@ -33,6 +33,10 @@ public class PageLookCacheTests : IDisposable
         });
 
     static byte[] Jpeg() => [0xFF, 0xD8, 0xFF, 0xE0, 1, 2, 3, 4, 5, 6, 7, 8];
+
+    // Ищем объявление свойства, а не один адрес: голый "/background?v=" нашёлся бы и в комментарии
+    // темы, утёкшем в разметку, — ровно тот баг, что чинил 95df17b.
+    const string BackgroundStyle = "--bg-image: url(\"/background?v=";
 
     void AddOwner(WebApplicationFactory<Program> factory, string login, string password)
     {
@@ -98,6 +102,14 @@ public class PageLookCacheTests : IDisposable
         db.SaveChanges();
     }
 
+    void AddShareLink(WebApplicationFactory<Program> factory, string token, string slug)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+        db.ShareLinks.Add(new ShareLinkRow { Token = token, Slug = slug, CreatedAt = DateTimeOffset.UtcNow });
+        db.SaveChanges();
+    }
+
     [Fact]
     public async Task An_article_page_picks_up_a_new_colour_scheme()
     {
@@ -126,12 +138,30 @@ public class PageLookCacheTests : IDisposable
         var client = await OwnerClient(factory);
 
         var before = await client.GetStringAsync("/zametka");
-        Assert.DoesNotContain("/background", before);
+        Assert.DoesNotContain("--bg-image", before);
 
         await UploadBackground(client);
 
         var after = await client.GetStringAsync("/zametka");
-        Assert.Contains("/background?v=", after);
+        Assert.Contains(BackgroundStyle, after);
+    }
+
+    [Fact]
+    public async Task An_article_page_loses_the_background_after_it_is_removed()
+    {
+        WriteArticle("zametka", "---\ntitle: Заметка\n---\nтекст\n");
+        var factory = StartFactory();
+        RegisterArticle(factory, "zametka", "Заметка");
+        var client = await OwnerClient(factory);
+
+        await UploadBackground(client);
+        Assert.Contains(BackgroundStyle, await client.GetStringAsync("/zametka"));
+
+        var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
+        await client.PostAsync("/settings/background/remove", new FormUrlEncodedContent(
+            new Dictionary<string, string> { [name] = value }));
+
+        Assert.DoesNotContain("--bg-image", await client.GetStringAsync("/zametka"));
     }
 
     [Fact]
@@ -140,21 +170,54 @@ public class PageLookCacheTests : IDisposable
         WriteArticle("zametka", "---\ntitle: Заметка\n---\nтекст\n");
         var factory = StartFactory();
         RegisterArticle(factory, "zametka", "Заметка");
-        using (var scope = factory.Services.CreateScope())
-        {
-            var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
-            db.ShareLinks.Add(new ShareLinkRow { Token = "gost", Slug = "zametka", CreatedAt = DateTimeOffset.UtcNow });
-            db.SaveChanges();
-        }
+        AddShareLink(factory, "gost", "zametka");
 
         var guest = factory.CreateClient();
         var before = await guest.GetStringAsync("/s/gost");
-        Assert.DoesNotContain("/background", before);
+        Assert.DoesNotContain("--bg-image", before);
 
         var owner = await OwnerClient(factory);
         await UploadBackground(owner);
 
         var after = await guest.GetStringAsync("/s/gost");
-        Assert.Contains("/background?v=", after);
+        Assert.Contains(BackgroundStyle, after);
+    }
+
+    [Fact]
+    public async Task The_guest_page_behind_a_share_link_picks_up_a_new_colour_scheme()
+    {
+        WriteArticle("zametka", "---\ntitle: Заметка\n---\nтекст\n");
+        var factory = StartFactory();
+        RegisterArticle(factory, "zametka", "Заметка");
+        AddShareLink(factory, "gost", "zametka");
+
+        var guest = factory.CreateClient();
+        Assert.Contains("data-color-scheme=\"system\"", await guest.GetStringAsync("/s/gost"));
+
+        var owner = await OwnerClient(factory);
+        var (name, value) = AntiforgeryToken(await owner.GetStringAsync("/settings"));
+        await owner.PostAsync("/settings/appearance", new FormUrlEncodedContent(
+            new Dictionary<string, string> { [name] = value, ["theme"] = "default", ["color_scheme"] = "dark" }));
+
+        Assert.Contains("data-color-scheme=\"dark\"", await guest.GetStringAsync("/s/gost"));
+    }
+
+    /// ThemeFactory отдаёт для темы, которой нет на диске, встроенную default, поэтому у двух
+    /// таких имён одинаковый theme.Version. В ключе кэша их различает только имя из отпечатка вида.
+    [Fact]
+    public void The_view_fingerprint_separates_two_theme_names_with_the_same_files()
+    {
+        var factory = StartFactory();
+        using var scope = factory.Services.CreateScope();
+        var settings = scope.ServiceProvider.GetRequiredService<SiteSettings>();
+        var themes = scope.ServiceProvider.GetRequiredService<ThemeFactory>();
+
+        Assert.Equal(themes.Get("pervaya").Version, themes.Get("vtoraya").Version);
+
+        settings.Set("theme.name", "pervaya");
+        var first = settings.ViewFingerprint;
+        settings.Set("theme.name", "vtoraya");
+
+        Assert.NotEqual(first, settings.ViewFingerprint);
     }
 }
