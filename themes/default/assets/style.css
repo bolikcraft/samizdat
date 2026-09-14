@@ -115,21 +115,16 @@ body {
 .user-menu a:hover, .user-menu button:hover { background: var(--callout); }
 .user-menu form { margin: 0; }
 
-/* Общая панель: навигация и статья лежат в одном скруглённом блоке.
-   Панель непрозрачная: сквозь неё читают длинный текст, и снимок под ним мешает.
-   Потолка ширины нет намеренно: панель тянется под любое окно, отступ от краёв одинаковый.
-   Ниже 720px панель разворачивается в одну колонку со сворачиваемым деревом сверху. */
+/* Два блока рядом: дерево на матовом стекле и статья на плотном фоне. Сама обёртка держит
+   только раскладку, своего фона у неё нет — иначе стекло боковика показывало бы её, а не снимок.
+   Потолка ширины нет намеренно: блоки тянутся под любое окно, отступ от краёв одинаковый.
+   Ниже 720px они складываются в одну колонку со сворачиваемым деревом сверху. */
 .shell {
   width: calc(100% - 2rem);
   margin: 0 auto 1.5rem;
-  padding: 1.25rem 1.5rem 2rem;
   display: grid;
   grid-template-columns: 16rem minmax(0, 1fr);
-  gap: 2rem;
-  background: var(--panel-solid);
-  border: 1px solid var(--panel-border);
-  border-radius: 14px;
-  box-shadow: var(--shadow);
+  gap: 1rem;
 }
 
 /* Страницы без дерева: вход, настройки, ошибки, статья по гостевой ссылке. */
@@ -137,15 +132,33 @@ body {
 /* Вход — одна короткая форма, широкая панель вокруг неё смотрится пустой. */
 .shell-plain:has(.login) { width: min(26rem, calc(100% - 2rem)); }
 
-/* Статья занимает всю ширину панели от боковика до правого края — так решено при разборе. */
-.shell main { max-width: none; margin: 0; padding: 0; }
-
-/* Меню владельца висит над снимком; без размытия оно становится плотным. */
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .user-menu ul { background: var(--panel-solid); }
+/* Читалка: плотный фон, сквозь снимок длинный текст читать тяжело.
+   Ширину не ограничиваем — статья тянется от боковика до правого края. */
+.shell main {
+  max-width: none;
+  margin: 0;
+  padding: 1.25rem 1.5rem 2rem;
+  background: var(--panel-solid);
+  border: 1px solid var(--panel-border);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
 }
 
-.sidebar { border-right: 1px solid var(--line); }
+/* Боковик остаётся матовым стеклом: снимок под ним видно, а мешать там нечему. */
+.sidebar {
+  padding: 1.25rem 1rem;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+}
+
+/* Боковик и меню владельца висят над снимком; без размытия они становятся плотными. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .sidebar, .user-menu ul { background: var(--panel-solid); }
+}
 /* Переключатель дерева нужен только узкому экрану. */
 .nav-switch { display: none; }
 /* Ход липкому блоку даёт колонка: она тянется во всю высоту панели (выравнивание грида
@@ -157,7 +170,6 @@ body {
   flex-direction: column;
   gap: 0.6rem;
   max-height: calc(100vh - 2rem);
-  padding: 0 1rem 0 0;
 }
 
 #nav-filter {
@@ -207,16 +219,11 @@ body {
   /* На iOS background-attachment: fixed рисует картинку неправильно. */
   body { background-attachment: scroll; }
   .top, .bottom { width: calc(100% - 1rem); padding: 0.75rem 0.25rem; }
-  .shell, .shell-plain {
-    display: block;
-    width: calc(100% - 1rem);
-    padding: 0.75rem;
-    border-radius: 10px;
-  }
+  .shell, .shell-plain { display: block; width: calc(100% - 1rem); }
   /* Отдельным правилом: браузер без :has() выбросил бы весь список селекторов вместе с ним. */
   .shell-plain:has(.login) { width: calc(100% - 1rem); }
-  .shell main { padding: 0.5rem 0 1rem; }
-  .sidebar { border-right: none; border-bottom: 1px solid var(--line); }
+  .shell main { padding: 0.75rem; border-radius: 10px; }
+  .sidebar { margin-bottom: 0.75rem; padding: 0.75rem; border-radius: 10px; }
   .nav-switch { display: block; }
   .nav-switch summary {
     cursor: pointer;
