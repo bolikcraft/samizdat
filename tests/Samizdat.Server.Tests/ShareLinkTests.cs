@@ -245,6 +245,24 @@ public class ShareLinkTests : IDisposable
     }
 
     [Fact]
+    public async Task Guest_page_fills_the_window()
+    {
+        using var factory = StartFactory();
+        WriteArticle("statya", "Текст статьи.");
+        RegisterArticle(factory, "statya", "Про ежей", ArticleVisibility.Shared);
+        var token = AddLink(factory, "statya");
+        var client = factory.CreateClient();
+
+        var html = await client.GetStringAsync($"/s/{token}");
+        var css = await client.GetStringAsync("/assets/style.css");
+
+        Assert.Contains("shell-full", html);
+        // Своей прокрутки у панели нет: длинный текст растит страницу целиком.
+        Assert.Contains("body:has(.shell-full) .shell-full main { flex: 1; }", css);
+        Assert.DoesNotContain("shell-full main { height: 100%; overflow-y: auto; }", css);
+    }
+
+    [Fact]
     public async Task Guest_page_does_not_show_other_slugs()
     {
         using var factory = StartFactory();

@@ -158,6 +158,8 @@ body {
 .shell-plain { display: block; width: min(52rem, calc(100% - 2rem)); }
 /* Вход — одна короткая форма, широкая панель вокруг неё смотрится пустой. */
 .shell-plain:has(.login) { width: min(26rem, calc(100% - 2rem)); }
+/* Статья по гостевой ссылке: панель во всю ширину окна, высоту ей даёт правило ниже. */
+.shell-full { width: calc(100% - 2rem); }
 
 /* Читалка: плотный фон, сквозь снимок длинный текст читать тяжело.
    Ширину не ограничиваем — статья тянется от боковика до правого края. */
@@ -406,6 +408,13 @@ blockquote { margin: 1.2rem 0; padding-left: 1rem; border-left: 4px solid var(--
   body:has(.settings-nav) .shell main { display: flex; flex-direction: column; overflow: hidden; }
   /* Заголовок страницы и сообщение о сохранении стоят на месте, едет только раздел. */
   body:has(.settings-nav) .settings-panes { flex: 1; min-height: 0; overflow-y: auto; }
+
+  /* Гостевая статья: панель тянется до низа окна, но своей прокрутки не имеет. Длинный текст
+     растит страницу, и шапка с подвалом уезжают вместе с ней — так подвал не отнимает у панели
+     полосу в каждом экране. Высоту даёт flex: 1 при body min-height: 100vh. */
+  body:has(.shell-full) { display: flex; flex-direction: column; }
+  body:has(.shell-full) .shell-full { display: flex; flex-direction: column; flex: 1; }
+  body:has(.shell-full) .shell-full main { flex: 1; }
 }
 
 /* Виден один раздел: тот, чей якорь стоит в адресе. Без якоря — первый: правило ниже держится
