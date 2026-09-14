@@ -59,7 +59,7 @@ body {
 }
 
 .top, .bottom {
-  width: min(100rem, calc(100% - 2rem));
+  width: calc(100% - 2rem);
   margin: 0 auto;
   padding: 1rem 0.5rem;
   color: var(--muted);
@@ -117,9 +117,10 @@ body {
 .user-menu form { margin: 0; }
 
 /* Общая панель: навигация и статья лежат в одном скруглённом блоке матового стекла.
+   Потолка ширины нет намеренно: панель тянется под любое окно, отступ от краёв одинаковый.
    Ниже 720px панель разворачивается в одну колонку со сворачиваемым деревом сверху. */
 .shell {
-  width: min(100rem, calc(100% - 2rem));
+  width: calc(100% - 2rem);
   margin: 0 auto 1.5rem;
   padding: 1.25rem 1.5rem 2rem;
   display: grid;
