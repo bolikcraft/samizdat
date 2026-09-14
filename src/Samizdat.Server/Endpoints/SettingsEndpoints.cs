@@ -307,7 +307,9 @@ public static class SettingsEndpoints
             {
                 ["file"] = image.File,
                 ["title"] = image.Title,
-                ["url"] = $"/assets/backgrounds/{image.File}",
+                // Плитке хватает миниатюры: полный снимок весит в десять раз больше и нужен
+                // только когда фон уже выбран.
+                ["url"] = $"/assets/backgrounds/{image.Thumb}",
                 ["selected"] = choice.Kind == BackgroundKind.Preset && choice.Value == image.File,
             }).ToList(),
             ["colors"] = catalog.Colors.Select(color => new Dictionary<string, object?>

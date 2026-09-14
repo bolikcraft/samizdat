@@ -3,7 +3,9 @@ using System.Text.RegularExpressions;
 
 namespace Samizdat.Core.Themes;
 
-public sealed record BackgroundImage(string File, string Title);
+/// Thumb — та же картинка размером с плитку. У рисованных фонов её нет: они и так весят копейки,
+/// и Thumb там равен File.
+public sealed record BackgroundImage(string File, string Title, string Thumb);
 
 /// Набор фонов темы: картинки лежат в assets/backgrounds/, список и палитра — в assets/backgrounds.json.
 /// Имена и цвета отсюда уезжают в настройки, в адреса и в разметку страницы, поэтому файл темы —
@@ -45,7 +47,10 @@ public sealed partial class BackgroundCatalog
 
         var images = (manifest.Images ?? [])
             .Where(image => image.File is not null && FileName().IsMatch(image.File))
-            .Select(image => new BackgroundImage(image.File!, image.Title ?? image.File!))
+            .Select(image => new BackgroundImage(image.File!, image.Title ?? image.File!,
+                                                 Thumb: image.Thumb is { } thumb && FileName().IsMatch(thumb)
+                                                     ? thumb
+                                                     : image.File!))
             .ToList();
         var colors = (manifest.Colors ?? []).Where(color => Hex().IsMatch(color)).ToList();
 
@@ -56,7 +61,7 @@ public sealed partial class BackgroundCatalog
 
     sealed record Manifest(List<ManifestImage>? Images, List<string>? Colors);
 
-    sealed record ManifestImage(string? File, string? Title);
+    sealed record ManifestImage(string? File, string? Title, string? Thumb);
 
     /// Имя файла, а не путь: значение уходит в адрес /assets/backgrounds/<файл>.
     [GeneratedRegex(@"^[a-z0-9-]+\.(svg|jpg|jpeg|png|webp)$")]

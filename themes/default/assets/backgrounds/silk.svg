@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="deepnight" x1="0" y1="0" x2="0.6" y2="1">
+      <stop offset="0" stop-color="#0a0714"/>
+      <stop offset="0.55" stop-color="#1a0f2b"/>
+      <stop offset="1" stop-color="#2c1330"/>
+    </linearGradient>
+    <!-- Градиент идёт вдоль ленты, из угла в угол: по дороге лента успевает сменить цвет. -->
+    <linearGradient id="ribbon1" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#ffb347"/>
+      <stop offset="0.35" stop-color="#ff5f6d"/>
+      <stop offset="0.7" stop-color="#c341e8"/>
+      <stop offset="1" stop-color="#4b2bd6"/>
+    </linearGradient>
+    <linearGradient id="ribbon2" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#ffe0a3"/>
+      <stop offset="0.45" stop-color="#ff8fb1"/>
+      <stop offset="1" stop-color="#8f7bff"/>
+    </linearGradient>
+    <filter id="wide" x="-30%" y="-40%" width="160%" height="180%">
+      <feGaussianBlur stdDeviation="34"/>
+    </filter>
+    <filter id="tight" x="-30%" y="-40%" width="160%" height="180%">
+      <feGaussianBlur stdDeviation="7"/>
+    </filter>
+  </defs>
+  <rect width="1600" height="900" fill="url(#deepnight)"/>
+  <!-- Широкая размытая копия даёт свечение, узкая поверх — саму ткань. -->
+  <g opacity="0.8" filter="url(#wide)">
+    <path d="M-200 980 C 200 760 380 520 700 460 C 1020 400 1180 230 1800 -60 L1800 240 C 1240 470 1060 600 780 660 C 460 730 240 900 -200 1100 Z"
+          fill="url(#ribbon1)"/>
+  </g>
+  <g filter="url(#tight)" opacity="0.95">
+    <path d="M-200 1000 C 220 800 400 570 720 512 C 1040 455 1200 290 1800 20 L1800 130 C 1260 400 1080 540 800 600 C 480 660 260 860 -200 1060 Z"
+          fill="url(#ribbon2)"/>
+  </g>
+  <!-- Вторая лента тоньше и уходит в другую сторону: одна дуга смотрится плоско. -->
+  <g filter="url(#tight)" opacity="0.5">
+    <path d="M-200 620 C 260 520 520 660 900 600 C 1240 546 1500 380 1800 300 L1800 350 C 1480 450 1230 620 890 676 C 520 736 240 600 -200 660 Z"
+          fill="url(#ribbon1)"/>
+  </g>
+</svg>

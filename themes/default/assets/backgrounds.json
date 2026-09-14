@@ -1,5 +1,21 @@
 {
   "images": [
+    { "file": "silk.svg", "title": "Шёлк" },
+    { "file": "waves.svg", "title": "Волны" },
+    { "file": "fluid.svg", "title": "Поток" },
+    { "file": "ribbon.svg", "title": "Лента" },
+    { "file": "winter-forest.webp", "title": "Зимний лес", "thumb": "winter-forest-thumb.webp" },
+    { "file": "winter-river.webp", "title": "Зимняя река", "thumb": "winter-river-thumb.webp" },
+    { "file": "snow-spruce.webp", "title": "Ель в снегу", "thumb": "snow-spruce-thumb.webp" },
+    { "file": "pine.webp", "title": "Сосновая лапа", "thumb": "pine-thumb.webp" },
+    { "file": "moss.webp", "title": "Мох", "thumb": "moss-thumb.webp" },
+    { "file": "bark.webp", "title": "Кора", "thumb": "bark-thumb.webp" },
+    { "file": "stones.webp", "title": "Камни", "thumb": "stones-thumb.webp" },
+    { "file": "shore.webp", "title": "Берег", "thumb": "shore-thumb.webp" },
+    { "file": "cabin.webp", "title": "Изба у порогов", "thumb": "cabin-thumb.webp" },
+    { "file": "fortress.webp", "title": "Крепость у моря", "thumb": "fortress-thumb.webp" },
+    { "file": "relief.webp", "title": "Барельеф", "thumb": "relief-thumb.webp" },
+    { "file": "palms.webp", "title": "Пальмы", "thumb": "palms-thumb.webp" },
     { "file": "dawn.svg", "title": "Рассвет" },
     { "file": "dusk.svg", "title": "Сумерки" },
     { "file": "forest.svg", "title": "Лес" },
@@ -7,7 +23,9 @@
     { "file": "sand.svg", "title": "Песок" },
     { "file": "slate.svg", "title": "Сланец" },
     { "file": "rings.svg", "title": "Круги" },
-    { "file": "mesh.svg", "title": "Сияние" }
+    { "file": "mesh.svg", "title": "Сияние" },
+    { "file": "aurora.svg", "title": "Северное сияние" },
+    { "file": "topo.svg", "title": "Горизонтали" }
   ],
   "colors": [
     "#7a4b52", "#a4664a", "#9a8248", "#5f7a4b",

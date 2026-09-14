@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="paper" x1="0" y1="0" x2="0.6" y2="1">
+      <stop offset="0" stop-color="#2b2118"/>
+      <stop offset="0.6" stop-color="#4a3625"/>
+      <stop offset="1" stop-color="#7a5636"/>
+    </linearGradient>
+  </defs>
+  <rect width="1600" height="900" fill="url(#paper)"/>
+  <!-- Горизонтали растут от одного центра: рисунок читается как склон на карте. -->
+  <g fill="none" stroke="#f0d9b5" stroke-opacity="0.16" stroke-width="2">
+    <ellipse cx="520" cy="470" rx="120" ry="80"/>
+    <ellipse cx="520" cy="470" rx="215" ry="145"/>
+    <ellipse cx="520" cy="470" rx="325" ry="215"/>
+    <ellipse cx="520" cy="470" rx="450" ry="295"/>
+    <ellipse cx="520" cy="470" rx="590" ry="385"/>
+    <ellipse cx="520" cy="470" rx="745" ry="485"/>
+    <ellipse cx="1250" cy="240" rx="90" ry="60"/>
+    <ellipse cx="1250" cy="240" rx="170" ry="115"/>
+    <ellipse cx="1250" cy="240" rx="265" ry="180"/>
+  </g>
+</svg>

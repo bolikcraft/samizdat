@@ -7,10 +7,14 @@
     </linearGradient>
   </defs>
   <rect width="1600" height="900" fill="url(#stone)"/>
-  <g stroke="#aab4c0" stroke-opacity="0.12" stroke-width="2">
-    <path d="M-100 200 L900 -100"/>
-    <path d="M-100 500 L1200 -100"/>
-    <path d="M300 1000 L1700 200"/>
-    <path d="M700 1000 L1700 500"/>
+  <!-- Косые грани: широкие светлые клинья дают камню объём, тонкие линии — скол. -->
+  <g fill="#c3ccd6" fill-opacity="0.07">
+    <path d="M-100 780 L780 -100 L1180 -100 L-100 1180 Z"/>
+    <path d="M620 1000 L1700 60 L1700 320 L1080 1000 Z"/>
+  </g>
+  <g stroke="#dfe6ee" stroke-opacity="0.18" stroke-width="2">
+    <path d="M-100 780 L780 -100"/>
+    <path d="M-100 1180 L1180 -100"/>
+    <path d="M620 1000 L1700 60"/>
   </g>
 </svg>

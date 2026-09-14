@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="dusk2" x1="0" y1="0" x2="0.5" y2="1">
+      <stop offset="0" stop-color="#04120f"/>
+      <stop offset="1" stop-color="#0b2b26"/>
+    </linearGradient>
+    <linearGradient id="arc1" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#0fd98f" stop-opacity="0"/>
+      <stop offset="0.5" stop-color="#0fd98f"/>
+      <stop offset="1" stop-color="#0aa9ff" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="arc2" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ffd166" stop-opacity="0"/>
+      <stop offset="0.5" stop-color="#ffd166"/>
+      <stop offset="1" stop-color="#ff7ab6" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-40%" width="140%" height="180%">
+      <feGaussianBlur stdDeviation="18"/>
+    </filter>
+  </defs>
+  <rect width="1600" height="900" fill="url(#dusk2)"/>
+  <!-- Дуги идут одна за другой с растущим радиусом: взгляд читает их как одну ленту. -->
+  <g fill="none" filter="url(#glow)">
+    <path d="M-100 780 Q 800 260 1700 700" stroke="url(#arc1)" stroke-width="26" opacity="0.85"/>
+    <path d="M-100 850 Q 800 340 1700 760" stroke="url(#arc2)" stroke-width="16" opacity="0.6"/>
+    <path d="M-100 920 Q 800 430 1700 830" stroke="url(#arc1)" stroke-width="10" opacity="0.45"/>
+  </g>
+  <g fill="none" opacity="0.9">
+    <path d="M-100 780 Q 800 260 1700 700" stroke="url(#arc1)" stroke-width="5"/>
+    <path d="M-100 850 Q 800 340 1700 760" stroke="url(#arc2)" stroke-width="3"/>
+  </g>
+</svg>
