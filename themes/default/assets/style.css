@@ -67,6 +67,21 @@
   }
 }
 
+/* Схемы в заметках нарисованы svg в цветах Obsidian. Незнакомая переменная в var() делает
+   fill невалидным, и фигура становится чёрной, поэтому имена Obsidian заведены как псевдонимы
+   палитры темы. Значения берутся из --fg и соседей, так что схема сама меняется вместе с темой. */
+:root {
+  --text-normal: var(--fg);
+  --text-muted: var(--muted);
+  --text-faint: var(--muted);
+  --background-primary: var(--bg);
+  --background-secondary: var(--callout);
+  --background-modifier-border: var(--line);
+  --color-green: var(--tip);
+  --color-red: var(--danger);
+  --color-accent: var(--accent);
+}
+
 * { box-sizing: border-box; }
 
 body {
