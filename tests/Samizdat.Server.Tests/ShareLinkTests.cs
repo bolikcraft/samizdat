@@ -819,7 +819,7 @@ public class ShareLinkTests : IDisposable
     }
 
     [Fact]
-    public async Task Guest_link_of_a_closed_article_sleeps()
+    public async Task Guest_link_works_even_when_the_article_is_closed()
     {
         using var factory = StartFactory();
         WriteArticle("statya", "Текст статьи.");
@@ -831,8 +831,9 @@ public class ShareLinkTests : IDisposable
         await PostForm(owner, "/visibility", new() { ["slug"] = "statya", ["visibility"] = "private" });
         var closed = await factory.CreateClient().GetAsync($"/s/{token}");
 
+        // Видимость закрывает статью для заведённых людей, а не для того, кому отдали ссылку.
         Assert.Equal(HttpStatusCode.OK, open.StatusCode);
-        Assert.Equal(HttpStatusCode.Gone, closed.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, closed.StatusCode);
     }
 
     [Fact]
@@ -853,17 +854,4 @@ public class ShareLinkTests : IDisposable
         Assert.Equal("otkrytaya", SingleLink(factory).Slug);
     }
 
-    [Fact]
-    public async Task Settings_page_marks_a_sleeping_link()
-    {
-        using var factory = StartFactory();
-        WriteArticle("statya", "Текст статьи.");
-        RegisterArticle(factory, "statya", "Про ежей");
-        AddLink(factory, "statya");
-        var client = await LoginClient(factory);
-
-        var html = await client.GetStringAsync("/settings");
-
-        Assert.Contains("статья закрыта", html);
-    }
 }

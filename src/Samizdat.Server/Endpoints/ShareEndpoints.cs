@@ -31,8 +31,8 @@ public static class ShareEndpoints
             var row = db.Articles.Find(link.Slug);
             if (row is null || !files.MarkdownExists(link.Slug)) return NotFound(pages, settings);
 
-            // Закрыли статью — ссылка спит: гостю это выглядит как истёкший срок.
-            if (row.Visibility != ArticleVisibility.Shared) return Expired(pages, settings);
+            // Видимость ссылке не указ: она про заведённых людей, а ссылка — про постороннего,
+            // и живёт своим сроком. Передумал — отзови её кнопкой.
 
             // Отдельный ключ кэша: у гостя другой html, без дерева и меню. Catalog пуст — на гостевой
             // странице нет списка статей. View нужен здесь так же, как на странице владельца:
