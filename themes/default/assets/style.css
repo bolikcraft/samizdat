@@ -65,8 +65,7 @@ body {
   color: var(--muted);
   text-shadow: var(--top-shadow);
 }
-/* backdrop-filter у панели делает её контекстом наложения, и она перекрывает меню владельца.
-   Поднимаем шапку над панелью. */
+/* Шапка держится над панелью: иначе выпадающее меню владельца уходит ей за край. */
 .top { position: relative; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
 .top a { color: var(--fg); font-family: system-ui, sans-serif; font-weight: bold; text-decoration: none; }
 /* Подвал лежит прямо на снимке, как и шапка, поэтому читается тем же приёмом — цветом --fg
@@ -116,7 +115,8 @@ body {
 .user-menu a:hover, .user-menu button:hover { background: var(--callout); }
 .user-menu form { margin: 0; }
 
-/* Общая панель: навигация и статья лежат в одном скруглённом блоке матового стекла.
+/* Общая панель: навигация и статья лежат в одном скруглённом блоке.
+   Панель непрозрачная: сквозь неё читают длинный текст, и снимок под ним мешает.
    Потолка ширины нет намеренно: панель тянется под любое окно, отступ от краёв одинаковый.
    Ниже 720px панель разворачивается в одну колонку со сворачиваемым деревом сверху. */
 .shell {
@@ -126,12 +126,10 @@ body {
   display: grid;
   grid-template-columns: 16rem minmax(0, 1fr);
   gap: 2rem;
-  background: var(--panel);
+  background: var(--panel-solid);
   border: 1px solid var(--panel-border);
   border-radius: 14px;
   box-shadow: var(--shadow);
-  backdrop-filter: blur(16px) saturate(1.4);
-  -webkit-backdrop-filter: blur(16px) saturate(1.4);
 }
 
 /* Страницы без дерева: вход, настройки, ошибки, статья по гостевой ссылке. */
@@ -142,9 +140,9 @@ body {
 /* Статья занимает всю ширину панели от боковика до правого края — так решено при разборе. */
 .shell main { max-width: none; margin: 0; padding: 0; }
 
-/* Без размытия панель становится плотной: сквозь неё текст не читался бы. */
+/* Меню владельца висит над снимком; без размытия оно становится плотным. */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .shell, .user-menu ul { background: var(--panel-solid); }
+  .user-menu ul { background: var(--panel-solid); }
 }
 
 .sidebar { border-right: 1px solid var(--line); }

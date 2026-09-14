@@ -194,13 +194,15 @@ public class ThemeRenderTests : IDisposable
     }
 
     [Fact]
-    public async Task The_stylesheet_draws_the_panel_as_frosted_glass()
+    public async Task The_stylesheet_puts_the_picture_behind_an_opaque_panel()
     {
         var css = await StartFactory().CreateClient().GetStringAsync("/assets/style.css");
 
         Assert.Contains("--bg-image", css);
+        // Панель непрозрачна: читать длинный текст сквозь снимок тяжело.
+        Assert.Contains("background: var(--panel-solid)", css);
+        // Размытие осталось только у меню владельца, оно висит прямо над снимком.
         Assert.Contains("backdrop-filter", css);
-        // Запасной вид для браузеров без размытия: панель становится плотной.
         Assert.Contains("@supports not", css);
     }
 }
