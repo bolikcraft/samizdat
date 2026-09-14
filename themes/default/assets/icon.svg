@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100" role="img" aria-label="Samizdat">
+  <title>Samizdat</title>
+  <path d="M34 6 L48 24 L64 12 L90 44 L66 94 L28 88 L10 50 Z" fill="#1f5a3e"/>
+  <path d="M34 6 L48 24 L44 94 L28 88 L10 50 Z" fill="#2a6a4a"/>
+  <path d="M48 24 L64 12 L90 44 L66 94 L44 94 Z" fill="#3a8760"/>
+  <g fill="#f4f6f2">
+    <rect x="28" y="40" width="44" height="11"/>
+    <rect x="28" y="60" width="26" height="11"/>
+  </g>
+</svg>

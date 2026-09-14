@@ -145,7 +145,7 @@ public class BackgroundTests : IDisposable
 
         // Вместе с соседней строкой: комментарий темы, утёкший в разметку, встанет между ними
         // и уронит проверку. Без этого Assert.Contains о том, что стоит перед <style>, молчит.
-        Assert.Contains("<link rel=\"stylesheet\" href=\"/assets/style.css\">\n<style>:root { --bg-image: url(\"/background?v=", html);
+        Assert.Contains("<link rel=\"apple-touch-icon\" href=\"/assets/apple-touch-icon.png\">\n<style>:root { --bg-image: url(\"/background?v=", html);
     }
 
     [Fact]
