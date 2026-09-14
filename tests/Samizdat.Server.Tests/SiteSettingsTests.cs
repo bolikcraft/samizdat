@@ -26,6 +26,9 @@ public class SiteSettingsTests : IDisposable
         {
             builder.UseSetting("Samizdat:DataRoot", dataRoot);
             builder.UseSetting("ConnectionStrings:Postgres", database.ConnectionString);
+            // Слежение за файлом настроек тут не нужно: тесты поднимают десятки хостов,
+            // и наблюдатели inotify упираются в системный лимит.
+            builder.UseSetting("hostBuilder:reloadConfigOnChange", "false");
             if (theme is not null) builder.UseSetting("Samizdat:Theme", theme);
             if (configureServices is not null) builder.ConfigureServices(configureServices);
         });

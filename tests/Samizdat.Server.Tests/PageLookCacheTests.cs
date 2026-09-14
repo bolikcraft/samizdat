@@ -30,6 +30,9 @@ public class PageLookCacheTests : IDisposable
         {
             builder.UseSetting("Samizdat:DataRoot", dataRoot);
             builder.UseSetting("ConnectionStrings:Postgres", database.ConnectionString);
+            // Слежение за файлом настроек тут не нужно: тесты поднимают десятки хостов,
+            // и наблюдатели inotify упираются в системный лимит.
+            builder.UseSetting("hostBuilder:reloadConfigOnChange", "false");
         });
 
     static byte[] Jpeg() => [0xFF, 0xD8, 0xFF, 0xE0, 1, 2, 3, 4, 5, 6, 7, 8];

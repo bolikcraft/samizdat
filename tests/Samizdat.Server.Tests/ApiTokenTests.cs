@@ -18,6 +18,9 @@ public class ApiTokenTests(DatabaseFixture database) : IDisposable
         {
             builder.UseSetting("Samizdat:DataRoot", dataRoot);
             builder.UseSetting("ConnectionStrings:Postgres", database.ConnectionString);
+            // Слежение за файлом настроек тут не нужно: тесты поднимают десятки хостов,
+            // и наблюдатели inotify упираются в системный лимит.
+            builder.UseSetting("hostBuilder:reloadConfigOnChange", "false");
         });
 
     UserRow AddOwner(WebApplicationFactory<Program> factory, string login, string password)
