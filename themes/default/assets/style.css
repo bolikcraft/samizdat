@@ -124,7 +124,7 @@ body {
   margin: 0 auto 1.5rem;
   display: grid;
   grid-template-columns: 16rem minmax(0, 1fr);
-  gap: 1rem;
+  gap: 0.25rem;
 }
 
 /* Страницы без дерева: вход, настройки, ошибки, статья по гостевой ссылке. */
