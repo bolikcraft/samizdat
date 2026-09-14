@@ -1,0 +1,17 @@
+{
+  "images": [
+    { "file": "dawn.svg", "title": "Рассвет" },
+    { "file": "dusk.svg", "title": "Сумерки" },
+    { "file": "forest.svg", "title": "Лес" },
+    { "file": "sea.svg", "title": "Море" },
+    { "file": "sand.svg", "title": "Песок" },
+    { "file": "slate.svg", "title": "Сланец" },
+    { "file": "rings.svg", "title": "Круги" },
+    { "file": "mesh.svg", "title": "Сияние" }
+  ],
+  "colors": [
+    "#7a4b52", "#a4664a", "#9a8248", "#5f7a4b",
+    "#3f7a6a", "#3d6f8f", "#4a5a8c", "#6a5187",
+    "#8c5273", "#5c5c62", "#2e3440", "#c9b79c"
+  ]
+}

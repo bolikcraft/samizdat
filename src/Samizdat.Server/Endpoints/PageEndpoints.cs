@@ -141,12 +141,14 @@ public static class PageEndpoints
 
         // Отдельный путь, не под /assets/: там уже стоит маршрут файлов темы.
         // Гостю по share-ссылке фон тоже нужен, поэтому без пароля.
-        app.MapGet("/background", (SiteSettings settings, BackgroundFile background, ILogger<Program> logger,
-                                   HttpContext context) =>
+        app.MapGet("/background", (BackgroundFile background, ILogger<Program> logger, HttpContext context) =>
         {
+            // Отдаём загруженный файл, а не имя из настроек: в галерее настроек картинка видна
+            // плиткой и тогда, когда фоном стоит цвет или картинка из набора.
+            var name = background.Current();
             try
             {
-                if (background.Open(settings.BackgroundFileName) is not { } found) return Results.NotFound();
+                if (name is null || background.Open(name) is not { } found) return Results.NotFound();
 
                 // Адрес несёт ?v=<mtime файла>, значит байты по одному адресу не меняются — кэшировать
                 // можно надолго. private, не public: сайт закрыт, общему кэшу перед ним (Апач, KeenDNS,
@@ -164,7 +166,7 @@ public static class PageEndpoints
                 // catch (IOException) — не только гонка File.Exists/File.OpenRead внутри Open (снесли
                 // заменой фона или вручную): сюда же попадёт и настоящий сбой диска. Гостю в обоих
                 // случаях отвечаем 404, но сбой стоит видеть в логе, а не терять молча.
-                logger.LogWarning(error, "Не удалось открыть фон {Name}", settings.BackgroundFileName);
+                logger.LogWarning(error, "Не удалось открыть фон {Name}", name);
                 return Results.NotFound();
             }
         }).AllowAnonymous();
@@ -199,6 +201,7 @@ public static class PageEndpoints
         ["title"] = "Samizdat",
         ["color_scheme"] = settings.ColorScheme,
         ["background_url"] = settings.BackgroundUrl,
+        ["background_color"] = settings.BackgroundColor,
     };
 
     internal static Dictionary<string, object?> UserModel(ClaimsPrincipal user) => new()

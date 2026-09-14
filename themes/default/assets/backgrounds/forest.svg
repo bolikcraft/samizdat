@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="moss" x1="0" y1="0" x2="0.4" y2="1">
+      <stop offset="0" stop-color="#14301f"/>
+      <stop offset="0.6" stop-color="#2f6242"/>
+      <stop offset="1" stop-color="#77a86b"/>
+    </linearGradient>
+    <radialGradient id="light" cx="0.75" cy="0.2" r="0.55">
+      <stop offset="0" stop-color="#e8f4c8" stop-opacity="0.4"/>
+      <stop offset="1" stop-color="#e8f4c8" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1600" height="900" fill="url(#moss)"/>
+  <rect width="1600" height="900" fill="url(#light)"/>
+</svg>

@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="stone" x1="0" y1="0" x2="1" y2="0.8">
+      <stop offset="0" stop-color="#1b1f26"/>
+      <stop offset="0.6" stop-color="#333b47"/>
+      <stop offset="1" stop-color="#59636f"/>
+    </linearGradient>
+  </defs>
+  <rect width="1600" height="900" fill="url(#stone)"/>
+  <g stroke="#aab4c0" stroke-opacity="0.12" stroke-width="2">
+    <path d="M-100 200 L900 -100"/>
+    <path d="M-100 500 L1200 -100"/>
+    <path d="M300 1000 L1700 200"/>
+    <path d="M700 1000 L1700 500"/>
+  </g>
+</svg>

@@ -17,23 +17,29 @@ public static class SettingsEndpoints
     // Предел стоит на всём теле: такое тело мы отказываемся буферизовать, даже не начиная читать.
     const long MaxBackgroundRequestBytes = MaxBackgroundBytes + 64 * 1024;
 
+    // Новый токен едет от формы до страницы в куке, а не в адресе: адрес попадает в историю
+    // браузера, в заголовок Referer и в логи прокси. Кука живёт до первого показа страницы.
+    const string NewTokenCookie = "samizdat_new_token";
+
     public static void MapSettings(this WebApplication app)
     {
         var group = app.MapGroup("/settings")
             .RequireAuthorization(policy => policy.RequireRole(nameof(UserRole.Owner)));
 
         group.MapGet("/", (PageRenderer pages, SamizdatDbContext db, SiteSettings settings, ClaimsPrincipal user,
-                           ThemeFactory themes, IAntiforgery antiforgery, HttpContext context,
+                           ThemeFactory themes, IThemeSource theme, BackgroundFile background,
+                           IAntiforgery antiforgery, HttpContext context,
                            string? ok, string? err) =>
         {
             var owner = CurrentUser(db, user);
             var tokens = db.ApiTokens.Where(token => token.UserId == owner.Id)
                 .OrderByDescending(token => token.CreatedAt).ToList();
 
+            var newToken = context.Request.Cookies[NewTokenCookie];
+            if (newToken is not null) context.Response.Cookies.Delete(NewTokenCookie, NewTokenCookieOptions(context));
+
             var now = DateTimeOffset.UtcNow;
             var titles = db.Articles.ToDictionary(article => article.Slug, article => article.Title);
-            var closed = db.Articles.Where(article => article.Visibility == ArticleVisibility.Private)
-                .Select(article => article.Slug).ToHashSet();
             // Живые сверху: мёртвые строки остаются как след, но не мешают найти рабочую ссылку.
             var links = db.ShareLinks.ToList()
                 .OrderByDescending(link => link.IsAlive(now)).ThenByDescending(link => link.CreatedAt)
@@ -45,8 +51,6 @@ public static class SettingsEndpoints
                     ["note"] = link.Note,
                     ["url"] = $"{context.Request.Scheme}://{context.Request.Host}/s/{link.Token}",
                     ["alive"] = link.IsAlive(now),
-                    // Статью закрыли — ссылка жива, но гостю не открывается.
-                    ["sleeping"] = link.IsAlive(now) && closed.Contains(link.Slug),
                     ["expires_at"] = link.ExpiresAt?.ToString("yyyy-MM-dd HH:mm"),
                     ["opened_count"] = link.OpenedCount,
                     ["last_opened_at"] = link.LastOpenedAt?.ToString("yyyy-MM-dd HH:mm"),
@@ -63,11 +67,13 @@ public static class SettingsEndpoints
                 ["message"] = Message(ok, err),
                 ["message_kind"] = err is not null ? "err" : ok is not null ? "ok" : null,
                 ["color_scheme"] = settings.ColorScheme,
+                ["background"] = BackgroundModel(settings, background, BackgroundCatalog.Read(theme)),
                 ["themes"] = themes.AvailableThemes().Select(name => new Dictionary<string, object?>
                 {
                     ["name"] = name,
                     ["selected"] = name == settings.ThemeName,
                 }).ToList(),
+                ["new_token"] = newToken,
                 ["tokens"] = tokens.Select(token => new Dictionary<string, object?>
                 {
                     ["id"] = token.Id,
@@ -150,11 +156,93 @@ public static class SettingsEndpoints
             return Results.Redirect("/settings?ok=background#appearance");
         }).RefuseAnOversizedBody().RequireValidToken();
 
+        // Выбор готового фона: картинка из набора темы, цвет из палитры, своя загруженная
+        // картинка или ничего. Значение попадает в настройку как есть, поэтому всё, кроме пустоты,
+        // сверяется с набором темы: в форму можно прислать что угодно.
+        group.MapPost("/background/pick",
+            async (HttpContext context, SiteSettings settings, BackgroundFile background, IThemeSource theme) =>
+        {
+            var form = await context.Request.ReadFormAsync();
+            var pick = form["pick"].ToString();
+            var catalog = BackgroundCatalog.Read(theme);
+
+            if (pick.Length == 0)
+            {
+                settings.Set("theme.background", "");
+                return Results.Redirect("/settings?ok=background_removed#appearance");
+            }
+
+            if (pick == "upload")
+            {
+                if (background.Current() is not { } name)
+                    return Results.Redirect("/settings?err=background_missing#appearance");
+
+                settings.Set("theme.background", name);
+                return Results.Redirect("/settings?ok=background#appearance");
+            }
+
+            if (pick.StartsWith(SiteSettings.PresetPrefix, StringComparison.Ordinal))
+            {
+                var file = pick[SiteSettings.PresetPrefix.Length..];
+                if (!catalog.HasImage(file)) return Results.Redirect("/settings?err=background_unknown#appearance");
+
+                settings.Set("theme.background", pick);
+                return Results.Redirect("/settings?ok=background#appearance");
+            }
+
+            if (pick.StartsWith(SiteSettings.ColorPrefix, StringComparison.Ordinal))
+            {
+                var color = pick[SiteSettings.ColorPrefix.Length..];
+                if (!catalog.HasColor(color)) return Results.Redirect("/settings?err=background_unknown#appearance");
+
+                settings.Set("theme.background", pick);
+                return Results.Redirect("/settings?ok=background_color#appearance");
+            }
+
+            return Results.Redirect("/settings?err=background_unknown#appearance");
+        }).RequireValidToken();
+
+        // Удаление загруженной картинки. Если она стояла фоном, фон заодно снимается: файла больше нет.
         group.MapPost("/background/remove", (SiteSettings settings, BackgroundFile background) =>
         {
             background.Remove();
-            settings.Set("theme.background", "");
+            if (settings.Background.Kind == BackgroundKind.Upload) settings.Set("theme.background", "");
             return Results.Redirect("/settings?ok=background_removed#appearance");
+        }).RequireValidToken();
+
+        group.MapPost("/tokens", async (HttpContext context, SamizdatDbContext db, ClaimsPrincipal user) =>
+        {
+            var form = await context.Request.ReadFormAsync();
+            var note = form["note"].ToString().Trim();
+
+            var owner = CurrentUser(db, user);
+            var token = ApiToken.Create();
+            db.ApiTokens.Add(new ApiTokenRow
+            {
+                UserId = owner.Id,
+                TokenHash = ApiToken.HashOf(token),
+                Note = note.Length > 0 ? note : null,
+                CreatedAt = DateTimeOffset.UtcNow,
+            });
+            db.SaveChanges();
+
+            context.Response.Cookies.Append(NewTokenCookie, token, NewTokenCookieOptions(context));
+            return Results.Redirect("/settings?ok=token_created#tokens");
+        }).RequireValidToken();
+
+        group.MapPost("/tokens/{id:int}/note", async (int id, HttpContext context,
+                                                     SamizdatDbContext db, ClaimsPrincipal user) =>
+        {
+            var form = await context.Request.ReadFormAsync();
+            var note = form["note"].ToString().Trim();
+
+            var owner = CurrentUser(db, user);
+            var token = db.ApiTokens.FirstOrDefault(row => row.Id == id);
+            if (token is null || token.UserId != owner.Id) return Results.NotFound();
+
+            token.Note = note.Length > 0 ? note : null;
+            db.SaveChanges();
+            return Results.Redirect("/settings?ok=token_note#tokens");
         }).RequireValidToken();
 
         group.MapPost("/tokens/{id:int}/revoke", (int id, SamizdatDbContext db, ClaimsPrincipal user) =>
@@ -190,6 +278,47 @@ public static class SettingsEndpoints
                 ? Results.Redirect("/settings?err=background_too_big#appearance")
                 : await next(invocation));
 
+    // Path сужает куку до настроек, HttpOnly закрывает её от скриптов. Delete обязан повторить
+    // эти же поля, иначе браузер удалит не ту куку, и токен останется висеть до конца сеанса.
+    static CookieOptions NewTokenCookieOptions(HttpContext context) => new()
+    {
+        HttpOnly = true,
+        Secure = context.Request.IsHttps,
+        SameSite = SameSiteMode.Strict,
+        Path = "/settings",
+    };
+
+    /// Галерея фонов: плитки набора темы, палитра цветов и загруженная картинка. Отмечена ровно
+    /// одна плитка — та, что стоит фоном сейчас.
+    static Dictionary<string, object?> BackgroundModel(SiteSettings settings, BackgroundFile background,
+                                                       BackgroundCatalog catalog)
+    {
+        var choice = settings.Background;
+        var uploaded = background.Current();
+
+        return new Dictionary<string, object?>
+        {
+            ["none_selected"] = choice.Kind == BackgroundKind.None,
+            ["upload_url"] = uploaded is not null ? $"/background?v={background.Version(uploaded)}" : null,
+            ["upload_selected"] = choice.Kind == BackgroundKind.Upload,
+            ["color"] = settings.BackgroundColor,
+            ["color_selected"] = choice.Kind == BackgroundKind.Color,
+            ["images"] = catalog.Images.Select(image => new Dictionary<string, object?>
+            {
+                ["file"] = image.File,
+                ["title"] = image.Title,
+                ["url"] = $"/assets/backgrounds/{image.File}",
+                ["selected"] = choice.Kind == BackgroundKind.Preset && choice.Value == image.File,
+            }).ToList(),
+            ["colors"] = catalog.Colors.Select(color => new Dictionary<string, object?>
+            {
+                ["value"] = color,
+                ["selected"] = choice.Kind == BackgroundKind.Color
+                               && string.Equals(choice.Value, color, StringComparison.OrdinalIgnoreCase),
+            }).ToList(),
+        };
+    }
+
     static UserRow CurrentUser(SamizdatDbContext db, ClaimsPrincipal user)
         => db.Users.First(row => row.Login == user.Identity!.Name);
 
@@ -201,14 +330,18 @@ public static class SettingsEndpoints
         "background_missing" => "Файл не выбран.",
         "background_type" => "Это не картинка. Подойдёт jpeg, png или webp.",
         "background_too_big" => "Картинка больше 8 МБ.",
+        "background_unknown" => "Такого фона нет в наборе темы.",
         not null => "Не удалось выполнить действие.",
         null => ok switch
         {
             "password" => "Пароль изменён.",
             "appearance" => "Настройки внешнего вида сохранены.",
+            "token_created" => "Токен создан.",
+            "token_note" => "Заметка сохранена.",
             "token_revoked" => "Токен отозван.",
             "link_revoked" => "Ссылка отозвана.",
-            "background" => "Фон загружен.",
+            "background" => "Фон выбран.",
+            "background_color" => "Цвет фона выбран.",
             "background_removed" => "Фон убран.",
             _ => null,
         },

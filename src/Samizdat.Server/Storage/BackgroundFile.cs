@@ -67,6 +67,14 @@ public sealed class BackgroundFile(string dataRoot)
         if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
     }
 
+    /// Имя загруженной картинки или null. Файл в каталоге всегда один, но недописанные временные
+    /// файлы соседа тоже лежат тут — их отсекает проверка расширения.
+    public string? Current()
+        => Directory.Exists(root)
+            ? Directory.EnumerateFiles(root).Select(Path.GetFileName)
+                .FirstOrDefault(name => name is not null && Types.ContainsKey(Path.GetExtension(name)))
+            : null;
+
     public BackgroundContent? Open(string name)
         => PathOf(name) is { } path
             ? new BackgroundContent(File.OpenRead(path), Types[Path.GetExtension(name)],

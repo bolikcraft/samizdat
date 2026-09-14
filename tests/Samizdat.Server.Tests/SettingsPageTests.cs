@@ -26,6 +26,9 @@ public class SettingsPageTests : IDisposable
         {
             builder.UseSetting("Samizdat:DataRoot", dataRoot);
             builder.UseSetting("ConnectionStrings:Postgres", database.ConnectionString);
+            // Слежение за файлом настроек тут не нужно: тесты поднимают десятки хостов,
+            // и наблюдатели inotify упираются в системный лимит.
+            builder.UseSetting("hostBuilder:reloadConfigOnChange", "false");
         });
 
     UserRow AddOwner(WebApplicationFactory<Program> factory, string login, string password)
@@ -186,25 +189,81 @@ public class SettingsPageTests : IDisposable
     }
 
     [Fact]
-    public async Task The_background_preview_and_remove_button_appear_only_while_a_background_is_set()
+    public async Task The_uploaded_picture_and_its_remove_button_appear_only_while_a_file_is_on_disk()
     {
         var factory = StartFactory();
         AddOwner(factory, "aleks", "тайна");
         var client = await LoginClient(factory, "aleks", "тайна");
 
         var before = await client.GetStringAsync("/settings");
-        Assert.DoesNotContain("background-preview", before);
+        Assert.DoesNotContain("value=\"upload\"", before);
         Assert.DoesNotContain("action=\"/settings/background/remove\"", before);
 
         PutBackground(factory, [0xFF, 0xD8, 0xFF, 0xE0, 1, 2, 3, 4], "background.jpg");
         var withBackground = await client.GetStringAsync("/settings");
-        Assert.Contains("background-preview", withBackground);
+        Assert.Contains("value=\"upload\"", withBackground);
         Assert.Contains("action=\"/settings/background/remove\"", withBackground);
 
         RemoveBackground(factory);
         var after = await client.GetStringAsync("/settings");
-        Assert.DoesNotContain("background-preview", after);
+        Assert.DoesNotContain("value=\"upload\"", after);
         Assert.DoesNotContain("action=\"/settings/background/remove\"", after);
+    }
+
+    [Fact]
+    public async Task A_picture_from_the_theme_set_becomes_the_background_and_is_marked_in_the_gallery()
+    {
+        var factory = StartFactory();
+        AddOwner(factory, "aleks", "тайна");
+        var client = await LoginClient(factory, "aleks", "тайна");
+        var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
+
+        await client.PostAsync("/settings/background/pick", new FormUrlEncodedContent(
+            new Dictionary<string, string> { [name] = value, ["pick"] = "preset:dawn.svg" }));
+
+        Assert.Contains("--bg-image: url(\"/assets/backgrounds/dawn.svg\")", await client.GetStringAsync("/"));
+        // Отмечена ровно одна плитка — выбранная.
+        var settings = await client.GetStringAsync("/settings");
+        Assert.Contains("value=\"preset:dawn.svg\"", settings);
+        Assert.Single(Regex.Matches(settings, "bg-tile-current"));
+    }
+
+    [Fact]
+    public async Task A_color_from_the_palette_paints_the_backdrop_and_the_accent()
+    {
+        var factory = StartFactory();
+        AddOwner(factory, "aleks", "тайна");
+        var client = await LoginClient(factory, "aleks", "тайна");
+        var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
+
+        await client.PostAsync("/settings/background/pick", new FormUrlEncodedContent(
+            new Dictionary<string, string> { [name] = value, ["pick"] = "color:#3f7a6a" }));
+
+        var page = await client.GetStringAsync("/");
+        // Из --brand стили считают акцент, из --backdrop — подложку страницы.
+        Assert.Contains("--backdrop: #3f7a6a", page);
+        Assert.Contains("--brand: #3f7a6a", page);
+        Assert.DoesNotContain("--bg-image", page);
+    }
+
+    [Fact]
+    public async Task A_background_outside_the_theme_set_is_refused()
+    {
+        var factory = StartFactory();
+        AddOwner(factory, "aleks", "тайна");
+        var client = await LoginClient(factory, "aleks", "тайна");
+        var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
+
+        foreach (var pick in new[] { "preset:../../etc/passwd", "preset:нет-такой.svg", "color:#000000", "чепуха" })
+        {
+            var response = await client.PostAsync("/settings/background/pick", new FormUrlEncodedContent(
+                new Dictionary<string, string> { [name] = value, ["pick"] = pick }));
+
+            Assert.Contains("err=background_unknown", response.RequestMessage!.RequestUri!.ToString());
+        }
+
+        using var scope = factory.Services.CreateScope();
+        Assert.Equal(BackgroundKind.None, scope.ServiceProvider.GetRequiredService<SiteSettings>().Background.Kind);
     }
 
     [Fact]
@@ -351,6 +410,135 @@ public class SettingsPageTests : IDisposable
 
         Assert.Contains("ноутбук", html);
         Assert.Contains("2026-09-01", html);
+    }
+
+    [Fact]
+    public async Task A_token_made_in_the_browser_is_shown_once_and_opens_the_api()
+    {
+        var factory = StartFactory();
+        AddOwner(factory, "aleks", "тайна");
+        var client = await LoginClient(factory, "aleks", "тайна");
+        var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
+
+        var response = await client.PostAsync("/settings/tokens", new FormUrlEncodedContent(
+            new Dictionary<string, string> { [name] = value, ["note"] = "ноутбук" }));
+        var html = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var token = Regex.Match(html, "class=\"new-token-value\" type=\"text\" readonly value=\"([0-9a-f]+)\"")
+            .Groups[1].Value;
+        Assert.NotEmpty(token);
+        Assert.Contains("ноутбук", html);
+
+        var apiClient = factory.CreateClient();
+        apiClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        Assert.Equal(HttpStatusCode.OK, (await apiClient.GetAsync("/api/state")).StatusCode);
+
+        // База хранит только хеш, поэтому второй раз показать токен нечем.
+        Assert.DoesNotContain(token, await client.GetStringAsync("/settings"));
+    }
+
+    [Fact]
+    public async Task A_token_made_without_a_note_gets_no_note()
+    {
+        var factory = StartFactory();
+        AddOwner(factory, "aleks", "тайна");
+        var client = await LoginClient(factory, "aleks", "тайна");
+        var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
+
+        await client.PostAsync("/settings/tokens", new FormUrlEncodedContent(
+            new Dictionary<string, string> { [name] = value, ["note"] = "   " }));
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+        Assert.Null(db.ApiTokens.Single().Note);
+    }
+
+    [Fact]
+    public async Task Making_a_token_without_antiforgery_token_is_rejected()
+    {
+        var factory = StartFactory();
+        AddOwner(factory, "aleks", "тайна");
+        var client = await LoginClient(factory, "aleks", "тайна");
+
+        var response = await client.PostAsync("/settings/tokens", new FormUrlEncodedContent(
+            new Dictionary<string, string> { ["note"] = "чужой" }));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+        Assert.Empty(db.ApiTokens);
+    }
+
+    [Fact]
+    public async Task A_token_note_can_be_changed_and_cleared()
+    {
+        var factory = StartFactory();
+        var owner = AddOwner(factory, "aleks", "тайна");
+        int tokenId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+            var row = new ApiTokenRow
+            {
+                UserId = owner.Id, TokenHash = ApiToken.HashOf(ApiToken.Create()), Note = "ноутбук",
+                CreatedAt = DateTimeOffset.UtcNow,
+            };
+            db.ApiTokens.Add(row);
+            db.SaveChanges();
+            tokenId = row.Id;
+        }
+        var client = await LoginClient(factory, "aleks", "тайна");
+        var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
+
+        await client.PostAsync($"/settings/tokens/{tokenId}/note", new FormUrlEncodedContent(
+            new Dictionary<string, string> { [name] = value, ["note"] = "рабочая машина" }));
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+            Assert.Equal("рабочая машина", db.ApiTokens.Single().Note);
+        }
+
+        await client.PostAsync($"/settings/tokens/{tokenId}/note", new FormUrlEncodedContent(
+            new Dictionary<string, string> { [name] = value, ["note"] = "" }));
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+            Assert.Null(db.ApiTokens.Single().Note);
+        }
+    }
+
+    [Fact]
+    public async Task A_note_of_a_foreign_token_stays_as_it_was()
+    {
+        var factory = StartFactory();
+        AddOwner(factory, "aleks", "тайна");
+        var other = AddOwner(factory, "other", "другая");
+        int foreignTokenId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+            var row = new ApiTokenRow
+            {
+                UserId = other.Id, TokenHash = ApiToken.HashOf(ApiToken.Create()), Note = "чужой",
+                CreatedAt = DateTimeOffset.UtcNow,
+            };
+            db.ApiTokens.Add(row);
+            db.SaveChanges();
+            foreignTokenId = row.Id;
+        }
+        var client = await LoginClient(factory, "aleks", "тайна");
+        var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
+
+        var response = await client.PostAsync($"/settings/tokens/{foreignTokenId}/note",
+            new FormUrlEncodedContent(new Dictionary<string, string> { [name] = value, ["note"] = "мой" }));
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        using var check = factory.Services.CreateScope();
+        var tokens = check.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+        Assert.Equal("чужой", tokens.ApiTokens.Single().Note);
     }
 
     [Fact]

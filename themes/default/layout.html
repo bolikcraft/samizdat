@@ -5,8 +5,12 @@
 {{ if description }}<meta name="description" content="{{ description | html.escape }}">{{ end }}
 <link rel="stylesheet" href="/assets/style.css">
 {{ if site.background_url }}{{~## Экранировать нельзя: внутри <style> HTML-сущности не раскрываются, escape испортит адрес.
-Значение безопасно и так — путь литерал, версия только цифры из времени файла, пользовательских данных тут нет. ##~}}
-<style>:root { --bg-image: url("{{ site.background_url }}"); }</style>{{ end }}</head>
+Значение безопасно и так — путь литерал, версия только цифры из времени файла, имя картинки из набора
+сверено с набором темы, пользовательских данных тут нет. ##~}}
+<style>:root { --bg-image: url("{{ site.background_url }}"); }</style>{{ end }}
+{{~ if site.background_color }}{{~## Цвет взят из палитры темы и по ней же проверен — в <style> он безопасен.
+Из --brand стили считают акцент интерфейса, см. style.css. ##~}}
+<style>:root { --backdrop: {{ site.background_color }}; --brand: {{ site.background_color }}; }</style>{{ end }}</head>
 <body>
 <header class="top">
   <a href="/">{{ site.title | html.escape }}</a>
