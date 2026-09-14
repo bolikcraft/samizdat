@@ -12,8 +12,8 @@ using Samizdat.Server.Data;
 namespace Samizdat.Server.Data.Migrations
 {
     [DbContext(typeof(SamizdatDbContext))]
-    [Migration("20260913115255_ArticleFolder")]
-    partial class ArticleFolder
+    [Migration("20260914080015_Init")]
+    partial class Init
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -98,6 +98,69 @@ namespace Samizdat.Server.Data.Migrations
                     b.ToTable("articles", (string)null);
                 });
 
+            modelBuilder.Entity("Samizdat.Server.Data.SettingRow", b =>
+                {
+                    b.Property<string>("Key")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.HasKey("Key");
+
+                    b.ToTable("site_settings", (string)null);
+                });
+
+            modelBuilder.Entity("Samizdat.Server.Data.ShareLinkRow", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("LastOpenedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int>("OpenedCount")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Slug")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasMaxLength(22)
+                        .HasColumnType("character varying(22)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Slug");
+
+                    b.HasIndex("Token")
+                        .IsUnique();
+
+                    b.ToTable("share_links", (string)null);
+                });
+
             modelBuilder.Entity("Samizdat.Server.Data.UserRow", b =>
                 {
                     b.Property<int>("Id")
@@ -134,6 +197,15 @@ namespace Samizdat.Server.Data.Migrations
                     b.HasOne("Samizdat.Server.Data.UserRow", null)
                         .WithMany()
                         .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Samizdat.Server.Data.ShareLinkRow", b =>
+                {
+                    b.HasOne("Samizdat.Server.Data.ArticleRow", null)
+                        .WithMany()
+                        .HasForeignKey("Slug")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

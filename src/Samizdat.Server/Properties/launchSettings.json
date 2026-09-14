@@ -11,13 +11,6 @@
         "ASPNETCORE_ENVIRONMENT": "Development"
       }
     },
-    "Владелец: задать пароль": {
-      "commandName": "Project",
-      "commandLineArgs": "owner set aleks смени-пароль",
-      "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
-      }
-    },
     "Токен CLI: выпустить": {
       "commandName": "Project",
       "commandLineArgs": "token new laptop",
