@@ -71,7 +71,7 @@ body {
 .top a { color: var(--fg); font-family: system-ui, sans-serif; font-weight: bold; text-decoration: none; }
 /* Подвал лежит прямо на снимке, как и шапка, поэтому читается тем же приёмом — цветом --fg
    и обводкой, а не подложкой: своего фона у него по замыслу нет. */
-.bottom { font-size: 0.9rem; color: var(--fg); }
+.bottom { font-size: 0.9rem; color: var(--fg); font-family: system-ui, sans-serif; font-weight: bold; }
 
 /* Меню владельца: <details> без js, раскрывается вправо под именем. */
 .user-menu { position: relative; font-family: system-ui, sans-serif; font-size: 0.9rem; }
