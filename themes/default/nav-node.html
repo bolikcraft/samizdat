@@ -6,6 +6,6 @@
 {{ end }}
 <ul class="nav-articles">
   {{ for article in $node.articles }}
-  <li><a href="/{{ article.slug | html.escape }}"{{ if article.is_current }} aria-current="page"{{ end }}>{{ article.title | html.escape }}</a></li>
+  <li>{{ if article.as_link }}<a href="/{{ article.slug | html.escape }}"{{ if article.is_current }} aria-current="page"{{ end }}{{ if !article.is_shared }} class="nav-private"{{ end }}>{{ article.title | html.escape }}</a>{{ else }}<span class="nav-closed">{{ article.title | html.escape }}</span>{{ end }}</li>
   {{ end }}
 </ul>

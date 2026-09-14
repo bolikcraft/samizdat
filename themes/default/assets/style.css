@@ -220,6 +220,11 @@ body {
 /* Подсветка текущей статьи: акцентный фон, контраст держится и в светлой, и в тёмной палитре. */
 .nav-articles a[aria-current="page"] { background: var(--accent); color: var(--bg); font-weight: bold; }
 
+/* Закрытая статья: у читателя — строка без ссылки, у владельца — ссылка с пометкой. */
+.nav-closed { color: var(--muted); }
+.nav-articles .nav-closed { display: block; padding: 0.15rem 0.35rem; }
+.nav-private::after { content: " ·"; color: var(--muted); }
+
 /* Разделы настроек занимают место дерева статей, поэтому и ведут себя так же. */
 .settings-nav {
   display: flex;
@@ -271,6 +276,7 @@ a { color: var(--accent); }
 .articles li:first-child { padding-top: 0; }
 .articles a { font-size: 1.1rem; font-weight: bold; text-decoration: none; }
 .articles a:hover { text-decoration: underline; }
+.articles .nav-closed { font-size: 1.1rem; font-weight: bold; }
 .articles .date { margin-top: 0.2rem; }
 .articles p { margin: 0.3rem 0 0; color: var(--muted); }
 

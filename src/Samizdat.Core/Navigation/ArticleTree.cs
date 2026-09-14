@@ -13,7 +13,7 @@ public static class ArticleTree
                 foreach (var part in entry.Folder.Split('/'))
                     node = Child(node, part);
 
-            node.Articles.Add(new ArticleLink(entry.Slug, entry.Title, entry.Slug == currentSlug));
+            node.Articles.Add(new ArticleLink(entry.Slug, entry.Title, entry.Slug == currentSlug, entry.IsShared));
         }
 
         Sort(root);

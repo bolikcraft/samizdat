@@ -110,6 +110,18 @@ public class ArticleTreeTests
     }
 
     [Fact]
+    public void Tree_keeps_the_closed_mark_of_an_article()
+    {
+        var tree = ArticleTree.Build([
+            new ArticleEntry("", "tayna", "Тайна", IsShared: false),
+            new ArticleEntry("", "otkrytaya", "Открытая", IsShared: true),
+        ]);
+
+        Assert.False(tree.Articles.Single(article => article.Slug == "tayna").IsShared);
+        Assert.True(tree.Articles.Single(article => article.Slug == "otkrytaya").IsShared);
+    }
+
+    [Fact]
     public void No_entries_produce_an_empty_root()
     {
         var tree = ArticleTree.Build([]);

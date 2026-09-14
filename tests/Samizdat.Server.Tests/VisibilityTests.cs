@@ -74,6 +74,37 @@ public class VisibilityTests : IDisposable
         Assert.Equal(HttpStatusCode.Forbidden, answer.StatusCode);
     }
 
+    [Fact]
+    public async Task Reader_sees_the_title_of_a_private_article_but_not_a_link()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        await AddArticle(factory, "tayna", ArticleVisibility.Private);
+        await AddArticle(factory, "otkrytaya", ArticleVisibility.Shared);
+        AddPerson(factory, "ivan", "parol", UserRole.Reader);
+
+        var client = await Login(factory, "ivan", "parol");
+        var html = await client.GetStringAsync("/otkrytaya");
+
+        Assert.Contains("nav-closed", html);
+        Assert.DoesNotContain("href=\"/tayna\"", html);
+        Assert.Contains("href=\"/otkrytaya\"", html);
+    }
+
+    [Fact]
+    public async Task Owner_sees_every_article_as_a_link()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        await AddArticle(factory, "tayna", ArticleVisibility.Private);
+        AddPerson(factory, "hozyain", "parol", UserRole.Owner);
+
+        var client = await Login(factory, "hozyain", "parol");
+        var html = await client.GetStringAsync("/tayna");
+
+        Assert.Contains("href=\"/tayna\"", html);
+    }
+
     WebApplicationFactory<Program> CreateFactory() =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {

@@ -2,7 +2,7 @@
 <ul class="articles">
 {{ for item in articles }}
   <li>
-    <a href="/{{ item.slug | html.escape }}">{{ item.title | html.escape }}</a>
+    {{ if item.as_link }}<a href="/{{ item.slug | html.escape }}"{{ if !item.is_shared }} class="nav-private"{{ end }}>{{ item.title | html.escape }}</a>{{ else }}<span class="nav-closed">{{ item.title | html.escape }}</span>{{ end }}
     {{ if item.date }}<div class="date">{{ item.date | html.escape }}</div>{{ end }}
     {{ if item.description }}<p>{{ item.description | html.escape }}</p>{{ end }}
   </li>

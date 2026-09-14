@@ -24,6 +24,7 @@ public static class PageEndpoints
         group.MapGet("/", (PageRenderer pages, SamizdatDbContext db, SiteSettings settings, ClaimsPrincipal user,
                            IAntiforgery antiforgery, HttpContext context) =>
         {
+            var isOwner = ArticleAccess.IsOwner(user);
             var rows = db.Articles.OrderByDescending(article => article.Date).ToList();
             var list = rows.Select(article => new Dictionary<string, object?>
             {
@@ -31,6 +32,8 @@ public static class PageEndpoints
                 ["title"] = article.Title,
                 ["description"] = article.Description,
                 ["date"] = article.Date.HasValue ? article.Date.Value.ToString("yyyy-MM-dd") : null,
+                ["is_shared"] = article.Visibility == ArticleVisibility.Shared,
+                ["as_link"] = isOwner || article.Visibility == ArticleVisibility.Shared,
             }).ToList();
 
             return Results.Content(pages.Render("index.html", new()
@@ -38,7 +41,7 @@ public static class PageEndpoints
                 ["page_title"] = "Samizdat",
                 ["site"] = SiteModel(settings),
                 ["articles"] = list,
-                ["nav"] = Navigation(db, currentSlug: null),
+                ["nav"] = Navigation(db, currentSlug: null, isOwner),
                 ["user"] = UserModel(user),
                 ["antiforgery"] = AntiforgeryHtml.Field(antiforgery, context),
             }), "text/html; charset=utf-8");
@@ -87,7 +90,7 @@ public static class PageEndpoints
                         ["date"] = parsed.FrontMatter.Date?.ToString("yyyy-MM-dd"),
                         ["html"] = body,
                     },
-                    ["nav"] = Navigation(db, currentSlug: slug),
+                    ["nav"] = Navigation(db, currentSlug: slug, ArticleAccess.IsOwner(user)),
                     ["user"] = UserModel(user),
                     // Плейсхолдер, не настоящий токен: страница кэшируется по slug и общая для всех
                     // гостей, а токен привязан к cookie конкретной сессии — см. Replace ниже.
@@ -165,7 +168,7 @@ public static class PageEndpoints
         {
             ["page_title"] = "Не найдено",
             ["site"] = SiteModel(settings),
-            ["nav"] = Navigation(db, currentSlug: null),
+            ["nav"] = Navigation(db, currentSlug: null, ArticleAccess.IsOwner(user)),
             ["user"] = UserModel(user),
             ["antiforgery"] = AntiforgeryHtml.Field(antiforgery, context),
         }), "text/html; charset=utf-8", statusCode: 404);
@@ -176,7 +179,7 @@ public static class PageEndpoints
         {
             ["page_title"] = "Статья закрыта",
             ["site"] = SiteModel(settings),
-            ["nav"] = Navigation(db, currentSlug: null),
+            ["nav"] = Navigation(db, currentSlug: null, ArticleAccess.IsOwner(user)),
             ["user"] = UserModel(user),
             ["antiforgery"] = AntiforgeryHtml.Field(antiforgery, context),
         }), "text/html; charset=utf-8", statusCode: 403);
@@ -193,27 +196,33 @@ public static class PageEndpoints
         ["login"] = user.Identity!.Name,
     };
 
-    internal static Dictionary<string, object?> Navigation(SamizdatDbContext db, string? currentSlug)
+    internal static Dictionary<string, object?> Navigation(SamizdatDbContext db, string? currentSlug,
+                                                           bool isOwner = true)
     {
         var entries = db.Articles
             .OrderBy(article => article.Folder).ThenBy(article => article.Title)
-            .Select(article => new ArticleEntry(article.Folder, article.Slug, article.Title))
+            .Select(article => new ArticleEntry(article.Folder, article.Slug, article.Title,
+                                                article.Visibility == ArticleVisibility.Shared))
             .ToList();
 
-        return ToModel(ArticleTree.Build(entries, currentSlug));
+        return ToModel(ArticleTree.Build(entries, currentSlug), isOwner);
     }
 
-    static Dictionary<string, object?> ToModel(TreeNode node) => new()
+    static Dictionary<string, object?> ToModel(TreeNode node, bool isOwner) => new()
     {
         ["name"] = node.Name,
         ["path"] = node.Path,
         ["has_current"] = node.HasCurrent,
-        ["folders"] = node.Folders.Select(ToModel).ToList(),
+        ["folders"] = node.Folders.Select(folder => ToModel(folder, isOwner)).ToList(),
         ["articles"] = node.Articles.Select(article => new Dictionary<string, object?>
         {
             ["slug"] = article.Slug,
             ["title"] = article.Title,
             ["is_current"] = article.IsCurrent,
+            ["is_shared"] = article.IsShared,
+            // Ссылку рисуем только на то, что этот зритель откроет: у читателя закрытая статья
+            // остаётся строкой с заголовком.
+            ["as_link"] = isOwner || article.IsShared,
         }).ToList(),
     };
 }
