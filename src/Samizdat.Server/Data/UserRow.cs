@@ -1,6 +1,13 @@
 namespace Samizdat.Server.Data;
 
-public enum UserRole { Owner = 0, Author = 1, Reader = 2 }
+public enum UserRole
+{
+    Owner = 0,
+
+    /// Читает открытые статьи, делает гостевые ссылки, меняет свой пароль. Номер 1 когда-то
+    /// занимал автор — значение убрано, номер не переиспользуем.
+    Reader = 2,
+}
 
 public sealed class UserRow
 {

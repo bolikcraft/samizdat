@@ -38,7 +38,7 @@ public class InitMigrationTests : IAsyncLifetime
         {
             Login = "second",
             PasswordHash = PasswordHasher.Hash("x"),
-            Role = UserRole.Author,
+            Role = UserRole.Reader,
             CreatedAt = DateTimeOffset.UtcNow,
         });
         await db.SaveChangesAsync();

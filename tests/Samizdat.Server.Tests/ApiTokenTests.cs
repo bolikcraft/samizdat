@@ -37,23 +37,26 @@ public class ApiTokenTests(DatabaseFixture database) : IDisposable
     }
 
     string CreateToken(WebApplicationFactory<Program> factory)
+        => CreateTokenFor(factory, $"owner-{Guid.NewGuid():N}", UserRole.Owner);
+
+    string CreateTokenFor(WebApplicationFactory<Program> factory, string login, UserRole role)
     {
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
-        var owner = new UserRow
+        var person = new UserRow
         {
-            Login = $"owner-{Guid.NewGuid():N}",
+            Login = login,
             PasswordHash = PasswordHasher.Hash("x"),
-            Role = UserRole.Owner,
+            Role = role,
             CreatedAt = DateTimeOffset.UtcNow,
         };
-        db.Users.Add(owner);
+        db.Users.Add(person);
         db.SaveChanges();
 
         var token = ApiToken.Create();
         db.ApiTokens.Add(new ApiTokenRow
         {
-            UserId = owner.Id,
+            UserId = person.Id,
             TokenHash = ApiToken.HashOf(token),
             CreatedAt = DateTimeOffset.UtcNow,
         });
@@ -87,6 +90,20 @@ public class ApiTokenTests(DatabaseFixture database) : IDisposable
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/state")).StatusCode);
+    }
+
+    // Выкладка — дело владельца: токен читателя проходит аутентификацию, но к /api не допускается.
+    [Fact]
+    public async Task Token_of_a_reader_does_not_open_the_api()
+    {
+        database.ResetDatabase();
+        using var factory = StartServer();
+        var token = CreateTokenFor(factory, "ivan", UserRole.Reader);
+
+        var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/state")).StatusCode);
     }
 
     [Fact]

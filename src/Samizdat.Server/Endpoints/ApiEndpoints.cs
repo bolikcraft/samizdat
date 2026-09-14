@@ -15,7 +15,7 @@ public static class ApiEndpoints
         var api = app.MapGroup("/api")
             .RequireAuthorization(policy => policy
                 .AddAuthenticationSchemes(ApiToken.Scheme)
-                .RequireAuthenticatedUser())
+                .RequireRole(nameof(UserRole.Owner)))
             .DisableAntiforgery();
 
         api.MapGet("/state", (SamizdatDbContext db) =>
