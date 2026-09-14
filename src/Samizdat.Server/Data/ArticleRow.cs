@@ -10,4 +10,9 @@ public sealed class ArticleRow
     public string? Theme { get; set; }
     public required string ContentHash { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
+    public ArticleVisibility Visibility { get; set; } = ArticleVisibility.Private;
+
+    /// Когда видимость меняли последний раз. Входит в отпечаток каталога: по нему сбрасывается
+    /// кэш страниц, иначе закрытая статья продолжала бы открываться из него.
+    public DateTimeOffset? VisibilityChangedAt { get; set; }
 }
