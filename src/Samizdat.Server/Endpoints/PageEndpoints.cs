@@ -60,6 +60,9 @@ public static class PageEndpoints
 
             if (!files.MarkdownExists(slug)) return NotFound(pages, db, settings, user, antiforgery, context);
 
+            if (!ArticleAccess.CanRead(row.Visibility, ArticleAccess.RoleOf(user)))
+                return Forbidden(pages, db, settings, user, antiforgery, context);
+
             // Content — content_hash из БД, а не отпечаток файла: PUT меняет хэш всегда, даже если
             // mtime и длина файла на диске совпали со старой версией. Catalog сбрасывает кэш, когда
             // меняется список статей: иначе дерево на старой странице этого не заметит.
@@ -100,6 +103,12 @@ public static class PageEndpoints
                                          SamizdatDbContext db, SiteSettings settings, ClaimsPrincipal user,
                                          IAntiforgery antiforgery, HttpContext context) =>
         {
+            // Доступ проверяется до выдачи файла, иначе вложения закрытой статьи уходят в обход страницы.
+            var row = db.Articles.Find(slug);
+            if (row is null) return NotFound(pages, db, settings, user, antiforgery, context);
+            if (!ArticleAccess.CanRead(row.Visibility, ArticleAccess.RoleOf(user)))
+                return Forbidden(pages, db, settings, user, antiforgery, context);
+
             var path = files.AttachmentPath(slug, file);
             if (path is null) return NotFound(pages, db, settings, user, antiforgery, context);
 
@@ -160,6 +169,17 @@ public static class PageEndpoints
             ["user"] = UserModel(user),
             ["antiforgery"] = AntiforgeryHtml.Field(antiforgery, context),
         }), "text/html; charset=utf-8", statusCode: 404);
+
+    static IResult Forbidden(PageRenderer pages, SamizdatDbContext db, SiteSettings settings, ClaimsPrincipal user,
+                             IAntiforgery antiforgery, HttpContext context)
+        => Results.Content(pages.Render("403.html", new()
+        {
+            ["page_title"] = "Статья закрыта",
+            ["site"] = SiteModel(settings),
+            ["nav"] = Navigation(db, currentSlug: null),
+            ["user"] = UserModel(user),
+            ["antiforgery"] = AntiforgeryHtml.Field(antiforgery, context),
+        }), "text/html; charset=utf-8", statusCode: 403);
 
     internal static Dictionary<string, object?> SiteModel(SiteSettings settings) => new()
     {

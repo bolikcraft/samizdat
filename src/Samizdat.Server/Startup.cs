@@ -56,6 +56,14 @@ public static class Startup
                 options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
                 options.ExpireTimeSpan = TimeSpan.FromDays(30);
                 options.SlidingExpiration = true;
+
+                // Своей страницы «доступа нет» у схемы нет: отказ по роли должен быть отказом,
+                // а не редиректом на чужой адрес. Страницу 403.html рисуют сами маршруты.
+                options.Events.OnRedirectToAccessDenied = context =>
+                {
+                    context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                    return Task.CompletedTask;
+                };
             })
             .AddScheme<AuthenticationSchemeOptions, ApiTokenAuthenticationHandler>(ApiToken.Scheme, _ => { });
         builder.Services.AddAuthorization();
