@@ -71,7 +71,11 @@ public static class PageEndpoints
             // меняется список статей: иначе дерево на старой странице этого не заметит.
             var key = new PageKey(Content: row.ContentHash, Theme: theme.Version,
                                   Catalog: CatalogFingerprint.Of(db), View: settings.ViewFingerprint);
-            var html = cache.GetOrBuild(slug, key, () =>
+            var isOwner = ArticleAccess.IsOwner(user);
+            // Своя ячейка, а не роль в ключе: с общей ячейкой владелец и читатель вытесняли бы
+            // страницы друг друга, и каждый второй запрос шёл бы в полный рендер.
+            var cell = isOwner ? slug : $"reader/{slug}";
+            var html = cache.GetOrBuild(cell, key, () =>
             {
                 var text = files.ReadMarkdown(slug)!;
                 var parsed = FrontMatterParser.Parse(text);
@@ -89,8 +93,9 @@ public static class PageEndpoints
                         ["description"] = parsed.FrontMatter.Description,
                         ["date"] = parsed.FrontMatter.Date?.ToString("yyyy-MM-dd"),
                         ["html"] = body,
+                        ["is_shared"] = row.Visibility == ArticleVisibility.Shared,
                     },
-                    ["nav"] = Navigation(db, currentSlug: slug, ArticleAccess.IsOwner(user)),
+                    ["nav"] = Navigation(db, currentSlug: slug, isOwner),
                     ["user"] = UserModel(user),
                     // Плейсхолдер, не настоящий токен: страница кэшируется по slug и общая для всех
                     // гостей, а токен привязан к cookie конкретной сессии — см. Replace ниже.
@@ -194,6 +199,7 @@ public static class PageEndpoints
     internal static Dictionary<string, object?> UserModel(ClaimsPrincipal user) => new()
     {
         ["login"] = user.Identity!.Name,
+        ["is_owner"] = ArticleAccess.IsOwner(user),
     };
 
     internal static Dictionary<string, object?> Navigation(SamizdatDbContext db, string? currentSlug,

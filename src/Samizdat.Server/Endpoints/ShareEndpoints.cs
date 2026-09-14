@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.EntityFrameworkCore;
 using Samizdat.Core;
@@ -114,6 +115,31 @@ public static class ShareEndpoints
             // Готовый урл показываем в настройках: та страница не кэшируется, там же список и отзыв.
             return Results.Redirect($"/settings#link-{link.Id}");
         }).RequireAuthorization(policy => policy.RequireRole(nameof(UserRole.Owner))).RequireValidToken();
+
+        // Действие над статьёй, а не над её адресом: slug приходит полем формы — тем же приёмом,
+        // что у /share. Сегмент visibility зарезервирован, статьи с таким slug не бывает.
+        app.MapPost("/visibility", async (HttpContext context, SamizdatDbContext db, ClaimsPrincipal user) =>
+        {
+            // Именно StatusCode, а не Results.Forbid(): Forbid отдаёт cookie-схеме редирект
+            // на страницу «доступа нет», а нам нужен честный код ответа.
+            if (!ArticleAccess.CanSwitchVisibility(ArticleAccess.RoleOf(user)))
+                return Results.StatusCode(StatusCodes.Status403Forbidden);
+
+            var form = await context.Request.ReadFormAsync();
+            var slug = form["slug"].ToString();
+            if (slug.Length == 0) return Results.BadRequest("Нет статьи");
+
+            var row = db.Articles.Find(slug);
+            if (row is null) return Results.NotFound();
+
+            row.Visibility = form["visibility"].ToString() == "shared"
+                ? ArticleVisibility.Shared
+                : ArticleVisibility.Private;
+            row.VisibilityChangedAt = DateTimeOffset.UtcNow;
+            await db.SaveChangesAsync();
+
+            return Results.Redirect($"/{slug}");
+        }).RequireValidToken();
     }
 
     // День, неделя, месяц, год и «без срока»: другие значения формой не выдаются и не принимаются.

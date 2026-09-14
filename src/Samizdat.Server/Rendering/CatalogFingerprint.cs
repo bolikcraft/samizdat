@@ -9,6 +9,9 @@ public static class CatalogFingerprint
     {
         var count = db.Articles.Count();
         var latest = db.Articles.Max(article => (DateTimeOffset?)article.UpdatedAt);
-        return $"{count}:{latest?.UtcTicks ?? 0}";
+        // Смена видимости не трогает UpdatedAt: то — время правки текста, по нему считается
+        // расхождение с вольтом. Без своего слагаемого закрытая статья осталась бы в кэше.
+        var access = db.Articles.Max(article => (DateTimeOffset?)article.VisibilityChangedAt);
+        return $"{count}:{latest?.UtcTicks ?? 0}:{access?.UtcTicks ?? 0}";
     }
 }

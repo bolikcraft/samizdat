@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Samizdat.Server.Auth;
@@ -105,6 +106,87 @@ public class VisibilityTests : IDisposable
         Assert.Contains("href=\"/tayna\"", html);
     }
 
+    [Fact]
+    public async Task Owner_opens_an_article_to_the_readers()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        await AddArticle(factory, "tayna", ArticleVisibility.Private);
+        AddPerson(factory, "hozyain", "parol", UserRole.Owner);
+
+        var client = await Login(factory, "hozyain", "parol");
+        var answer = await Post(client, "/visibility", new() { ["slug"] = "tayna", ["visibility"] = "shared" });
+
+        Assert.Equal(HttpStatusCode.Redirect, answer.StatusCode);
+        Assert.Equal("/tayna", answer.Headers.Location?.ToString());
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+        var row = db.Articles.Single();
+        Assert.Equal(ArticleVisibility.Shared, row.Visibility);
+        Assert.NotNull(row.VisibilityChangedAt);
+    }
+
+    [Fact]
+    public async Task Reader_does_not_switch_visibility()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        await AddArticle(factory, "otkrytaya", ArticleVisibility.Shared);
+        AddPerson(factory, "ivan", "parol", UserRole.Reader);
+
+        var client = await Login(factory, "ivan", "parol");
+        var answer = await Post(client, "/visibility", new() { ["slug"] = "otkrytaya", ["visibility"] = "private" });
+
+        Assert.Equal(HttpStatusCode.Forbidden, answer.StatusCode);
+    }
+
+    [Fact]
+    public async Task Closing_an_article_takes_it_out_of_the_cache()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        await AddArticle(factory, "tayna", ArticleVisibility.Shared);
+        AddPerson(factory, "hozyain", "parol", UserRole.Owner);
+        AddPerson(factory, "ivan", "parol", UserRole.Reader);
+
+        var reader = await Login(factory, "ivan", "parol");
+        Assert.Equal(HttpStatusCode.OK, (await reader.GetAsync("/tayna")).StatusCode);
+
+        var owner = await Login(factory, "hozyain", "parol");
+        await Post(owner, "/visibility", new() { ["slug"] = "tayna", ["visibility"] = "private" });
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await reader.GetAsync("/tayna")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Owner_and_reader_do_not_push_each_other_out_of_the_cache()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        await AddArticle(factory, "otkrytaya", ArticleVisibility.Shared);
+        await AddArticle(factory, "tayna", ArticleVisibility.Private);
+        AddPerson(factory, "hozyain", "parol", UserRole.Owner);
+        AddPerson(factory, "ivan", "parol", UserRole.Reader);
+
+        var owner = await Login(factory, "hozyain", "parol");
+        var reader = await Login(factory, "ivan", "parol");
+
+        var ownerPage = await owner.GetStringAsync("/otkrytaya");
+        var readerPage = await reader.GetStringAsync("/otkrytaya");
+        var ownerAgain = await owner.GetStringAsync("/otkrytaya");
+
+        Assert.Contains("/visibility", ownerPage);
+        Assert.DoesNotContain("/visibility", readerPage);
+        Assert.Contains("/visibility", ownerAgain);
+
+        // Дыра, ради которой заведена ячейка reader/{slug}: из общей ячейки читателю пришла бы
+        // страница владельца со ссылкой на закрытую статью.
+        Assert.Contains("href=\"/tayna\"", ownerPage);
+        Assert.DoesNotContain("href=\"/tayna\"", readerPage);
+        Assert.Contains("href=\"/tayna\"", ownerAgain);
+    }
+
     WebApplicationFactory<Program> CreateFactory() =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
@@ -138,6 +220,21 @@ public class VisibilityTests : IDisposable
             CreatedAt = DateTimeOffset.UtcNow,
         });
         db.SaveChanges();
+    }
+
+    // Форма достаёт свой antiforgery-токен со страницы — сервер требует его на каждом небезопасном POST.
+    static async Task<HttpResponseMessage> Post(HttpClient client, string path, Dictionary<string, string> fields)
+    {
+        var (name, value) = AntiforgeryToken(await client.GetStringAsync("/"));
+        fields[name] = value;
+        return await client.PostAsync(path, new FormUrlEncodedContent(fields));
+    }
+
+    static (string Name, string Value) AntiforgeryToken(string html)
+    {
+        var match = Regex.Match(html, "<input type=\"hidden\" name=\"([^\"]+)\" value=\"([^\"]+)\">");
+        if (!match.Success) throw new InvalidOperationException("Antiforgery-поле не найдено на странице");
+        return (match.Groups[1].Value, match.Groups[2].Value);
     }
 
     // Без автоперехода: иначе клиент сам сходит по редиректу и тест не увидит его кода.
