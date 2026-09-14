@@ -20,8 +20,9 @@
   </details>
   {{ end }}
 </header>
-{{~## Панель есть на любой странице; без дерева она просто без бокового столбца — shell-plain. ##~}}
-<div class="shell{{ if !nav }} shell-plain{{ end }}">{{ if nav }}
+{{~## Панель есть на любой странице; без бокового столбца — shell-plain. В столбце либо дерево
+статей, либо свой список страницы: имя его шаблона приходит в side_nav. ##~}}
+<div class="shell{{ if !nav && !side_nav }} shell-plain{{ end }}">{{ if nav }}
   <aside class="sidebar">
     {{~## На узком экране дерево должно быть свёрнуто, иначе читатель прокручивает весь вольт
     до статьи. Переключатель — <details> без open, а дерево лежит рядом с ним, а не внутри:
@@ -31,7 +32,8 @@
       <input type="search" id="nav-filter" placeholder="Фильтр по заголовку" autocomplete="off">
       <nav id="nav-tree">{{ include 'nav-node' node: nav }}</nav>
     </div>
-  </aside>{{~ end }}
+  </aside>{{ else if side_nav }}
+  <aside class="sidebar">{{ include side_nav }}</aside>{{~ end }}
   <main>{{ content }}</main>
 </div>
 <footer class="bottom">Samizdat</footer>

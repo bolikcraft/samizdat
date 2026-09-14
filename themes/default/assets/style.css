@@ -3,6 +3,9 @@
    самого белого (тёмная) снимка держат 4.5:1 — порог WCAG AA. Менять их или 0.86 только с
    пересчётом контраста. */
 :root {
+  /* Без этого свойства браузер рисует список выбора, каретку и полосы прокрутки светлыми
+     даже при тёмной палитре: своими стилями внутренности этих виджетов не достать. */
+  color-scheme: light;
   --bg: #fdfdfc; --fg: #1a1a18; --muted: #5f5f5a; --accent: #2a6a4a; --line: #e3e3df;
   --callout: #f1f4f2; --code-bg: #f5f5f3;
   --warn: #c98a2b; --danger: #c0503f; --tip: #2f8f5f;
@@ -19,6 +22,7 @@
    выбор «тёмная». Набор повторён дважды: обычный CSS не умеет отдать один блок двум условиям. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-color-scheme="light"]) {
+    color-scheme: dark;
     --bg: #16171a; --fg: #e6e6e3; --muted: #a1a19b; --accent: #7fbf9a; --line: #2b2d31;
     --callout: #1e2024; --code-bg: #1b1d21;
     --warn: #d9a84e; --danger: #d97a68; --tip: #6fbf94;
@@ -31,6 +35,7 @@
 }
 
 :root[data-color-scheme="dark"] {
+  color-scheme: dark;
   --bg: #16171a; --fg: #e6e6e3; --muted: #a1a19b; --accent: #7fbf9a; --line: #2b2d31;
   --callout: #1e2024; --code-bg: #1b1d21;
   --warn: #d9a84e; --danger: #d97a68; --tip: #6fbf94;
@@ -215,6 +220,23 @@ body {
 /* Подсветка текущей статьи: акцентный фон, контраст держится и в светлой, и в тёмной палитре. */
 .nav-articles a[aria-current="page"] { background: var(--accent); color: var(--bg); font-weight: bold; }
 
+/* Разделы настроек занимают место дерева статей, поэтому и ведут себя так же. */
+.settings-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  font-family: system-ui, sans-serif;
+  font-size: 0.95rem;
+}
+.settings-nav a {
+  padding: 0.4rem 0.6rem;
+  border-radius: 6px;
+  color: var(--fg);
+  text-decoration: none;
+}
+.settings-nav a:hover { background: var(--callout); }
+.settings-nav a[aria-current="page"] { background: var(--accent); color: var(--bg); font-weight: bold; }
+
 @media (max-width: 720px) {
   /* На iOS background-attachment: fixed рисует картинку неправильно. */
   body { background-attachment: scroll; }
@@ -312,28 +334,40 @@ blockquote { margin: 1.2rem 0; padding-left: 1rem; border-left: 4px solid var(--
 /* Один размер для всех кнопок темы: высота 2.125rem, как в Nextcloud. Цвета задаются ниже. */
 .login button,
 .settings-form button,
-.settings-section > .inline-form button,
 .share-form button,
-.tokens .inline-form button,
-.links .inline-form button,
+.inline-form button,
 .copy-link {
   min-height: 2.125rem; padding: 0 1rem; border: none; border-radius: 8px;
   font: inherit; font-family: system-ui, sans-serif; font-size: 0.875rem; font-weight: 600;
   line-height: 1.2; cursor: pointer;
 }
-.login button, .settings-form button, .settings-section > .inline-form button, .share-form button {
+.login button, .settings-form button, .share-form button {
   background: var(--accent); color: var(--bg);
 }
 .error { color: var(--danger); }
 
-.settings-message { padding: 0.6rem 0.9rem; border-radius: 6px; font-family: system-ui, sans-serif; font-size: 0.95rem; }
+.settings-message {
+  padding: 0.6rem 0.9rem;
+  border-left: 3px solid currentColor;
+  border-radius: 6px;
+  font-family: system-ui, sans-serif;
+  font-size: 0.95rem;
+}
 .settings-message-ok { background: var(--callout); color: var(--tip); }
 .settings-message-err { background: var(--callout); color: var(--danger); }
 
-.settings-section { margin: 2rem 0; padding-top: 1.5rem; border-top: 1px solid var(--line); }
-.settings-section:first-of-type { padding-top: 0; border-top: none; }
-.settings-section h2 { font-size: 1.1rem; }
-.settings-section .hint { color: var(--muted); font-size: 0.9rem; }
+/* Виден один раздел: тот, чей якорь стоит в адресе. Без якоря — первый: правило ниже держится
+   на :has(), поэтому «первый» задан отдельным селектором, а не заранее в .settings-pane. */
+.settings-pane { display: none; }
+.settings-pane:target { display: block; }
+.settings-panes:not(:has(.settings-pane:target)) > .settings-pane:first-child { display: block; }
+
+.settings-pane h2 { margin: 0 0 0.4rem; font-size: 1.25rem; }
+.settings-pane h3 { margin: 0 0 0.4rem; font-size: 1rem; }
+.settings-pane .hint { margin: 0 0 1rem; color: var(--muted); font-size: 0.9rem; }
+
+/* Смысловые куски раздела: между ними линия, перед первым её нет. */
+.settings-block + .settings-block { margin-top: 1.75rem; padding-top: 1.5rem; border-top: 1px solid var(--line); }
 
 .settings-form { display: grid; gap: 0.75rem; max-width: 24rem; }
 .settings-form label { display: grid; gap: 0.3rem; font-family: system-ui, sans-serif; font-size: 0.9rem; color: var(--muted); }
@@ -341,36 +375,133 @@ blockquote { margin: 1.2rem 0; padding-left: 1rem; border-left: 4px solid var(--
   width: 100%; padding: 0.5rem; font: inherit; color: var(--fg);
   background: var(--bg); border: 1px solid var(--line); border-radius: 4px;
 }
+.settings-form input:focus-visible, .settings-form select:focus-visible {
+  border-color: var(--accent); outline: 2px solid var(--accent); outline-offset: 1px;
+}
 .settings-form fieldset.color-scheme {
-  display: grid; gap: 0.3rem; border: 1px solid var(--line); border-radius: 4px; padding: 0.6rem 0.8rem;
+  border: 1px solid var(--line); border-radius: 8px; padding: 0.4rem 0.6rem 0.6rem;
 }
 .settings-form fieldset.color-scheme legend { font-family: system-ui, sans-serif; font-size: 0.85rem; color: var(--muted); padding: 0 0.3rem; }
-.settings-form fieldset.color-scheme label { display: flex; align-items: center; gap: 0.4rem; flex-direction: row; }
-/* Правило ширины для полей ввода растягивало и радиокнопку, отгоняя подпись к правому краю. */
-.settings-form fieldset.color-scheme input { width: auto; }
 .settings-form button { justify-self: start; }
-.settings-section > .inline-form { margin: 0.75rem 0 0; }
 
+/* Варианты схемы стоят строкой пилюль. Выбранный виден и по самой радиокнопке, заливка
+   только подчёркивает его — на браузере без :has() ничего не теряется. */
+.scheme-choices { display: flex; flex-wrap: wrap; gap: 0.25rem; }
+.scheme-choices label {
+  display: flex; align-items: center; gap: 0.4rem; flex-direction: row;
+  padding: 0.35rem 0.7rem; border-radius: 999px; color: var(--fg); cursor: pointer;
+}
+.scheme-choices label:hover { background: var(--callout); }
+.scheme-choices label:has(input:checked) { background: var(--callout); font-weight: 600; }
+/* Правило ширины для полей ввода растягивало и радиокнопку, отгоняя подпись к правому краю. */
+.scheme-choices input { width: auto; margin: 0; accent-color: var(--accent); }
+
+/* Форма загрузки и текущий фон стоят рядом, пока хватает ширины. */
+.background-row { display: flex; flex-wrap: wrap; gap: 1.5rem; align-items: flex-start; }
+.background-card { display: grid; gap: 0.6rem; justify-items: start; margin: 0; }
 .background-preview { max-width: 18rem; border-radius: 8px; border: 1px solid var(--panel-border); }
+.inline-form { margin: 0; }
 
-.tokens th, .tokens td { font-size: 0.9rem; }
-.tokens .inline-form, .links .inline-form { margin: 0; }
+.empty {
+  padding: 0.9rem 1rem; border-radius: 8px; background: var(--callout);
+  color: var(--muted); font-family: system-ui, sans-serif; font-size: 0.95rem;
+}
+
+/* Таблицы настроек — списки, а не сетка: только линия под строкой и приглушённая шапка.
+   Прокрутку узкого экрана держит обёртка, поэтому сама таблица остаётся таблицей и тянется
+   во всю ширину панели (общее правило для таблиц статьи делает их блоком и сжимает по содержимому). */
+.table-scroll { overflow-x: auto; }
+.settings-table { display: table; width: 100%; margin: 0; font-size: 0.9rem; }
+.settings-table tbody tr:hover { background: var(--callout); }
+.settings-table th, .settings-table td {
+  border: none; border-bottom: 1px solid var(--line); padding: 0.5rem 0.6rem; vertical-align: middle;
+}
+.settings-table th {
+  font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted);
+}
+.settings-table td:first-child, .settings-table th:first-child { padding-left: 0; }
+.settings-table .row-actions { text-align: right; white-space: nowrap; }
+
 /* Кнопки в таблицах настроек — «Отозвать» и «Скопировать» — стоят рядом и должны быть одного
    размера. Цвет разный: отзыв необратим, копирование — нет. */
-.tokens .inline-form button, .links .inline-form button, .copy-link { background: none; }
-.tokens .inline-form button, .links .inline-form button {
+.settings-table .inline-form button, .copy-link, .background-card .inline-form button { background: none; }
+.settings-table .inline-form button {
   color: var(--danger); border: 1px solid var(--danger);
 }
-.tokens .inline-form button:hover, .links .inline-form button:hover { background: var(--danger); color: var(--bg); }
-.copy-link { color: var(--accent); border: 1px solid var(--accent); }
-.copy-link:hover { background: var(--accent); color: var(--bg); }
+.settings-table .inline-form button:hover { background: var(--danger); color: var(--bg); }
+.copy-link, .background-card .inline-form button { color: var(--accent); border: 1px solid var(--accent); }
+.copy-link:hover, .background-card .inline-form button:hover { background: var(--accent); color: var(--bg); }
 
-.share { margin-top: 2rem; }
-.share > summary { cursor: pointer; }
-.share-form { display: flex; flex-wrap: wrap; gap: .75rem; align-items: end; margin-top: .75rem; }
-.share-form label { display: flex; flex-direction: column; gap: .25rem; }
+.share { margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--line); }
+.share > summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  list-style: none;
+  font-family: system-ui, sans-serif;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+.share > summary::-webkit-details-marker { display: none; }
+/* Галочка из двух рамок квадрата: у шрифтовых ▸ ▾ толщина и размер пляшут от шрифта,
+   а эта под текст не подстраивается и поворачивается при раскрытии. */
+.share > summary::before {
+  content: "";
+  width: 0.4rem;
+  height: 0.4rem;
+  margin-left: 0.15rem;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg);
+}
+.share[open] > summary { color: var(--fg); }
+.share[open] > summary::before { transform: rotate(45deg); }
+@media (prefers-reduced-motion: no-preference) {
+  .share > summary::before { transition: transform 0.15s ease; }
+}
 
-.links { width: 100%; border-collapse: collapse; }
-.links td, .links th { text-align: left; padding: .4rem .5rem; vertical-align: top; }
-.links .link-url { width: 18rem; max-width: 100%; }
+.share-form { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: end; margin-top: 0.75rem; }
+.share-form label {
+  display: grid;
+  gap: 0.3rem;
+  font-family: system-ui, sans-serif;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+/* Поле заметки тянется по свободной ширине, срок остаётся узким. */
+.share-form .note { flex: 1 1 16rem; max-width: 22rem; }
+.share-form input, .share-form select {
+  /* Та же высота, что у кнопки рядом, — иначе строка формы выглядит ступенькой. */
+  min-height: 2.125rem;
+  width: 100%;
+  padding: 0.25rem 0.5rem;
+  font: inherit;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+.share-form select { min-width: 8rem; }
+.share-form input:focus-visible, .share-form select:focus-visible {
+  border-color: var(--accent);
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* Поле с адресом занимает всю свободную ширину столбца, кнопка рядом остаётся по содержимому. */
+.link-cell { display: flex; gap: 0.4rem; align-items: center; }
+.link-cell .link-url {
+  flex: 1 1 auto;
+  min-width: 14rem;
+  min-height: 2.125rem;
+  padding: 0 0.5rem;
+  font: inherit;
+  font-size: 0.85rem;
+  color: var(--muted);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
 .dead-link { opacity: .55; }

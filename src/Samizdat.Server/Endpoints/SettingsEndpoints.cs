@@ -52,6 +52,8 @@ public static class SettingsEndpoints
             {
                 ["page_title"] = "Настройки",
                 ["site"] = PageEndpoints.SiteModel(settings),
+                // Вместо дерева статей в боковике — список разделов настроек.
+                ["side_nav"] = "settings-nav",
                 ["user"] = PageEndpoints.UserModel(user),
                 ["antiforgery"] = AntiforgeryHtml.Field(antiforgery, context),
                 ["message"] = Message(ok, err),
@@ -73,6 +75,8 @@ public static class SettingsEndpoints
             }), "text/html; charset=utf-8");
         });
 
+        // Якорь в конце адреса — раздел настроек: страница показывает тот, чей якорь стоит в адресе.
+        // Без него после отправки формы открывался бы первый раздел, а не тот, где нажали кнопку.
         group.MapPost("/password", async (HttpContext context, SamizdatDbContext db, ClaimsPrincipal user) =>
         {
             var form = await context.Request.ReadFormAsync();
@@ -83,15 +87,15 @@ public static class SettingsEndpoints
             var owner = CurrentUser(db, user);
 
             if (!PasswordHasher.Verify(current, owner.PasswordHash))
-                return Results.Redirect("/settings?err=wrong_password");
+                return Results.Redirect("/settings?err=wrong_password#security");
             if (next.Length < 8)
-                return Results.Redirect("/settings?err=short_password");
+                return Results.Redirect("/settings?err=short_password#security");
             if (next != repeat)
-                return Results.Redirect("/settings?err=password_mismatch");
+                return Results.Redirect("/settings?err=password_mismatch#security");
 
             owner.PasswordHash = PasswordHasher.Hash(next);
             db.SaveChanges();
-            return Results.Redirect("/settings?ok=password");
+            return Results.Redirect("/settings?ok=password#security");
         }).RequireValidToken();
 
         group.MapPost("/appearance", async (HttpContext context, SiteSettings settings, ThemeFactory themes) =>
@@ -103,7 +107,7 @@ public static class SettingsEndpoints
             if (themes.AvailableThemes().Contains(theme)) settings.Set("theme.name", theme);
             if (colorScheme is "light" or "dark" or "system") settings.Set("theme.color_scheme", colorScheme);
 
-            return Results.Redirect("/settings?ok=appearance");
+            return Results.Redirect("/settings?ok=appearance#appearance");
         }).RequireValidToken();
 
         group.MapPost("/background", [RequestSizeLimit(MaxBackgroundRequestBytes)]
@@ -117,34 +121,36 @@ public static class SettingsEndpoints
             catch (BadHttpRequestException)
             {
                 // Тело больше лимита: Kestrel обрывает чтение сам, не дав ReadFormAsync его дочитать.
-                return Results.Redirect("/settings?err=background_too_big");
+                return Results.Redirect("/settings?err=background_too_big#appearance");
             }
             catch (InvalidDataException)
             {
                 // Форма нечитаема: оборванная граница, слишком много полей, слишком длинный ключ.
-                return Results.Redirect("/settings?err=background_form");
+                return Results.Redirect("/settings?err=background_form#appearance");
             }
 
             var upload = form.Files["file"];
-            if (upload is null || upload.Length == 0) return Results.Redirect("/settings?err=background_missing");
-            if (upload.Length > MaxBackgroundBytes) return Results.Redirect("/settings?err=background_too_big");
+            if (upload is null || upload.Length == 0)
+                return Results.Redirect("/settings?err=background_missing#appearance");
+            if (upload.Length > MaxBackgroundBytes)
+                return Results.Redirect("/settings?err=background_too_big#appearance");
 
             await using var stream = upload.OpenReadStream();
             var head = new byte[BackgroundFile.HeadLength];
             var read = await stream.ReadAtLeastAsync(head, head.Length, throwOnEndOfStream: false);
             if (BackgroundFile.ExtensionOf(head.AsSpan(0, read)) is not { } extension)
-                return Results.Redirect("/settings?err=background_type");
+                return Results.Redirect("/settings?err=background_type#appearance");
 
             stream.Position = 0;
             settings.Set("theme.background", background.Save(stream, extension));
-            return Results.Redirect("/settings?ok=background");
+            return Results.Redirect("/settings?ok=background#appearance");
         }).RefuseAnOversizedBody().RequireValidToken();
 
         group.MapPost("/background/remove", (SiteSettings settings, BackgroundFile background) =>
         {
             background.Remove();
             settings.Set("theme.background", "");
-            return Results.Redirect("/settings?ok=background_removed");
+            return Results.Redirect("/settings?ok=background_removed#appearance");
         }).RequireValidToken();
 
         group.MapPost("/tokens/{id:int}/revoke", (int id, SamizdatDbContext db, ClaimsPrincipal user) =>
@@ -155,7 +161,7 @@ public static class SettingsEndpoints
 
             db.ApiTokens.Remove(token);
             db.SaveChanges();
-            return Results.Redirect("/settings?ok=token_revoked");
+            return Results.Redirect("/settings?ok=token_revoked#tokens");
         }).RequireValidToken();
 
         // Отзыв мягкий: строка остаётся, чтобы гость получил 410 «ссылка не работает», а не 404.
@@ -166,7 +172,7 @@ public static class SettingsEndpoints
 
             link.RevokedAt = DateTimeOffset.UtcNow;
             db.SaveChanges();
-            return Results.Redirect("/settings?ok=link_revoked");
+            return Results.Redirect("/settings?ok=link_revoked#links");
         }).RequireValidToken();
     }
 
@@ -177,7 +183,7 @@ public static class SettingsEndpoints
     static RouteHandlerBuilder RefuseAnOversizedBody(this RouteHandlerBuilder builder)
         => builder.AddEndpointFilter(async (invocation, next) =>
             invocation.HttpContext.Request.ContentLength > MaxBackgroundRequestBytes
-                ? Results.Redirect("/settings?err=background_too_big")
+                ? Results.Redirect("/settings?err=background_too_big#appearance")
                 : await next(invocation));
 
     static UserRow CurrentUser(SamizdatDbContext db, ClaimsPrincipal user)

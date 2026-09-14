@@ -135,6 +135,57 @@ public class SettingsPageTests : IDisposable
     }
 
     [Fact]
+    public async Task The_settings_page_puts_the_section_list_where_the_article_tree_is()
+    {
+        var factory = StartFactory();
+        AddOwner(factory, "aleks", "тайна");
+        var client = await LoginClient(factory, "aleks", "тайна");
+
+        var html = await client.GetStringAsync("/settings");
+
+        // Настройки идут в той же раскладке, что и статьи: боковик плюс панель, а не одна колонка.
+        Assert.Contains("class=\"shell\"", html);
+        Assert.DoesNotContain("shell-plain", html);
+        Assert.DoesNotContain("nav-tree", html);
+        Assert.Contains("class=\"settings-nav\"", html);
+    }
+
+    [Fact]
+    public async Task Every_section_of_the_list_has_its_own_pane()
+    {
+        var factory = StartFactory();
+        AddOwner(factory, "aleks", "тайна");
+        var client = await LoginClient(factory, "aleks", "тайна");
+
+        var html = await client.GetStringAsync("/settings");
+
+        // Раздел выбирается якорем. Ссылка без своей панели оставила бы страницу пустой.
+        var sections = Regex.Matches(html, "href=\"#([a-z]+)\"").Select(match => match.Groups[1].Value).ToList();
+        Assert.Equal(["appearance", "security", "tokens", "links"], sections);
+        foreach (var section in sections)
+            Assert.Contains($"class=\"settings-pane\" id=\"{section}\"", html);
+    }
+
+    [Fact]
+    public async Task A_saved_form_returns_to_its_own_section()
+    {
+        var factory = StartFactory();
+        AddOwner(factory, "aleks", "тайна");
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        await client.PostAsync("/login", new FormUrlEncodedContent(
+            new Dictionary<string, string> { ["login"] = "aleks", ["password"] = "тайна" }));
+        var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
+
+        var appearance = await client.PostAsync("/settings/appearance", new FormUrlEncodedContent(
+            new Dictionary<string, string> { [name] = value, ["theme"] = "default", ["color_scheme"] = "dark" }));
+        var password = await client.PostAsync("/settings/password", new FormUrlEncodedContent(
+            new Dictionary<string, string> { [name] = value, ["current"] = "неверно", ["new"] = "x", ["new2"] = "x" }));
+
+        Assert.Equal("/settings?ok=appearance#appearance", appearance.Headers.Location?.OriginalString);
+        Assert.Equal("/settings?err=wrong_password#security", password.Headers.Location?.OriginalString);
+    }
+
+    [Fact]
     public async Task The_background_preview_and_remove_button_appear_only_while_a_background_is_set()
     {
         var factory = StartFactory();
