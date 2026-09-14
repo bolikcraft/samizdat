@@ -9,12 +9,12 @@
   <input type="hidden" name="slug" value="{{ article.slug | html.escape }}">
   {{ if article.is_shared }}
   <input type="hidden" name="visibility" value="private">
-  <span class="visibility-state">Видна всем заведённым</span>
+  <span class="visibility-state">Видна пользователям</span>
   <button type="submit">Закрыть</button>
   {{ else }}
   <input type="hidden" name="visibility" value="shared">
   <span class="visibility-state">Только моя</span>
-  <button type="submit">Открыть всем заведённым</button>
+  <button type="submit">Открыть пользователям</button>
   {{ end }}
 </form>
 {{ end }}

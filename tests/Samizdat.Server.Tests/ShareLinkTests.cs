@@ -831,7 +831,7 @@ public class ShareLinkTests : IDisposable
         await PostForm(owner, "/visibility", new() { ["slug"] = "statya", ["visibility"] = "private" });
         var closed = await factory.CreateClient().GetAsync($"/s/{token}");
 
-        // Видимость закрывает статью для заведённых людей, а не для того, кому отдали ссылку.
+        // Видимость закрывает статью для пользователей сайта, а не для того, кому отдали ссылку.
         Assert.Equal(HttpStatusCode.OK, open.StatusCode);
         Assert.Equal(HttpStatusCode.OK, closed.StatusCode);
     }
