@@ -59,7 +59,7 @@ body {
 }
 
 .top, .bottom {
-  width: min(76rem, calc(100% - 2rem));
+  width: min(100rem, calc(100% - 2rem));
   margin: 0 auto;
   padding: 1rem 0.5rem;
   color: var(--muted);
@@ -69,20 +69,9 @@ body {
    Поднимаем шапку над панелью. */
 .top { position: relative; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
 .top a { color: var(--fg); font-family: system-ui, sans-serif; font-weight: bold; text-decoration: none; }
-/* Подвал лежит прямо на снимке, а обводку ему даёт схема, а не яркость снимка: светлая схема
-   поверх тёмной фотографии расплывалась. Подкладка из того же стекла, что и панель, отвязывает
-   подвал от снимка и держит те же 4.5:1. */
-.bottom { font-size: 0.9rem; }
-.bottom span {
-  display: inline-block;
-  padding: 0.15rem 0.55rem;
-  background: var(--panel);
-  border: 1px solid var(--panel-border);
-  border-radius: 6px;
-  text-shadow: none;
-  backdrop-filter: blur(16px) saturate(1.4);
-  -webkit-backdrop-filter: blur(16px) saturate(1.4);
-}
+/* Подвал лежит прямо на снимке, как и шапка, поэтому читается тем же приёмом — цветом --fg
+   и обводкой, а не подложкой: своего фона у него по замыслу нет. */
+.bottom { font-size: 0.9rem; color: var(--fg); }
 
 /* Меню владельца: <details> без js, раскрывается вправо под именем. */
 .user-menu { position: relative; font-family: system-ui, sans-serif; font-size: 0.9rem; }
@@ -128,11 +117,9 @@ body {
 .user-menu form { margin: 0; }
 
 /* Общая панель: навигация и статья лежат в одном скруглённом блоке матового стекла.
-   Ниже 720px панель разворачивается в одну колонку со сворачиваемым деревом сверху.
-   76rem = столбец текста 44rem + боковик 16rem + поля: шире панель только растит пустое
-   стекло справа от текста и закрывает фотографию. */
+   Ниже 720px панель разворачивается в одну колонку со сворачиваемым деревом сверху. */
 .shell {
-  width: min(76rem, calc(100% - 2rem));
+  width: min(100rem, calc(100% - 2rem));
   margin: 0 auto 1.5rem;
   padding: 1.25rem 1.5rem 2rem;
   display: grid;
@@ -151,13 +138,12 @@ body {
 /* Вход — одна короткая форма, широкая панель вокруг неё смотрится пустой. */
 .shell-plain:has(.login) { width: min(26rem, calc(100% - 2rem)); }
 
-/* Ширина строки: панель тянется почти во всё окно, а читать длинные строки тяжело.
-   44rem — примерно 75 знаков в строке шрифтом статьи. */
-.shell main { max-width: 44rem; margin: 0 auto; padding: 0; }
+/* Статья занимает всю ширину панели от боковика до правого края — так решено при разборе. */
+.shell main { max-width: none; margin: 0; padding: 0; }
 
 /* Без размытия панель становится плотной: сквозь неё текст не читался бы. */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .shell, .user-menu ul, .bottom span { background: var(--panel-solid); }
+  .shell, .user-menu ul { background: var(--panel-solid); }
 }
 
 .sidebar { border-right: 1px solid var(--line); }
