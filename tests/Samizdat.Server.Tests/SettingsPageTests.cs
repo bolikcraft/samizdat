@@ -189,6 +189,26 @@ public class SettingsPageTests : IDisposable
     }
 
     [Fact]
+    public async Task A_message_stands_inside_the_section_it_belongs_to()
+    {
+        var factory = StartFactory();
+        AddOwner(factory, "aleks", "тайна");
+        var client = await LoginClient(factory, "aleks", "тайна");
+
+        // Разделы переключаются якорем, без перезагрузки. Сообщение над всеми разделами оставалось
+        // висеть над чужой формой: выбрал фон, перешёл на пароль — «Фон выбран.» ещё тут.
+        var background = await client.GetStringAsync("/settings?ok=background");
+        Assert.InRange(background.IndexOf("Фон выбран.", StringComparison.Ordinal),
+                       background.IndexOf("id=\"appearance\"", StringComparison.Ordinal),
+                       background.IndexOf("id=\"security\"", StringComparison.Ordinal));
+
+        var password = await client.GetStringAsync("/settings?ok=password");
+        Assert.InRange(password.IndexOf("Пароль изменён.", StringComparison.Ordinal),
+                       password.IndexOf("id=\"security\"", StringComparison.Ordinal),
+                       password.IndexOf("id=\"tokens\"", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task The_uploaded_picture_and_its_remove_button_appear_only_while_a_file_is_on_disk()
     {
         var factory = StartFactory();

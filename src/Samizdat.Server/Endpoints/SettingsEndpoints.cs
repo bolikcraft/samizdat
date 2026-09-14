@@ -66,6 +66,7 @@ public static class SettingsEndpoints
                 ["antiforgery"] = AntiforgeryHtml.Field(antiforgery, context),
                 ["message"] = Message(ok, err),
                 ["message_kind"] = err is not null ? "err" : ok is not null ? "ok" : null,
+                ["message_section"] = (err ?? ok) is { } code ? SectionOf(code) : null,
                 ["color_scheme"] = settings.ColorScheme,
                 ["background"] = BackgroundModel(settings, background, BackgroundCatalog.Read(theme)),
                 ["themes"] = themes.AvailableThemes().Select(name => new Dictionary<string, object?>
@@ -85,8 +86,6 @@ public static class SettingsEndpoints
             }), "text/html; charset=utf-8");
         });
 
-        // Якорь в конце адреса — раздел настроек: страница показывает тот, чей якорь стоит в адресе.
-        // Без него после отправки формы открывался бы первый раздел, а не тот, где нажали кнопку.
         group.MapPost("/password", async (HttpContext context, SamizdatDbContext db, ClaimsPrincipal user) =>
         {
             var form = await context.Request.ReadFormAsync();
@@ -96,16 +95,13 @@ public static class SettingsEndpoints
 
             var owner = CurrentUser(db, user);
 
-            if (!PasswordHasher.Verify(current, owner.PasswordHash))
-                return Results.Redirect("/settings?err=wrong_password#security");
-            if (next.Length < 8)
-                return Results.Redirect("/settings?err=short_password#security");
-            if (next != repeat)
-                return Results.Redirect("/settings?err=password_mismatch#security");
+            if (!PasswordHasher.Verify(current, owner.PasswordHash)) return Err("wrong_password");
+            if (next.Length < 8) return Err("short_password");
+            if (next != repeat) return Err("password_mismatch");
 
             owner.PasswordHash = PasswordHasher.Hash(next);
             db.SaveChanges();
-            return Results.Redirect("/settings?ok=password#security");
+            return Ok("password");
         }).RequireValidToken();
 
         group.MapPost("/appearance", async (HttpContext context, SiteSettings settings, ThemeFactory themes) =>
@@ -117,7 +113,7 @@ public static class SettingsEndpoints
             if (themes.AvailableThemes().Contains(theme)) settings.Set("theme.name", theme);
             if (colorScheme is "light" or "dark" or "system") settings.Set("theme.color_scheme", colorScheme);
 
-            return Results.Redirect("/settings?ok=appearance#appearance");
+            return Ok("appearance");
         }).RequireValidToken();
 
         group.MapPost("/background", [RequestSizeLimit(MaxBackgroundRequestBytes)]
@@ -131,29 +127,27 @@ public static class SettingsEndpoints
             catch (BadHttpRequestException)
             {
                 // Тело больше лимита: Kestrel обрывает чтение сам, не дав ReadFormAsync его дочитать.
-                return Results.Redirect("/settings?err=background_too_big#appearance");
+                return Err("background_too_big");
             }
             catch (InvalidDataException)
             {
                 // Форма нечитаема: оборванная граница, слишком много полей, слишком длинный ключ.
-                return Results.Redirect("/settings?err=background_form#appearance");
+                return Err("background_form");
             }
 
             var upload = form.Files["file"];
-            if (upload is null || upload.Length == 0)
-                return Results.Redirect("/settings?err=background_missing#appearance");
-            if (upload.Length > MaxBackgroundBytes)
-                return Results.Redirect("/settings?err=background_too_big#appearance");
+            if (upload is null || upload.Length == 0) return Err("background_missing");
+            if (upload.Length > MaxBackgroundBytes) return Err("background_too_big");
 
             await using var stream = upload.OpenReadStream();
             var head = new byte[BackgroundFile.HeadLength];
             var read = await stream.ReadAtLeastAsync(head, head.Length, throwOnEndOfStream: false);
             if (BackgroundFile.ExtensionOf(head.AsSpan(0, read)) is not { } extension)
-                return Results.Redirect("/settings?err=background_type#appearance");
+                return Err("background_type");
 
             stream.Position = 0;
             settings.Set("theme.background", background.Save(stream, extension));
-            return Results.Redirect("/settings?ok=background#appearance");
+            return Ok("background");
         }).RefuseAnOversizedBody().RequireValidToken();
 
         // Выбор готового фона: картинка из набора темы, цвет из палитры, своя загруженная
@@ -169,37 +163,36 @@ public static class SettingsEndpoints
             if (pick.Length == 0)
             {
                 settings.Set("theme.background", "");
-                return Results.Redirect("/settings?ok=background_removed#appearance");
+                return Ok("background_removed");
             }
 
             if (pick == "upload")
             {
-                if (background.Current() is not { } name)
-                    return Results.Redirect("/settings?err=background_missing#appearance");
+                if (background.Current() is not { } name) return Err("background_missing");
 
                 settings.Set("theme.background", name);
-                return Results.Redirect("/settings?ok=background#appearance");
+                return Ok("background");
             }
 
             if (pick.StartsWith(SiteSettings.PresetPrefix, StringComparison.Ordinal))
             {
                 var file = pick[SiteSettings.PresetPrefix.Length..];
-                if (!catalog.HasImage(file)) return Results.Redirect("/settings?err=background_unknown#appearance");
+                if (!catalog.HasImage(file)) return Err("background_unknown");
 
                 settings.Set("theme.background", pick);
-                return Results.Redirect("/settings?ok=background#appearance");
+                return Ok("background");
             }
 
             if (pick.StartsWith(SiteSettings.ColorPrefix, StringComparison.Ordinal))
             {
                 var color = pick[SiteSettings.ColorPrefix.Length..];
-                if (!catalog.HasColor(color)) return Results.Redirect("/settings?err=background_unknown#appearance");
+                if (!catalog.HasColor(color)) return Err("background_unknown");
 
                 settings.Set("theme.background", pick);
-                return Results.Redirect("/settings?ok=background_color#appearance");
+                return Ok("background_color");
             }
 
-            return Results.Redirect("/settings?err=background_unknown#appearance");
+            return Err("background_unknown");
         }).RequireValidToken();
 
         // Удаление загруженной картинки. Если она стояла фоном, фон заодно снимается: файла больше нет.
@@ -207,7 +200,7 @@ public static class SettingsEndpoints
         {
             background.Remove();
             if (settings.Background.Kind == BackgroundKind.Upload) settings.Set("theme.background", "");
-            return Results.Redirect("/settings?ok=background_removed#appearance");
+            return Ok("background_removed");
         }).RequireValidToken();
 
         group.MapPost("/tokens", async (HttpContext context, SamizdatDbContext db, ClaimsPrincipal user) =>
@@ -227,7 +220,7 @@ public static class SettingsEndpoints
             db.SaveChanges();
 
             context.Response.Cookies.Append(NewTokenCookie, token, NewTokenCookieOptions(context));
-            return Results.Redirect("/settings?ok=token_created#tokens");
+            return Ok("token_created");
         }).RequireValidToken();
 
         group.MapPost("/tokens/{id:int}/note", async (int id, HttpContext context,
@@ -242,7 +235,7 @@ public static class SettingsEndpoints
 
             token.Note = note.Length > 0 ? note : null;
             db.SaveChanges();
-            return Results.Redirect("/settings?ok=token_note#tokens");
+            return Ok("token_note");
         }).RequireValidToken();
 
         group.MapPost("/tokens/{id:int}/revoke", (int id, SamizdatDbContext db, ClaimsPrincipal user) =>
@@ -253,7 +246,7 @@ public static class SettingsEndpoints
 
             db.ApiTokens.Remove(token);
             db.SaveChanges();
-            return Results.Redirect("/settings?ok=token_revoked#tokens");
+            return Ok("token_revoked");
         }).RequireValidToken();
 
         // Отзыв мягкий: строка остаётся, чтобы гость получил 410 «ссылка не работает», а не 404.
@@ -264,9 +257,27 @@ public static class SettingsEndpoints
 
             link.RevokedAt = DateTimeOffset.UtcNow;
             db.SaveChanges();
-            return Results.Redirect("/settings?ok=link_revoked#links");
+            return Ok("link_revoked");
         }).RequireValidToken();
     }
+
+    /// Возврат на страницу настроек с итогом действия: код итога в адресе, раздел — в якоре.
+    // Якорем страница выбирает раздел: без него открылся бы первый, а не тот, где нажали кнопку.
+    static IResult Ok(string code) => Results.Redirect($"/settings?ok={code}#{SectionOf(code)}");
+    static IResult Err(string code) => Results.Redirect($"/settings?err={code}#{SectionOf(code)}");
+
+    /// Раздел, которому принадлежит итог действия.
+    // Разделы переключаются якорем, без перезагрузки, поэтому сообщение стоит внутри своего
+    // раздела: одно общее над разделами оставалось висеть над чужой формой. Якорь возврата и
+    // место сообщения берутся отсюда оба — иначе сообщение попадало бы в скрытый раздел.
+    // Незнакомый код уходит в первый раздел: его же показывает страница без якоря.
+    static string SectionOf(string code) => code switch
+    {
+        "password" or "wrong_password" or "short_password" or "password_mismatch" => "security",
+        "token_created" or "token_note" or "token_revoked" => "tokens",
+        "link_revoked" => "links",
+        _ => "appearance",
+    };
 
     /// Отсеивает слишком большое тело по Content-Length, ничего не читая.
     // Обязан стоять до RequireValidToken: тот ради токена читает многочастную форму сам, Kestrel
@@ -275,7 +286,7 @@ public static class SettingsEndpoints
     static RouteHandlerBuilder RefuseAnOversizedBody(this RouteHandlerBuilder builder)
         => builder.AddEndpointFilter(async (invocation, next) =>
             invocation.HttpContext.Request.ContentLength > MaxBackgroundRequestBytes
-                ? Results.Redirect("/settings?err=background_too_big#appearance")
+                ? Err("background_too_big")
                 : await next(invocation));
 
     // Path сужает куку до настроек, HttpOnly закрывает её от скриптов. Delete обязан повторить
