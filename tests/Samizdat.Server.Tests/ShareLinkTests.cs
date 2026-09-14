@@ -27,7 +27,7 @@ public class ShareLinkTests : IDisposable
             builder.UseSetting("ConnectionStrings:Postgres", database.ConnectionString);
         });
 
-    async Task<HttpClient> LoginClient(WebApplicationFactory<Program> factory)
+    async Task<HttpClient> LoginClient(WebApplicationFactory<Program> factory, UserRole role = UserRole.Owner)
     {
         var login = $"owner-{Guid.NewGuid():N}";
         using (var scope = factory.Services.CreateScope())
@@ -37,7 +37,7 @@ public class ShareLinkTests : IDisposable
             {
                 Login = login,
                 PasswordHash = PasswordHasher.Hash("тайна"),
-                Role = UserRole.Owner,
+                Role = role,
                 CreatedAt = DateTimeOffset.UtcNow,
             });
             db.SaveChanges();
@@ -94,14 +94,15 @@ public class ShareLinkTests : IDisposable
         File.WriteAllBytes(Path.Combine(folder, name), bytes);
     }
 
-    void RegisterArticle(WebApplicationFactory<Program> factory, string slug, string title)
+    void RegisterArticle(WebApplicationFactory<Program> factory, string slug, string title,
+                         ArticleVisibility visibility = ArticleVisibility.Private)
     {
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
         db.Articles.Add(new ArticleRow
         {
             Slug = slug, Title = title, ContentHash = Guid.NewGuid().ToString("N"),
-            UpdatedAt = DateTimeOffset.UtcNow,
+            Visibility = visibility, UpdatedAt = DateTimeOffset.UtcNow,
         });
         db.SaveChanges();
     }
@@ -130,6 +131,40 @@ public class ShareLinkTests : IDisposable
         var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
         return db.ShareLinks.First(row => row.Token == token);
     }
+
+    static ShareLinkRow SingleLink(WebApplicationFactory<Program> factory)
+    {
+        using var scope = factory.Services.CreateScope();
+        return scope.ServiceProvider.GetRequiredService<SamizdatDbContext>().ShareLinks.Single();
+    }
+
+    static List<ShareLinkRow> AllLinks(WebApplicationFactory<Program> factory)
+    {
+        using var scope = factory.Services.CreateScope();
+        return scope.ServiceProvider.GetRequiredService<SamizdatDbContext>().ShareLinks.ToList();
+    }
+
+    static void Expire(WebApplicationFactory<Program> factory, int id)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+        db.ShareLinks.Find(id)!.ExpiresAt = DateTimeOffset.UtcNow.AddDays(-1);
+        db.SaveChanges();
+    }
+
+    // Токен берём с главной, а не со статьи: закрытую статью читатель не откроет, а поле там то же.
+    static async Task<HttpResponseMessage> PostForm(HttpClient client, string path, Dictionary<string, string> fields)
+    {
+        var antiforgery = AntiforgeryToken(await client.GetStringAsync("/"));
+        fields[antiforgery.Name] = antiforgery.Value;
+        return await client.PostAsync(path, new FormUrlEncodedContent(fields));
+    }
+
+    static Task<HttpResponseMessage> PostShare(HttpClient client, string slug, string days, string note = "") =>
+        PostForm(client, "/share", new() { ["slug"] = slug, ["days"] = days, ["note"] = note });
+
+    static Task<HttpResponseMessage> PostRevoke(HttpClient client, string slug) =>
+        PostForm(client, "/share/revoke", new() { ["slug"] = slug });
 
     // Форма достаёт свой antiforgery-токен со страницы — сервер требует его на каждом небезопасном POST.
     static (string Name, string Value) AntiforgeryToken(string html)
@@ -178,7 +213,7 @@ public class ShareLinkTests : IDisposable
     {
         using var factory = StartFactory();
         WriteArticle("statya", "---\ntitle: Про ежей\n---\n\nТекст статьи.");
-        RegisterArticle(factory, "statya", "Про ежей");
+        RegisterArticle(factory, "statya", "Про ежей", ArticleVisibility.Shared);
         var token = AddLink(factory, "statya");
 
         var client = factory.CreateClient();
@@ -195,7 +230,7 @@ public class ShareLinkTests : IDisposable
     {
         using var factory = StartFactory();
         WriteArticle("statya", "Текст статьи.");
-        RegisterArticle(factory, "statya", "Про ежей");
+        RegisterArticle(factory, "statya", "Про ежей", ArticleVisibility.Shared);
         RegisterArticle(factory, "chuzhaya", "Чужая статья");
         var token = AddLink(factory, "statya");
 
@@ -211,7 +246,7 @@ public class ShareLinkTests : IDisposable
     {
         using var factory = StartFactory();
         WriteArticle("statya", "см. [[chuzhaya]]");
-        RegisterArticle(factory, "statya", "Про ежей");
+        RegisterArticle(factory, "statya", "Про ежей", ArticleVisibility.Shared);
         WriteArticle("chuzhaya", "Чужой текст.");
         RegisterArticle(factory, "chuzhaya", "Чужая статья");
         var token = AddLink(factory, "statya");
@@ -231,7 +266,7 @@ public class ShareLinkTests : IDisposable
         using var factory = StartFactory();
         WriteArticle("statya", "Текст статьи.");
         WriteAttachment("statya", "shema.png", [1]);
-        RegisterArticle(factory, "statya", "Про ежей");
+        RegisterArticle(factory, "statya", "Про ежей", ArticleVisibility.Shared);
         var live = AddLink(factory, "statya");
         var revoked = AddLink(factory, "statya", revokedAt: DateTimeOffset.UtcNow);
 
@@ -252,7 +287,7 @@ public class ShareLinkTests : IDisposable
     {
         using var factory = StartFactory();
         WriteArticle("statya", "Текст для гостя.");
-        RegisterArticle(factory, "statya", "Про ежей");
+        RegisterArticle(factory, "statya", "Про ежей", ArticleVisibility.Shared);
         WriteArticle("share:statya", "Текст для владельца.");
         RegisterArticle(factory, "share:statya", "Одноимённая");
         var token = AddLink(factory, "statya");
@@ -300,7 +335,7 @@ public class ShareLinkTests : IDisposable
     {
         using var factory = StartFactory();
         WriteArticle("statya", "Текст статьи.");
-        RegisterArticle(factory, "statya", "Про ежей");
+        RegisterArticle(factory, "statya", "Про ежей", ArticleVisibility.Shared);
         var token = AddLink(factory, "statya");
 
         var client = factory.CreateClient();
@@ -317,7 +352,7 @@ public class ShareLinkTests : IDisposable
     {
         using var factory = StartFactory();
         WriteArticle("statya", "Текст статьи.");
-        RegisterArticle(factory, "statya", "Про ежей");
+        RegisterArticle(factory, "statya", "Про ежей", ArticleVisibility.Shared);
         var token = AddLink(factory, "statya");
 
         var client = factory.CreateClient();
@@ -332,7 +367,7 @@ public class ShareLinkTests : IDisposable
         using var factory = StartFactory();
         WriteArticle("statya", "![[shema.png]]");
         WriteAttachment("statya", "shema.png", [1, 2, 3]);
-        RegisterArticle(factory, "statya", "Про ежей");
+        RegisterArticle(factory, "statya", "Про ежей", ArticleVisibility.Shared);
         var token = AddLink(factory, "statya");
 
         var client = factory.CreateClient();
@@ -410,7 +445,7 @@ public class ShareLinkTests : IDisposable
         using var factory = StartFactory();
         WriteArticle("statya", "![[shema.png]]");
         WriteAttachment("statya", "shema.png", [1]);
-        RegisterArticle(factory, "statya", "Про ежей");
+        RegisterArticle(factory, "statya", "Про ежей", ArticleVisibility.Shared);
         var token = AddLink(factory, "statya");
 
         var client = factory.CreateClient();
@@ -460,7 +495,8 @@ public class ShareLinkTests : IDisposable
         Assert.Equal("Пете", link.Note);
         Assert.NotNull(link.ExpiresAt);
         Assert.InRange(link.ExpiresAt!.Value, DateTimeOffset.UtcNow.AddDays(6), DateTimeOffset.UtcNow.AddDays(8));
-        Assert.Equal($"/settings#link-{link.Id}", response.Headers.Location!.OriginalString);
+        // Обратно на статью: ссылка видна прямо там, в блоке «Поделиться».
+        Assert.Equal("/statya", response.Headers.Location!.OriginalString);
     }
 
     [Fact]
@@ -649,7 +685,7 @@ public class ShareLinkTests : IDisposable
         using var factory = StartFactory();
         WriteArticle("statya", "![[shema.png]]");
         WriteAttachment("statya", "shema.png", [1]);
-        RegisterArticle(factory, "statya", "Про ежей");
+        RegisterArticle(factory, "statya", "Про ежей", ArticleVisibility.Shared);
         var first = AddLink(factory, "statya");
         var second = AddLink(factory, "statya");
         var owner = await LoginClient(factory);
@@ -664,5 +700,170 @@ public class ShareLinkTests : IDisposable
         Assert.Contains($"src=\"/s/{first}/shema.png\"", firstPage);
         Assert.Contains($"src=\"/s/{second}/shema.png\"", secondPage);
         Assert.DoesNotContain("__SHARE_BASE__", firstPage);
+        Assert.DoesNotContain("__SHARE_PANEL__", firstPage);
+    }
+
+    [Fact]
+    public async Task Second_share_changes_the_term_instead_of_making_a_new_link()
+    {
+        using var factory = StartFactory();
+        WriteArticle("statya", "Текст статьи.");
+        RegisterArticle(factory, "statya", "Про ежей");
+        var client = await LoginClient(factory);
+
+        await PostShare(client, "statya", "7");
+        var first = SingleLink(factory);
+
+        await PostShare(client, "statya", "30");
+        var second = SingleLink(factory);
+
+        Assert.Equal(first.Id, second.Id);
+        Assert.Equal(first.Token, second.Token);
+        Assert.True(second.ExpiresAt > first.ExpiresAt);
+    }
+
+    [Fact]
+    public async Task A_revoked_link_does_not_come_back_to_life()
+    {
+        using var factory = StartFactory();
+        WriteArticle("statya", "Текст статьи.");
+        RegisterArticle(factory, "statya", "Про ежей");
+        var client = await LoginClient(factory);
+
+        await PostShare(client, "statya", "7");
+        var first = SingleLink(factory);
+
+        await PostRevoke(client, "statya");
+        await PostShare(client, "statya", "7");
+
+        var links = AllLinks(factory);
+        Assert.Equal(2, links.Count);
+        Assert.NotEqual(first.Token, links.Single(link => link.RevokedAt is null).Token);
+
+        var guest = factory.CreateClient();
+        Assert.Equal(HttpStatusCode.Gone, (await guest.GetAsync($"/s/{first.Token}")).StatusCode);
+    }
+
+    [Fact]
+    public async Task An_expired_link_is_replaced_by_a_new_one()
+    {
+        using var factory = StartFactory();
+        WriteArticle("statya", "Текст статьи.");
+        RegisterArticle(factory, "statya", "Про ежей");
+        var client = await LoginClient(factory);
+
+        await PostShare(client, "statya", "1");
+        var first = SingleLink(factory);
+        Expire(factory, first.Id);
+
+        await PostShare(client, "statya", "7");
+
+        var links = AllLinks(factory);
+        Assert.Equal(2, links.Count);
+        Assert.NotEqual(first.Token, links.Single(link => link.ExpiresAt > DateTimeOffset.UtcNow).Token);
+    }
+
+    [Fact]
+    public async Task Article_page_shows_the_live_link_and_no_create_button()
+    {
+        using var factory = StartFactory();
+        WriteArticle("statya", "Текст статьи.");
+        RegisterArticle(factory, "statya", "Про ежей");
+        var client = await LoginClient(factory);
+
+        await PostShare(client, "statya", "7");
+        var token = SingleLink(factory).Token;
+
+        var html = await client.GetStringAsync("/statya");
+
+        Assert.Contains($"/s/{token}", html);
+        Assert.Contains("/share/revoke", html);
+        Assert.DoesNotContain("Создать ссылку", html);
+    }
+
+    [Fact]
+    public async Task A_new_link_shows_up_on_the_cached_page()
+    {
+        using var factory = StartFactory();
+        WriteArticle("statya", "Текст статьи.");
+        RegisterArticle(factory, "statya", "Про ежей");
+        var client = await LoginClient(factory);
+
+        var before = await client.GetStringAsync("/statya");
+        Assert.Contains("Создать ссылку", before);
+
+        await PostShare(client, "statya", "7");
+        var after = await client.GetStringAsync("/statya");
+
+        Assert.Contains($"/s/{SingleLink(factory).Token}", after);
+    }
+
+    [Fact]
+    public async Task Revoke_from_the_article_page_closes_the_link()
+    {
+        using var factory = StartFactory();
+        WriteArticle("statya", "Текст статьи.");
+        RegisterArticle(factory, "statya", "Про ежей");
+        var client = await LoginClient(factory);
+
+        await PostShare(client, "statya", "7");
+        var token = SingleLink(factory).Token;
+
+        var answer = await PostRevoke(client, "statya");
+
+        Assert.Equal(HttpStatusCode.Redirect, answer.StatusCode);
+        Assert.Equal("/statya", answer.Headers.Location?.ToString());
+
+        var guest = factory.CreateClient();
+        Assert.Equal(HttpStatusCode.Gone, (await guest.GetAsync($"/s/{token}")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Guest_link_of_a_closed_article_sleeps()
+    {
+        using var factory = StartFactory();
+        WriteArticle("statya", "Текст статьи.");
+        RegisterArticle(factory, "statya", "Про ежей", ArticleVisibility.Shared);
+        var token = AddLink(factory, "statya");
+        var owner = await LoginClient(factory);
+
+        var open = await factory.CreateClient().GetAsync($"/s/{token}");
+        await PostForm(owner, "/visibility", new() { ["slug"] = "statya", ["visibility"] = "private" });
+        var closed = await factory.CreateClient().GetAsync($"/s/{token}");
+
+        Assert.Equal(HttpStatusCode.OK, open.StatusCode);
+        Assert.Equal(HttpStatusCode.Gone, closed.StatusCode);
+    }
+
+    [Fact]
+    public async Task Reader_shares_an_open_article_but_not_a_closed_one()
+    {
+        using var factory = StartFactory();
+        WriteArticle("statya", "Текст статьи.");
+        RegisterArticle(factory, "statya", "Про ежей");
+        WriteArticle("otkrytaya", "Текст статьи.");
+        RegisterArticle(factory, "otkrytaya", "Открытая", ArticleVisibility.Shared);
+        var client = await LoginClient(factory, UserRole.Reader);
+
+        var closed = await PostShare(client, "statya", "7");
+        var open = await PostShare(client, "otkrytaya", "7");
+
+        Assert.Equal(HttpStatusCode.Forbidden, closed.StatusCode);
+        Assert.Equal(HttpStatusCode.Redirect, open.StatusCode);
+        Assert.Equal("otkrytaya", SingleLink(factory).Slug);
+    }
+
+    [Fact]
+    public async Task Settings_page_marks_a_sleeping_link()
+    {
+        using var factory = StartFactory();
+        WriteArticle("statya", "Текст статьи.");
+        RegisterArticle(factory, "statya", "Про ежей");
+        AddLink(factory, "statya");
+        var client = await LoginClient(factory);
+
+        var html = await client.GetStringAsync("/settings");
+
+        Assert.Contains("статья закрыта", html);
     }
 }

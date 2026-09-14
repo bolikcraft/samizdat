@@ -114,7 +114,7 @@
         </div>
       </td>
       <td>{{ if link.note }}{{ link.note | html.escape }}{{ else }}—{{ end }}</td>
-      <td>{{ if link.alive }}{{ if link.expires_at }}до {{ link.expires_at | html.escape }}{{ else }}без срока{{ end }}{{ else }}не работает{{ end }}</td>
+      <td>{{ if link.alive }}{{ if link.expires_at }}до {{ link.expires_at | html.escape }}{{ else }}без срока{{ end }}{{ if link.sleeping }} <span class="link-sleeping">статья закрыта</span>{{ end }}{{ else }}не работает{{ end }}</td>
       <td>{{ link.opened_count }}{{ if link.last_opened_at }}, {{ link.last_opened_at | html.escape }}{{ end }}</td>
       <td class="row-actions">
         {{ if link.alive }}
@@ -157,15 +157,6 @@
   sectionLinks.forEach(function (link) {
     link.addEventListener('click', function () {
       if (navSwitch) navSwitch.open = false;
-    });
-  });
-
-  // Кнопка «Скопировать»: без неё поле всё равно выделяется руками.
-  document.querySelectorAll('.copy-link').forEach(function (button) {
-    button.addEventListener('click', function () {
-      navigator.clipboard.writeText(button.dataset.url).then(function () {
-        button.textContent = 'Скопировано';
-      });
     });
   });
 </script>

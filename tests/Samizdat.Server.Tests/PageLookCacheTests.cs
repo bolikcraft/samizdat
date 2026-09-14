@@ -91,13 +91,15 @@ public class PageLookCacheTests : IDisposable
         File.WriteAllText(Path.Combine(folder, "index.md"), text);
     }
 
-    void RegisterArticle(WebApplicationFactory<Program> factory, string slug, string title)
+    void RegisterArticle(WebApplicationFactory<Program> factory, string slug, string title,
+                         ArticleVisibility visibility = ArticleVisibility.Private)
     {
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
         db.Articles.Add(new ArticleRow
         {
-            Slug = slug, Title = title, ContentHash = "x", UpdatedAt = DateTimeOffset.UtcNow,
+            Slug = slug, Title = title, ContentHash = "x", Visibility = visibility,
+            UpdatedAt = DateTimeOffset.UtcNow,
         });
         db.SaveChanges();
     }
@@ -169,7 +171,7 @@ public class PageLookCacheTests : IDisposable
     {
         WriteArticle("zametka", "---\ntitle: Заметка\n---\nтекст\n");
         var factory = StartFactory();
-        RegisterArticle(factory, "zametka", "Заметка");
+        RegisterArticle(factory, "zametka", "Заметка", ArticleVisibility.Shared);
         AddShareLink(factory, "gost", "zametka");
 
         var guest = factory.CreateClient();
@@ -188,7 +190,7 @@ public class PageLookCacheTests : IDisposable
     {
         WriteArticle("zametka", "---\ntitle: Заметка\n---\nтекст\n");
         var factory = StartFactory();
-        RegisterArticle(factory, "zametka", "Заметка");
+        RegisterArticle(factory, "zametka", "Заметка", ArticleVisibility.Shared);
         AddShareLink(factory, "gost", "zametka");
 
         var guest = factory.CreateClient();

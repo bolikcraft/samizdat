@@ -2,6 +2,16 @@
 (function () {
   var STORAGE_PREFIX = "samizdat:nav:";
 
+  // Кнопка «Скопировать» стоит и в настройках, и в блоке «Поделиться» на статье. Обработчик
+  // живёт тут, а не в странице: на статье встроенный <script> запрещён.
+  document.querySelectorAll(".copy-link").forEach(function (button) {
+    button.addEventListener("click", function () {
+      navigator.clipboard.writeText(button.dataset.url).then(function () {
+        button.textContent = "Скопировано";
+      });
+    });
+  });
+
   document.querySelectorAll("#nav-tree details.nav-folder[data-path]").forEach(function (folder) {
     try {
       var saved = localStorage.getItem(STORAGE_PREFIX + folder.dataset.path);

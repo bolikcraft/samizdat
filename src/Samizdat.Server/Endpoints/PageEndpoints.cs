@@ -100,10 +100,15 @@ public static class PageEndpoints
                     // Плейсхолдер, не настоящий токен: страница кэшируется по slug и общая для всех
                     // гостей, а токен привязан к cookie конкретной сессии — см. Replace ниже.
                     ["antiforgery"] = AntiforgeryHtml.Placeholder,
+                    // Тем же приёмом: ссылка меняется без правки статьи, в кэше ей не место.
+                    ["share_panel"] = SharePanel.Placeholder,
                 });
             });
 
             html = html.Replace(AntiforgeryHtml.Placeholder, AntiforgeryHtml.Field(antiforgery, context));
+            html = html.Replace(SharePanel.Placeholder,
+                SharePanel.Render(pages, db, slug, antiforgery, context,
+                                  ArticleAccess.CanShare(row.Visibility, ArticleAccess.RoleOf(user))));
             return Results.Content(html, "text/html; charset=utf-8");
         });
 

@@ -18,23 +18,6 @@
   {{ end }}
 </form>
 {{ end }}
-{{ if user }}
-<details class="share">
-  <summary>Поделиться</summary>
-  <form method="post" action="/share" class="share-form">
-    {{ antiforgery }}
-    <input type="hidden" name="slug" value="{{ article.slug | html.escape }}">
-    <label>Срок
-      <select name="days">
-        <option value="1">День</option>
-        <option value="7" selected>Неделя</option>
-        <option value="30">Месяц</option>
-        <option value="365">Год</option>
-        <option value="0">Без срока</option>
-      </select>
-    </label>
-    <label class="note">Кому <input type="text" name="note" maxlength="200" autocomplete="off" placeholder="кому отдаёте ссылку"></label>
-    <button type="submit">Создать ссылку</button>
-  </form>
-</details>
-{{ end }}
+{{~## Блок «Поделиться» приходит готовым html: страница лежит в кэше, а ссылка меняется без
+правки статьи. Рисует его SharePanel при каждой отдаче. ##~}}
+{{ share_panel }}

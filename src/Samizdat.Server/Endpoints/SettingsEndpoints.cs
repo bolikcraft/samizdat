@@ -32,6 +32,8 @@ public static class SettingsEndpoints
 
             var now = DateTimeOffset.UtcNow;
             var titles = db.Articles.ToDictionary(article => article.Slug, article => article.Title);
+            var closed = db.Articles.Where(article => article.Visibility == ArticleVisibility.Private)
+                .Select(article => article.Slug).ToHashSet();
             // Живые сверху: мёртвые строки остаются как след, но не мешают найти рабочую ссылку.
             var links = db.ShareLinks.ToList()
                 .OrderByDescending(link => link.IsAlive(now)).ThenByDescending(link => link.CreatedAt)
@@ -43,6 +45,8 @@ public static class SettingsEndpoints
                     ["note"] = link.Note,
                     ["url"] = $"{context.Request.Scheme}://{context.Request.Host}/s/{link.Token}",
                     ["alive"] = link.IsAlive(now),
+                    // Статью закрыли — ссылка жива, но гостю не открывается.
+                    ["sleeping"] = link.IsAlive(now) && closed.Contains(link.Slug),
                     ["expires_at"] = link.ExpiresAt?.ToString("yyyy-MM-dd HH:mm"),
                     ["opened_count"] = link.OpenedCount,
                     ["last_opened_at"] = link.LastOpenedAt?.ToString("yyyy-MM-dd HH:mm"),

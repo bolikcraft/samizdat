@@ -1,0 +1,47 @@
+<details class="share">
+  <summary>Поделиться</summary>
+  {{ if link }}
+  <div class="share-live">
+    <div class="link-cell">
+      <input class="link-url" type="text" value="{{ link.url | html.escape }}" readonly>
+      <button type="button" class="copy-link" data-url="{{ link.url | html.escape }}">Скопировать</button>
+    </div>
+    <p class="share-term">{{ if link.expires_at }}Действует до {{ link.expires_at | html.escape }}{{ else }}Без срока{{ end }}, открыли раз: {{ link.opened_count }}</p>
+    <form method="post" action="/share" class="share-form">
+      {{ antiforgery }}
+      <input type="hidden" name="slug" value="{{ slug | html.escape }}">
+      <label>Новый срок
+        <select name="days">
+          <option value="1">День</option>
+          <option value="7" selected>Неделя</option>
+          <option value="30">Месяц</option>
+          <option value="365">Год</option>
+          <option value="0">Без срока</option>
+        </select>
+      </label>
+      <button type="submit">Изменить срок</button>
+    </form>
+    <form method="post" action="/share/revoke" class="share-form">
+      {{ antiforgery }}
+      <input type="hidden" name="slug" value="{{ slug | html.escape }}">
+      <button type="submit">Отозвать</button>
+    </form>
+  </div>
+  {{ else }}
+  <form method="post" action="/share" class="share-form">
+    {{ antiforgery }}
+    <input type="hidden" name="slug" value="{{ slug | html.escape }}">
+    <label>Срок
+      <select name="days">
+        <option value="1">День</option>
+        <option value="7" selected>Неделя</option>
+        <option value="30">Месяц</option>
+        <option value="365">Год</option>
+        <option value="0">Без срока</option>
+      </select>
+    </label>
+    <label class="note">Кому <input type="text" name="note" maxlength="200" autocomplete="off" placeholder="кому отдаёте ссылку"></label>
+    <button type="submit">Создать ссылку</button>
+  </form>
+  {{ end }}
+</details>

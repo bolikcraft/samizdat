@@ -500,6 +500,13 @@ blockquote { margin: 1.2rem 0; padding-left: 1rem; border-left: 4px solid var(--
   outline-offset: 1px;
 }
 
+/* Живая ссылка статьи: адрес, срок и две формы идут столбиком. Отступ между ними держит gap,
+   поэтому собственный отступ форм тут снимается. */
+.share-live { display: grid; gap: 0.75rem; margin-top: 0.75rem; }
+.share-live .share-form { margin-top: 0; }
+.share-term { margin: 0; font-family: system-ui, sans-serif; font-size: 0.9rem; color: var(--muted); }
+.link-sleeping { color: var(--danger); }
+
 /* Поле с адресом занимает всю свободную ширину столбца, кнопка рядом остаётся по содержимому. */
 .link-cell { display: flex; gap: 0.4rem; align-items: center; }
 .link-cell .link-url {

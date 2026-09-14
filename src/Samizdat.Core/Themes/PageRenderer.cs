@@ -20,6 +20,10 @@ public sealed class PageRenderer(IThemeSource theme)
         return RenderTemplate("layout.html", layoutModel);
     }
 
+    /// Фрагмент без layout: им рисуются куски, которые нельзя положить в кэш страницы.
+    public string RenderPart(string templateName, Dictionary<string, object?> model)
+        => RenderTemplate(templateName, model);
+
     string RenderTemplate(string name, Dictionary<string, object?> model)
     {
         var template = cache.GetOrAdd((name, theme.Version), key => Parse(key.Path));

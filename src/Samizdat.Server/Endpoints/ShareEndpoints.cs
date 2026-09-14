@@ -31,6 +31,9 @@ public static class ShareEndpoints
             var row = db.Articles.Find(link.Slug);
             if (row is null || !files.MarkdownExists(link.Slug)) return NotFound(pages, settings);
 
+            // Закрыли статью — ссылка спит: гостю это выглядит как истёкший срок.
+            if (row.Visibility != ArticleVisibility.Shared) return Expired(pages, settings);
+
             // Отдельный ключ кэша: у гостя другой html, без дерева и меню. Catalog пуст — на гостевой
             // странице нет списка статей. View нужен здесь так же, как на странице владельца:
             // см. SiteSettings.ViewFingerprint.
@@ -57,6 +60,8 @@ public static class ShareEndpoints
                         // NoArticles: любая вики-ссылка станет текстом, чужие slug не утекают.
                         ["html"] = markdown.Render(parsed.Body, link.Slug, NoArticles.Instance, AttachmentBase),
                     },
+                    // Гостю делиться нечем: ссылка у него уже есть, панель на его странице пуста.
+                    ["share_panel"] = "",
                     // nav и user пусты: тема не рисует ни боковика, ни меню владельца.
                 });
             });
@@ -88,7 +93,7 @@ public static class ShareEndpoints
             return Results.File(path, type);
         }).AllowAnonymous();
 
-        app.MapPost("/share", async (HttpContext context, SamizdatDbContext db) =>
+        app.MapPost("/share", async (HttpContext context, SamizdatDbContext db, ClaimsPrincipal user) =>
         {
             var form = await context.Request.ReadFormAsync();
             var slug = form["slug"].ToString();
@@ -99,22 +104,65 @@ public static class ShareEndpoints
             if (note.Length > 200) return Results.BadRequest();
             // Пустой slug — испорченная форма, а не «статьи нет»: спека обещает тут 400.
             if (slug.Length == 0) return Results.BadRequest();
-            if (db.Articles.Find(slug) is null) return Results.NotFound();
 
-            var link = new ShareLinkRow
+            var article = db.Articles.Find(slug);
+            if (article is null) return Results.NotFound();
+            // Именно StatusCode, а не Results.Forbid(): Forbid отдаёт cookie-схеме редирект
+            // на страницу «доступа нет», а нам нужен честный код ответа.
+            if (!ArticleAccess.CanShare(article.Visibility, ArticleAccess.RoleOf(user)))
+                return Results.StatusCode(StatusCodes.Status403Forbidden);
+
+            var now = DateTimeOffset.UtcNow;
+            var expires = days == 0 ? null : (DateTimeOffset?)now.AddDays(days);
+
+            // Живая ссылка у статьи одна: второе нажатие меняет ей срок, а не плодит адрес.
+            // Мёртвую не оживляем — отозванный или истёкший адрес остаётся мёртвым навсегда.
+            var live = db.ShareLinks.Where(link => link.Slug == slug).AsEnumerable()
+                .FirstOrDefault(link => link.IsAlive(now));
+            if (live is not null)
+            {
+                live.ExpiresAt = expires;
+                if (note.Length > 0) live.Note = note;
+                db.SaveChanges();
+                return Results.Redirect($"/{slug}");
+            }
+
+            db.ShareLinks.Add(new ShareLinkRow
             {
                 Token = ShareToken.Create(),
                 Slug = slug,
                 Note = note.Length == 0 ? null : note,
-                CreatedAt = DateTimeOffset.UtcNow,
-                ExpiresAt = days == 0 ? null : DateTimeOffset.UtcNow.AddDays(days),
-            };
-            db.ShareLinks.Add(link);
+                CreatedAt = now,
+                ExpiresAt = expires,
+            });
             db.SaveChanges();
 
-            // Готовый урл показываем в настройках: та страница не кэшируется, там же список и отзыв.
-            return Results.Redirect($"/settings#link-{link.Id}");
-        }).RequireAuthorization(policy => policy.RequireRole(nameof(UserRole.Owner))).RequireValidToken();
+            // Ссылка видна прямо на статье, в блоке «Поделиться» — возвращаемся туда.
+            return Results.Redirect($"/{slug}");
+        }).RequireAuthorization().RequireValidToken();
+
+        app.MapPost("/share/revoke", async (HttpContext context, SamizdatDbContext db, ClaimsPrincipal user) =>
+        {
+            var form = await context.Request.ReadFormAsync();
+            var slug = form["slug"].ToString();
+            if (slug.Length == 0) return Results.BadRequest();
+
+            var article = db.Articles.Find(slug);
+            if (article is null) return Results.NotFound();
+            if (!ArticleAccess.CanShare(article.Visibility, ArticleAccess.RoleOf(user)))
+                return Results.StatusCode(StatusCodes.Status403Forbidden);
+
+            var now = DateTimeOffset.UtcNow;
+            var live = db.ShareLinks.Where(link => link.Slug == slug).AsEnumerable()
+                .FirstOrDefault(link => link.IsAlive(now));
+            if (live is not null)
+            {
+                live.RevokedAt = now;
+                db.SaveChanges();
+            }
+
+            return Results.Redirect($"/{slug}");
+        }).RequireAuthorization().RequireValidToken();
 
         // Действие над статьёй, а не над её адресом: slug приходит полем формы — тем же приёмом,
         // что у /share. Сегмент visibility зарезервирован, статьи с таким slug не бывает.
