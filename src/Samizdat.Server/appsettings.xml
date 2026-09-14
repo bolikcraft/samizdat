@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Имя корневого элемента провайдер XML не читает, ключи берутся от вложенных. -->
+<configuration>
+  <Logging>
+    <LogLevel>
+      <Default>Information</Default>
+      <Microsoft.AspNetCore>Warning</Microsoft.AspNetCore>
+    </LogLevel>
+  </Logging>
+  <AllowedHosts>*</AllowedHosts>
+</configuration>

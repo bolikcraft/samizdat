@@ -13,6 +13,7 @@ TestResults/
 
 # Секреты и локальные настройки
 appsettings.Development.json
+appsettings.Development.xml
 appsettings.Local.json
 .env
 .env.local
