@@ -90,6 +90,67 @@ public class PeopleTests : IDisposable
     }
 
     [Fact]
+    public async Task Login_of_a_new_person_is_not_empty()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        AddPerson(factory, "hozyain", "parol-hozyaina", UserRole.Owner);
+
+        var owner = await Login(factory, "hozyain", "parol-hozyaina");
+        var answer = await Post(owner, "/settings/people",
+            new() { ["login"] = "  ", ["password"] = "parol-ivana" });
+
+        Assert.Equal("/settings?err=bad_person#people", answer.Headers.Location?.ToString());
+        Assert.Single(Users(factory));
+    }
+
+    [Fact]
+    public async Task Short_password_of_a_new_person_is_refused()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        AddPerson(factory, "hozyain", "parol-hozyaina", UserRole.Owner);
+
+        var owner = await Login(factory, "hozyain", "parol-hozyaina");
+        var answer = await Post(owner, "/settings/people",
+            new() { ["login"] = "ivan", ["password"] = "korotko" });
+
+        Assert.Equal("/settings?err=person_short_password#people", answer.Headers.Location?.ToString());
+        Assert.DoesNotContain(Users(factory), row => row.Login == "ivan");
+    }
+
+    [Fact]
+    public async Task Short_new_password_of_a_person_is_refused()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        AddPerson(factory, "hozyain", "parol-hozyaina", UserRole.Owner);
+        var ivan = AddPerson(factory, "ivan", "staryy-parol", UserRole.Reader);
+
+        var owner = await Login(factory, "hozyain", "parol-hozyaina");
+        var answer = await Post(owner, $"/settings/people/{ivan}/password",
+            new() { ["password"] = "korotko" });
+
+        Assert.Equal("/settings?err=person_short_password#people", answer.Headers.Location?.ToString());
+        Assert.Equal(HttpStatusCode.Redirect, (await TryLogin(factory, "ivan", "staryy-parol")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Person_who_is_not_there_is_not_found()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        AddPerson(factory, "hozyain", "parol-hozyaina", UserRole.Owner);
+
+        var owner = await Login(factory, "hozyain", "parol-hozyaina");
+
+        Assert.Equal(HttpStatusCode.NotFound, (await Post(owner, "/settings/people/4242/delete", [])).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound,
+            (await Post(owner, "/settings/people/4242/password",
+                new() { ["password"] = "dlinnyy-parol" })).StatusCode);
+    }
+
+    [Fact]
     public async Task Owner_changes_the_password_of_a_person()
     {
         database.ResetDatabase();
@@ -129,7 +190,7 @@ public class PeopleTests : IDisposable
     }
 
     [Fact]
-    public async Task Owner_does_not_delete_themselves()
+    public async Task Last_owner_is_not_deleted()
     {
         database.ResetDatabase();
         using var factory = CreateFactory();
@@ -141,6 +202,85 @@ public class PeopleTests : IDisposable
         Assert.Equal(HttpStatusCode.Redirect, answer.StatusCode);
         Assert.Equal("/settings?err=last_owner#people", answer.Headers.Location?.ToString());
         Assert.Single(Users(factory), row => row.Login == "hozyain");
+    }
+
+    [Fact]
+    public async Task Owner_does_not_delete_themselves()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        var owner = AddPerson(factory, "hozyain", "parol-hozyaina", UserRole.Owner);
+        AddPerson(factory, "vtoroy", "parol-vtorogo", UserRole.Owner);
+
+        var client = await Login(factory, "hozyain", "parol-hozyaina");
+        var answer = await Post(client, $"/settings/people/{owner}/delete", []);
+
+        Assert.Equal("/settings?err=self_delete#people", answer.Headers.Location?.ToString());
+        Assert.Equal(2, Users(factory).Count);
+    }
+
+    [Fact]
+    public async Task Owner_does_not_delete_another_owner()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        AddPerson(factory, "hozyain", "parol-hozyaina", UserRole.Owner);
+        var other = AddPerson(factory, "vtoroy", "parol-vtorogo", UserRole.Owner);
+
+        var client = await Login(factory, "hozyain", "parol-hozyaina");
+        var answer = await Post(client, $"/settings/people/{other}/delete", []);
+
+        Assert.Equal("/settings?err=other_owner#people", answer.Headers.Location?.ToString());
+        Assert.Single(Users(factory), row => row.Login == "vtoroy");
+    }
+
+    [Fact]
+    public async Task Owner_does_not_change_the_password_of_another_owner()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        AddPerson(factory, "hozyain", "parol-hozyaina", UserRole.Owner);
+        var other = AddPerson(factory, "vtoroy", "parol-vtorogo", UserRole.Owner);
+
+        var client = await Login(factory, "hozyain", "parol-hozyaina");
+        var answer = await Post(client, $"/settings/people/{other}/password",
+            new() { ["password"] = "chuzhoy-parol" });
+
+        Assert.Equal("/settings?err=other_owner#people", answer.Headers.Location?.ToString());
+        Assert.Equal(HttpStatusCode.Redirect, (await TryLogin(factory, "vtoroy", "parol-vtorogo")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Owner_does_not_change_their_own_password_from_the_table()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        var owner = AddPerson(factory, "hozyain", "parol-hozyaina", UserRole.Owner);
+
+        var client = await Login(factory, "hozyain", "parol-hozyaina");
+        var answer = await Post(client, $"/settings/people/{owner}/password",
+            new() { ["password"] = "novyy-parol" });
+
+        Assert.Equal("/settings?err=own_password#people", answer.Headers.Location?.ToString());
+        Assert.Equal(HttpStatusCode.Redirect, (await TryLogin(factory, "hozyain", "parol-hozyaina")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Table_shows_buttons_only_for_readers()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        var owner = AddPerson(factory, "hozyain", "parol-hozyaina", UserRole.Owner);
+        var other = AddPerson(factory, "vtoroy", "parol-vtorogo", UserRole.Owner);
+        var ivan = AddPerson(factory, "ivan", "parol-ivana", UserRole.Reader);
+
+        var client = await Login(factory, "hozyain", "parol-hozyaina");
+        var html = await client.GetStringAsync("/settings/");
+
+        Assert.Contains($"/settings/people/{ivan}/password", html);
+        Assert.Contains($"/settings/people/{ivan}/delete", html);
+        Assert.DoesNotContain($"/settings/people/{owner}/", html);
+        Assert.DoesNotContain($"/settings/people/{other}/", html);
     }
 
     [Fact]

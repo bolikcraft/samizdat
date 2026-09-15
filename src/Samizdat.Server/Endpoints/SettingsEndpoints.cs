@@ -74,7 +74,9 @@ public static class SettingsEndpoints
                     ["login"] = row.Login,
                     ["role"] = row.Role == UserRole.Owner ? "владелец" : "читатель",
                     ["created_at"] = row.CreatedAt.ToString("yyyy-MM-dd"),
-                    ["is_me"] = row.Login == person.Login,
+                    // Строка владельца — без кнопок: свой пароль меняют в разделе «Пароль»,
+                    // а чужого владельца не трогают вовсе.
+                    ["can_change"] = row.Role != UserRole.Owner,
                 }).ToList()
                 : [];
 
@@ -285,7 +287,8 @@ public static class SettingsEndpoints
             var login = form["login"].ToString().Trim();
             var password = form["password"].ToString();
 
-            if (login.Length == 0 || login.Length > 100 || password.Length == 0) return Err("bad_person");
+            if (login.Length == 0 || login.Length > 100) return Err("bad_person");
+            if (password.Length < MinPasswordLength) return Err("person_short_password");
             // Занятый логин ловим сами: иначе уникальный индекс дал бы владельцу голый 500.
             if (db.Users.Any(row => row.Login == login)) return Err("login_taken");
 
@@ -300,14 +303,21 @@ public static class SettingsEndpoints
             return Ok("person_added");
         }).RequireValidToken().OwnerOnly();
 
-        group.MapPost("/people/{id:int}/password", async (int id, HttpContext context, SamizdatDbContext db) =>
+        group.MapPost("/people/{id:int}/password", async (int id, HttpContext context, SamizdatDbContext db,
+                                                         ClaimsPrincipal user) =>
         {
             var form = await context.Request.ReadFormAsync();
             var password = form["password"].ToString();
-            if (password.Length == 0) return Err("bad_person");
+
+            if (CurrentUser(db, user) is not { } me) return LoggedOut();
 
             var person = db.Users.Find(id);
             if (person is null) return Results.NotFound();
+            // Свой пароль меняют в разделе «Пароль»: там спрашивают текущий. Чужой владелец
+            // не подчиняется даже владельцу — свою учётку он ведёт сам.
+            if (person.Id == me.Id) return Err("own_password");
+            if (person.Role == UserRole.Owner) return Err("other_owner");
+            if (password.Length < MinPasswordLength) return Err("person_short_password");
 
             person.PasswordHash = PasswordHasher.Hash(password);
             person.SessionStamp = UserRow.NewSessionStamp();
@@ -317,6 +327,8 @@ public static class SettingsEndpoints
 
         group.MapPost("/people/{id:int}/delete", async (int id, SamizdatDbContext db, ClaimsPrincipal user) =>
         {
+            if (CurrentUser(db, user) is not { } me) return LoggedOut();
+
             var person = db.Users.Find(id);
             if (person is null) return Results.NotFound();
 
@@ -324,7 +336,8 @@ public static class SettingsEndpoints
             // и поднять его можно было бы только командой в консоли.
             if (person.Role == UserRole.Owner && db.Users.Count(row => row.Role == UserRole.Owner) == 1)
                 return Err("last_owner");
-            if (person.Login == user.Identity!.Name) return Err("self_delete");
+            if (person.Id == me.Id) return Err("self_delete");
+            if (person.Role == UserRole.Owner) return Err("other_owner");
 
             db.Users.Remove(person);
             await db.SaveChangesAsync();
@@ -364,7 +377,8 @@ public static class SettingsEndpoints
         "token_created" or "token_note" or "token_revoked" => "tokens",
         "link_revoked" => "links",
         "person_added" or "person_password" or "person_deleted" => "people",
-        "bad_person" or "login_taken" or "last_owner" or "self_delete" => "people",
+        "bad_person" or "person_short_password" or "login_taken" => "people",
+        "last_owner" or "self_delete" or "other_owner" or "own_password" => "people",
         _ => "appearance",
     };
 
@@ -437,10 +451,13 @@ public static class SettingsEndpoints
         "background_type" => "Это не картинка. Подойдёт jpeg, png или webp.",
         "background_too_big" => "Картинка больше 8 МБ.",
         "background_unknown" => "Такого фона нет в наборе темы.",
-        "bad_person" => "Логин и пароль не должны быть пустыми.",
+        "bad_person" => "Логин не должен быть пустым.",
+        "person_short_password" => "Пароль должен быть не короче 8 символов.",
         "login_taken" => "Такой логин уже занят.",
         "last_owner" => "Это последний владелец, его нельзя удалить.",
         "self_delete" => "Себя удалить нельзя.",
+        "other_owner" => "Другого владельца менять нельзя.",
+        "own_password" => "Свой пароль меняйте в разделе «Пароль»: там спрашивают текущий.",
         not null => "Не удалось выполнить действие.",
         null => ok switch
         {
