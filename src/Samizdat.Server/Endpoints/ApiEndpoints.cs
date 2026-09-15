@@ -1,4 +1,6 @@
 using System.Text;
+using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using Samizdat.Core;
 using Samizdat.Server.Auth;
 using Samizdat.Server.Data;
@@ -71,7 +73,17 @@ public static class ApiEndpoints
             row.Theme = parsed.FrontMatter.Theme;
             row.ContentHash = ArticleHash.Compute(markdown, attachments, folder);
             row.UpdatedAt = DateTimeOffset.UtcNow;
-            await db.SaveChangesAsync();
+            try
+            {
+                await db.SaveChangesAsync();
+            }
+            // Описание из фронтматтера ничем не ограничено, а у tsvector предел 1 МБ на документ:
+            // без этого владелец получил бы на выкладке голую пятисотку.
+            catch (DbUpdateException error) when (error.InnerException is PostgresException
+                { SqlState: PostgresErrorCodes.ProgramLimitExceeded })
+            {
+                return Results.BadRequest($"{slug}: описание слишком длинное для поискового индекса");
+            }
 
             return Results.Ok(new { slug, hash = row.ContentHash });
         });

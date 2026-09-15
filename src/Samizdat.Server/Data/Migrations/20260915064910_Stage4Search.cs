@@ -47,6 +47,7 @@ namespace Samizdat.Server.Data.Migrations
                 table: "article_links",
                 column: "ToSlug");
 
+            // Триграммы — запасной поиск, когда полнотекст не нашёл ничего.
             // С PostgreSQL 13 расширение trusted: прав владельца базы хватает, superuser не нужен.
             migrationBuilder.Sql("CREATE EXTENSION IF NOT EXISTS pg_trgm;");
 
