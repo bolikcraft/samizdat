@@ -1,6 +1,8 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using Samizdat.Core.Themes;
 using Samizdat.Server.Auth;
 using Samizdat.Server.Data;
@@ -289,8 +291,6 @@ public static class SettingsEndpoints
 
             if (login.Length == 0 || login.Length > 100) return Err("bad_person");
             if (password.Length < MinPasswordLength) return Err("person_short_password");
-            // Занятый логин ловим сами: иначе уникальный индекс дал бы владельцу голый 500.
-            if (db.Users.Any(row => row.Login == login)) return Err("login_taken");
 
             db.Users.Add(new UserRow
             {
@@ -299,7 +299,19 @@ public static class SettingsEndpoints
                 Role = UserRole.Reader,
                 CreatedAt = DateTimeOffset.UtcNow,
             });
-            await db.SaveChangesAsync();
+
+            try
+            {
+                await db.SaveChangesAsync();
+            }
+            catch (DbUpdateException error)
+                when (error.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+            {
+                // Занятый логин слышим от базы, а не смотрим перед вставкой: между «посмотрел»
+                // и «вставил» логин успевал занять соседний запрос, и владелец получал голый 500.
+                return Err("login_taken");
+            }
+
             return Ok("person_added");
         }).RequireValidToken().OwnerOnly();
 

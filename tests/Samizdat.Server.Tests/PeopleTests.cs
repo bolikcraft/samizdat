@@ -90,6 +90,32 @@ public class PeopleTests : IDisposable
     }
 
     [Fact]
+    public async Task Login_that_differs_only_in_case_is_busy_too()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        AddPerson(factory, "hozyain", "parol-hozyaina", UserRole.Owner);
+        AddPerson(factory, "ivan", "parol-ivana", UserRole.Reader);
+
+        var owner = await Login(factory, "hozyain", "parol-hozyaina");
+        var answer = await Post(owner, "/settings/people",
+            new() { ["login"] = "Ivan", ["password"] = "drugoy-parol" });
+
+        Assert.Equal("/settings?err=login_taken#people", answer.Headers.Location?.ToString());
+        Assert.Single(Users(factory), row => row.Login == "ivan");
+    }
+
+    [Fact]
+    public async Task Person_logs_in_with_a_login_in_another_case()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        AddPerson(factory, "ivan", "parol-ivana", UserRole.Reader);
+
+        Assert.Equal(HttpStatusCode.Redirect, (await TryLogin(factory, "IVAN", "parol-ivana")).StatusCode);
+    }
+
+    [Fact]
     public async Task Login_of_a_new_person_is_not_empty()
     {
         database.ResetDatabase();

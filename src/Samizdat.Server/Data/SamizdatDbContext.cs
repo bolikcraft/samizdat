@@ -10,8 +10,14 @@ public sealed class SamizdatDbContext(DbContextOptions<SamizdatDbContext> option
     public DbSet<SettingRow> Settings => Set<SettingRow>();
     public DbSet<ShareLinkRow> ShareLinks => Set<ShareLinkRow>();
 
+    /// Сравнение без оглядки на регистр: Ivan и ivan — один человек. Правило стоит на колонке,
+    /// поэтому его держат разом и уникальный индекс, и поиск при входе.
+    const string CaseInsensitive = "case_insensitive";
+
     protected override void OnModelCreating(ModelBuilder model)
     {
+        model.HasCollation(CaseInsensitive, locale: "und-u-ks-level2", provider: "icu", deterministic: false);
+
         model.Entity<ArticleRow>(article =>
         {
             article.ToTable("articles");
@@ -25,7 +31,7 @@ public sealed class SamizdatDbContext(DbContextOptions<SamizdatDbContext> option
         {
             user.ToTable("users");
             user.HasIndex(row => row.Login).IsUnique();
-            user.Property(row => row.Login).HasMaxLength(100);
+            user.Property(row => row.Login).HasMaxLength(100).UseCollation(CaseInsensitive);
         });
 
         model.Entity<ApiTokenRow>(token =>
