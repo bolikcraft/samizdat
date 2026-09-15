@@ -203,6 +203,27 @@ public class DownloadTests : IDisposable
     }
 
     [Fact]
+    public async Task The_source_inside_the_archive_is_trimmed_for_the_guest()
+    {
+        using var factory = CreateFactory();
+        AddArticle(factory, "tayna", ArticleVisibility.Private,
+                   "---\ntitle: Тайна\ntags: [заметки]\n---\n\nТекст.\n");
+        await File.WriteAllBytesAsync(Path.Combine(dataRoot, "articles", "tayna", "ezh.png"), [1, 2, 3]);
+        SetSetting(factory, "articles.download.guests", "on");
+        var token = AddLink(factory, "tayna");
+
+        var client = factory.CreateClient();
+        var answer = await client.GetAsync($"/download/s/{token}");
+
+        using var zip = new ZipArchive(await answer.Content.ReadAsStreamAsync(), ZipArchiveMode.Read);
+        using var source = new StreamReader(zip.GetEntry("tayna/index.md")!.Open());
+        var text = await source.ReadToEndAsync();
+
+        Assert.Contains("title: Тайна", text);
+        Assert.DoesNotContain("tags", text);
+    }
+
+    [Fact]
     public async Task A_broken_header_is_not_handed_to_the_reader()
     {
         using var factory = CreateFactory();
@@ -278,6 +299,19 @@ public class DownloadTests : IDisposable
     }
 
     [Fact]
+    public async Task An_expired_link_downloads_nothing()
+    {
+        using var factory = CreateFactory();
+        AddArticle(factory, "tayna", ArticleVisibility.Private);
+        SetSetting(factory, "articles.download.guests", "on");
+        var token = AddLink(factory, "tayna", expiresAt: DateTimeOffset.UtcNow.AddDays(-1));
+
+        var client = factory.CreateClient();
+
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"/download/s/{token}")).StatusCode);
+    }
+
+    [Fact]
     public async Task Downloading_does_not_count_as_opening_the_link()
     {
         using var factory = CreateFactory();
@@ -293,7 +327,8 @@ public class DownloadTests : IDisposable
         Assert.Equal(0, db.ShareLinks.Single().OpenedCount);
     }
 
-    static string AddLink(WebApplicationFactory<Program> factory, string slug, bool revoked = false)
+    static string AddLink(WebApplicationFactory<Program> factory, string slug, bool revoked = false,
+                          DateTimeOffset? expiresAt = null)
     {
         var token = ShareToken.Create();
 
@@ -305,6 +340,7 @@ public class DownloadTests : IDisposable
             Slug = slug,
             CreatedAt = DateTimeOffset.UtcNow,
             RevokedAt = revoked ? DateTimeOffset.UtcNow : null,
+            ExpiresAt = expiresAt,
         });
         db.SaveChanges();
         return token;
@@ -398,7 +434,13 @@ public class DownloadTests : IDisposable
     {
         using var factory = CreateFactory();
         AddArticle(factory, "otkrytaya", ArticleVisibility.Shared);
+        AddPerson(factory, "hozyain", "parol", UserRole.Owner);
         AddPerson(factory, "ivan", "parol", UserRole.Reader);
+
+        // Владелец заходит первым и кладёт в кэш свою ячейку с кнопкой — ячейки owner/reader
+        // разные, и без этого захода тест прошёл бы даже при слитых ячейках.
+        var owner = await Login(factory, "hozyain", "parol");
+        await owner.GetStringAsync("/otkrytaya");
 
         var client = await Login(factory, "ivan", "parol");
         var html = await client.GetStringAsync("/otkrytaya");

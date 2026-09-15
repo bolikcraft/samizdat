@@ -46,32 +46,45 @@ public static class DownloadEndpoints
     }
 
     /// asIs — файл владельцу, байт в байт. Остальным шапка пересобирается.
-    internal static IResult Package(ArticleFiles files, string slug, bool asIs)
+    static IResult Package(ArticleFiles files, string slug, bool asIs)
     {
-        byte[] markdown;
-        if (asIs)
+        try
         {
-            markdown = files.ReadMarkdownBytes(slug)!;
+            byte[] markdown;
+            if (asIs)
+            {
+                markdown = files.ReadMarkdownBytes(slug) ?? throw new FileNotFoundException();
+            }
+            else
+            {
+                // Сломанный фронтматтер — 404: разобрать шапку нечем, а отдать её как есть нельзя,
+                // иначе чужие поля уедут вместе с файлом. Владельцу такой файл по-прежнему отдаётся.
+                try
+                {
+                    var text = files.ReadMarkdown(slug) ?? throw new FileNotFoundException();
+                    markdown = Encoding.UTF8.GetBytes(PublicSource.Of(text));
+                }
+                catch (FrontMatterException)
+                {
+                    return Results.NotFound();
+                }
+            }
+
+            var attachments = files.Attachments(slug).ToList();
+
+            // fileDownloadName сам оформляет Content-Disposition, в том числе кириллицу в имени.
+            return attachments.Count == 0
+                ? Results.File(markdown, "text/markdown; charset=utf-8", $"{slug}.md")
+                : Results.File(ArticlePackage.Pack(slug, markdown, attachments), "application/zip", $"{slug}.zip");
         }
-        else
+        catch (IOException)
         {
-            // Сломанный фронтматтер — 404: разобрать шапку нечем, а отдать её как есть нельзя,
-            // иначе чужие поля уедут вместе с файлом. Владельцу такой файл по-прежнему отдаётся.
-            try
-            {
-                markdown = Encoding.UTF8.GetBytes(PublicSource.Of(files.ReadMarkdown(slug)!));
-            }
-            catch (FrontMatterException)
-            {
-                return Results.NotFound();
-            }
+            // Гонка с Replace: пока собираем файл, владелец выложил новую версию из Obsidian, и
+            // Directory.Move увёл папку статьи из-под чтения — это штатный режим, а не сбой, и
+            // отдельного предупреждения в лог не пишем (в отличие от /background, где та же гонка —
+            // редкое ручное действие и стоит того, чтобы её видеть). FileNotFoundException выше —
+            // тот же случай, только пойман раньше, до обращения к несуществующему файлу.
+            return Results.NotFound();
         }
-
-        var attachments = files.Attachments(slug).ToList();
-
-        // fileDownloadName сам оформляет Content-Disposition, в том числе кириллицу в имени.
-        return attachments.Count == 0
-            ? Results.File(markdown, "text/markdown; charset=utf-8", $"{slug}.md")
-            : Results.File(ArticlePackage.Pack(slug, markdown, attachments), "application/zip", $"{slug}.zip");
     }
 }
