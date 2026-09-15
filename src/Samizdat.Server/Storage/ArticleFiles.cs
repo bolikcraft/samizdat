@@ -87,7 +87,9 @@ public sealed class ArticleFiles(string dataRoot)
             : [];
 
     /// Кладём новую версию рядом и переносим одним движением: читатель не видит половину статьи.
-    public void Replace(string slug, byte[] markdown, IReadOnlyCollection<(string Name, byte[] Bytes)> attachments)
+    /// Старая версия остаётся в служебной папке до Commit/Rollback — запись саму по себе можно отменить.
+    public ArticleWrite BeginReplace(string slug, byte[] markdown,
+                                      IReadOnlyCollection<(string Name, byte[] Bytes)> attachments)
     {
         if (!IsValidSlug(slug)) throw new ArgumentException("Плохой slug", nameof(slug));
 
@@ -112,15 +114,45 @@ public sealed class ArticleFiles(string dataRoot)
         }
 
         var old = Path.Combine(ArticlesRoot, $".old-{slug}-{Guid.NewGuid():N}");
-        if (Directory.Exists(target)) Directory.Move(target, old);
+        var hadOldVersion = Directory.Exists(target);
+        if (hadOldVersion) Directory.Move(target, old);
         Directory.Move(staging, target);
-        if (Directory.Exists(old)) Directory.Delete(old, recursive: true);
+
+        return new ArticleWrite(target, old, hadOldVersion);
     }
+
+    /// Запись без возможности отмены — там, где сохранение в базу не может отказать после неё.
+    public void Replace(string slug, byte[] markdown, IReadOnlyCollection<(string Name, byte[] Bytes)> attachments)
+        => BeginReplace(slug, markdown, attachments).Commit();
 
     public void Remove(string slug)
     {
         if (!IsValidSlug(slug)) return;
         var folder = Folder(slug);
         if (Directory.Exists(folder)) Directory.Delete(folder, recursive: true);
+    }
+}
+
+/// Запись статьи на диск, которую ещё можно отменить: база может отказать уже после того,
+/// как файлы легли на место.
+public sealed class ArticleWrite(string target, string old, bool hadOldVersion)
+{
+    bool done;
+
+    /// Публикация подтверждена — старая версия больше не нужна.
+    public void Commit()
+    {
+        if (done) return;
+        done = true;
+        if (hadOldVersion) Directory.Delete(old, recursive: true);
+    }
+
+    /// База отказала — возвращаем прежнюю версию на место, а для новой статьи убираем только что созданную папку.
+    public void Rollback()
+    {
+        if (done) return;
+        done = true;
+        Directory.Delete(target, recursive: true);
+        if (hadOldVersion) Directory.Move(old, target);
     }
 }

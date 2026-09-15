@@ -125,6 +125,107 @@ public class IndexTests(DatabaseFixture database) : IDisposable
     }
 
     [Fact]
+    public async Task Refused_republish_leaves_the_file_on_disk_untouched()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        var client = TestPublisher.ClientWithToken(factory);
+        var original = "---\ntitle: Длинное\n---\nобычный текст\n";
+
+        (await TestPublisher.Push(client, "dlinnoe", original)).EnsureSuccessStatusCode();
+
+        var description = string.Join(' ', Enumerable.Range(0, 150_000).Select(number => $"slovo{number}"));
+        var answer = await TestPublisher.Push(
+            client, "dlinnoe", $"---\ntitle: Длинное\ndescription: {description}\n---\nновый текст\n");
+
+        Assert.Equal(HttpStatusCode.BadRequest, answer.StatusCode);
+        var onDisk = await File.ReadAllTextAsync(Path.Combine(dataRoot, "articles", "dlinnoe", "index.md"));
+        Assert.Equal(original, onDisk);
+    }
+
+    [Fact]
+    public async Task Refused_publish_of_a_new_article_leaves_no_row_and_no_folder()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        var client = TestPublisher.ClientWithToken(factory);
+
+        var description = string.Join(' ', Enumerable.Range(0, 150_000).Select(number => $"slovo{number}"));
+        var answer = await TestPublisher.Push(
+            client, "novoe", $"---\ntitle: Новое\ndescription: {description}\n---\nтекст\n");
+
+        Assert.Equal(HttpStatusCode.BadRequest, answer.StatusCode);
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+        Assert.Empty(db.Articles.Where(row => row.Slug == "novoe"));
+        Assert.False(Directory.Exists(Path.Combine(dataRoot, "articles", "novoe")));
+    }
+
+    [Fact]
+    public async Task Refused_republish_keeps_the_previous_attachments()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        var client = TestPublisher.ClientWithToken(factory);
+
+        using (var form = TestPublisher.Form("---\ntitle: Со схемой\n---\nтекст\n", ("shema.png", [1, 2, 3])))
+        {
+            form.Add(new StringContent(""), "folder");
+            (await client.PutAsync("/api/articles/so-shemoy", form)).EnsureSuccessStatusCode();
+        }
+
+        var description = string.Join(' ', Enumerable.Range(0, 150_000).Select(number => $"slovo{number}"));
+        using (var form = TestPublisher.Form(
+                   $"---\ntitle: Со схемой\ndescription: {description}\n---\nтекст\n", ("drugoe.png", [4])))
+        {
+            form.Add(new StringContent(""), "folder");
+            var answer = await client.PutAsync("/api/articles/so-shemoy", form);
+            Assert.Equal(HttpStatusCode.BadRequest, answer.StatusCode);
+        }
+
+        var folder = Path.Combine(dataRoot, "articles", "so-shemoy");
+        Assert.True(File.Exists(Path.Combine(folder, "shema.png")));
+        Assert.False(File.Exists(Path.Combine(folder, "drugoe.png")));
+    }
+
+    [Fact]
+    public async Task Deleting_an_article_without_a_file_on_disk_still_succeeds()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        var client = TestPublisher.ClientWithToken(factory);
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+            db.Articles.Add(new ArticleRow { Slug = "propavshaya", Title = "Пропавшая", ContentHash = "h1" });
+            db.SaveChanges();
+        }
+
+        var response = await client.DeleteAsync("/api/articles/propavshaya");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Successful_publish_leaves_no_staging_or_backup_folders()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        var client = TestPublisher.ClientWithToken(factory);
+
+        (await TestPublisher.Push(client, "obychnaya", "---\ntitle: Обычная\n---\nv1\n")).EnsureSuccessStatusCode();
+        (await TestPublisher.Push(client, "obychnaya", "---\ntitle: Обычная\n---\nv2\n")).EnsureSuccessStatusCode();
+
+        var leftovers = Directory.EnumerateDirectories(Path.Combine(dataRoot, "articles"))
+            .Select(Path.GetFileName)
+            .Where(name => name!.StartsWith(".tmp-") || name.StartsWith(".old-"));
+
+        Assert.Empty(leftovers);
+    }
+
+    [Fact]
     public async Task Publishing_fills_the_text_and_the_links()
     {
         database.ResetDatabase();

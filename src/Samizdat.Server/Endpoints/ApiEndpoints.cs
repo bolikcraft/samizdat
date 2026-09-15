@@ -61,7 +61,9 @@ public static class ApiEndpoints
                 return Results.BadRequest($"{slug}/index.md: {error.Message}");
             }
 
-            files.Replace(slug, markdown, attachments);
+            // Запись на диск можно отменить: SaveChangesAsync ниже способен отказать уже после того,
+            // как файлы легли на место, и тогда диск и база разойдутся.
+            var write = files.BeginReplace(slug, markdown, attachments);
 
             var row = await db.Articles.FindAsync(slug) ?? db.Articles.Add(new ArticleRow
             {
@@ -85,9 +87,16 @@ public static class ApiEndpoints
             catch (DbUpdateException error) when (error.InnerException is PostgresException
                 { SqlState: PostgresErrorCodes.ProgramLimitExceeded })
             {
+                write.Rollback();
                 return Results.BadRequest($"{slug}: описание слишком длинное для поискового индекса");
             }
+            catch
+            {
+                write.Rollback();
+                throw;
+            }
 
+            write.Commit();
             return Results.Ok(new { slug, hash = row.ContentHash });
         });
 
@@ -95,13 +104,16 @@ public static class ApiEndpoints
         {
             if (!ArticleFiles.IsValidSlug(slug)) return Results.BadRequest("Плохой slug");
 
-            files.Remove(slug);
+            // Сперва база, потом диск: если SaveChangesAsync откажет, файл останется на месте и статья
+            // не потеряется. Строка без файла — это 404 и предупреждение в лог на видном месте, а файл
+            // без строки — просто мусор, который следующий push перезапишет.
             var row = await db.Articles.FindAsync(slug);
             if (row is not null)
             {
                 db.Articles.Remove(row);
                 await db.SaveChangesAsync();
             }
+            files.Remove(slug);
             return Results.Ok();
         });
 
