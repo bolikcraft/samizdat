@@ -13,7 +13,7 @@ public sealed class ArticleFiles(string dataRoot)
     // Первый сегмент маршрутов, у которых есть литеральный обработчик GET: там статья с таким
     // именем была бы недоступна. Регистр не важен — маршруты его не различают.
     static readonly HashSet<string> ReservedSlugs =
-        new(["s", "login", "settings", "assets", "background", "visibility", "share"],
+        new(["s", "login", "settings", "assets", "background", "visibility", "share", "search"],
             StringComparer.OrdinalIgnoreCase);
 
     public static bool IsReservedSlug(string slug) => ReservedSlugs.Contains(slug);

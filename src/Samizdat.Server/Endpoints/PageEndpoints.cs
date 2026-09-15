@@ -9,6 +9,7 @@ using Samizdat.Core.Themes;
 using Samizdat.Server.Auth;
 using Samizdat.Server.Data;
 using Samizdat.Server.Rendering;
+using Samizdat.Server.Search;
 using Samizdat.Server.Storage;
 
 namespace Samizdat.Server.Endpoints;
@@ -44,6 +45,40 @@ public static class PageEndpoints
                 ["nav"] = Navigation(db, currentSlug: null, isOwner),
                 ["user"] = UserModel(user),
                 ["antiforgery"] = AntiforgeryHtml.Field(antiforgery, context),
+            }), "text/html; charset=utf-8");
+        });
+
+        group.MapGet("/search", async (string? q, PageRenderer pages, ArticleSearch search, SamizdatDbContext db,
+                                       SiteSettings settings, ClaimsPrincipal user, IAntiforgery antiforgery,
+                                       HttpContext context) =>
+        {
+            var query = (q ?? "").Trim();
+            var isOwner = ArticleAccess.IsOwner(user);
+
+            IReadOnlyList<SearchHit> hits = query.Length == 0 ? [] : await search.Find(query, isOwner);
+            // Похожие показываем только вместо пустого ответа: точные находки они бы разбавили шумом.
+            var guess = query.Length > 0 && hits.Count == 0;
+            if (guess) hits = await search.FindSimilar(query, isOwner);
+
+            return Results.Content(pages.Render("search.html", new()
+            {
+                ["page_title"] = query.Length == 0 ? "Поиск" : $"Поиск: {query}",
+                ["site"] = SiteModel(settings),
+                ["nav"] = Navigation(db, currentSlug: null, isOwner),
+                ["user"] = UserModel(user),
+                ["antiforgery"] = AntiforgeryHtml.Field(antiforgery, context),
+                ["search_query"] = query,
+                ["is_guess"] = guess && hits.Count > 0,
+                ["capped"] = hits.Count == ArticleSearch.Limit,
+                ["hits"] = hits.Select(hit => new Dictionary<string, object?>
+                {
+                    ["slug"] = hit.Slug,
+                    ["title"] = hit.Title,
+                    ["folder"] = hit.Folder,
+                    ["as_link"] = hit.CanOpen,
+                    // Готовый html: экранирование и подсветка уже сделаны, в шаблоне идёт сырым.
+                    ["snippet"] = hit.Snippet is null ? null : SearchSnippet.ToHtml(hit.Snippet),
+                }).ToList(),
             }), "text/html; charset=utf-8");
         });
 

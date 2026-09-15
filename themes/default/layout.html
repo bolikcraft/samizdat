@@ -18,6 +18,12 @@
 <header class="top">
   <a href="/">{{ site.title | html.escape }}</a>
   {{ if user }}
+  <form class="search" action="/search" method="get" role="search">
+    <input type="search" name="q" value="{{ if search_query }}{{ search_query | html.escape }}{{ end }}"
+           placeholder="Поиск" autocomplete="off" aria-label="Поиск по статьям">
+  </form>
+  {{ end }}
+  {{ if user }}
   <details class="user-menu">
     <summary>{{ user.login | html.escape }}</summary>
     <ul>

@@ -1,0 +1,24 @@
+<h1>Поиск</h1>
+<form class="search-page" action="/search" method="get" role="search">
+  <input type="search" name="q" value="{{ if search_query }}{{ search_query | html.escape }}{{ end }}"
+         placeholder="Слово или фраза" autocomplete="off" autofocus>
+  <button type="submit">Найти</button>
+</form>
+{{ if search_query }}
+  {{ if (hits | array.size) == 0 }}
+  <p class="search-note">Ничего не нашлось.</p>
+  {{ else }}
+  {{ if is_guess }}<p class="search-note">Точных совпадений нет. Возможно, вы искали:</p>{{ end }}
+  {{ if capped }}<p class="search-note">Показаны первые {{ hits | array.size }} находок.</p>{{ end }}
+  <ul class="articles">
+  {{ for hit in hits }}
+    <li>
+      {{ if hit.as_link }}<a href="/{{ hit.slug | html.escape }}">{{ hit.title | html.escape }}</a>{{ else }}<span class="nav-closed">{{ hit.title | html.escape }}</span>{{ end }}
+      {{ if hit.folder }}<div class="date">{{ hit.folder | html.escape }}</div>{{ end }}
+      {{~## Цитата уже безопасна: html экранирован в C#, там же расставлена подсветка. ##~}}
+      {{ if hit.snippet }}<p class="snippet">{{ hit.snippet }}</p>{{ end }}
+    </li>
+  {{ end }}
+  </ul>
+  {{ end }}
+{{ end }}

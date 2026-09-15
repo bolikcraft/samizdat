@@ -157,6 +157,18 @@ body {
 .user-menu a:hover, .user-menu button:hover { background: var(--callout); }
 .user-menu form { margin: 0; }
 
+.top .search { margin: 0; }
+.top .search input, .search-page input {
+  padding: 0.3rem 0.5rem; border: 1px solid var(--line); border-radius: 6px;
+  background: var(--bg); color: var(--fg); font-family: system-ui, sans-serif; font-size: 0.9rem;
+}
+.top .search input { width: min(18rem, 40vw); }
+.search-page { display: flex; gap: 0.5rem; margin: 1rem 0; }
+.search-page input { flex: 1; }
+.search-note { color: var(--muted); font-family: system-ui, sans-serif; font-size: 0.9rem; }
+.snippet { color: var(--muted); }
+.snippet mark { background: var(--accent); color: var(--bg); border-radius: 3px; padding: 0 0.15rem; }
+
 /* Два блока рядом: дерево на матовом стекле и статья на плотном фоне. Сама обёртка держит
    только раскладку, своего фона у неё нет — иначе стекло боковика показывало бы её, а не снимок.
    Потолка ширины нет намеренно: блоки тянутся под любое окно, отступ от краёв одинаковый.
@@ -382,12 +394,13 @@ blockquote { margin: 1.2rem 0; padding-left: 1rem; border-left: 4px solid var(--
 .share-form button,
 .visibility-form button,
 .inline-form button,
+.search-page button,
 .copy-link {
   min-height: 2.125rem; padding: 0 1rem; border: none; border-radius: 8px;
   font: inherit; font-family: system-ui, sans-serif; font-size: 0.875rem; font-weight: 600;
   line-height: 1.2; cursor: pointer;
 }
-.login button, .settings-form button, .share-form button, .visibility-form button {
+.login button, .settings-form button, .share-form button, .visibility-form button, .search-page button {
   background: var(--accent); color: var(--bg); --busy-ink: var(--bg);
 }
 /* Пока форма отправляется, подпись гаснет и на её месте крутится колечко: так ширина кнопки

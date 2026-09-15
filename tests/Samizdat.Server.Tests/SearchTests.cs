@@ -1,5 +1,7 @@
+using System.Net;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using Samizdat.Server.Auth;
 using Samizdat.Server.Data;
 using Samizdat.Server.Search;
 
@@ -274,5 +276,178 @@ public class ArticleSearchTests(DatabaseFixture database) : IDisposable
         var search = scope.ServiceProvider.GetRequiredService<ArticleSearch>();
 
         Assert.Empty(await search.FindSimilar("гипервизер", isOwner: false));
+    }
+}
+
+[Collection("db")]
+public class SearchPageTests(DatabaseFixture database) : IDisposable
+{
+    readonly string dataRoot = Directory.CreateTempSubdirectory("samizdat-data").FullName;
+
+    public void Dispose() => Directory.Delete(dataRoot, recursive: true);
+
+    WebApplicationFactory<Program> CreateFactory() =>
+        new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("Samizdat:DataRoot", dataRoot);
+            builder.UseSetting("ConnectionStrings:Postgres", database.ConnectionString);
+            builder.UseSetting("hostBuilder:reloadConfigOnChange", "false");
+        });
+
+    [Fact]
+    public async Task Owner_finds_an_article_by_a_word_of_its_text()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        var api = TestPublisher.ClientWithToken(factory);
+        (await TestPublisher.Push(api, "dom", "---\ntitle: Дом\n---\n\nВ доме стоит тихий сервер."))
+            .EnsureSuccessStatusCode();
+
+        var client = await TestLogin.AsOwner(factory);
+        var html = await client.GetStringAsync("/search?q=серверы");
+
+        Assert.Contains("href=\"/dom\"", html);
+        Assert.Contains("<mark>", html);
+    }
+
+    [Fact]
+    public async Task Page_without_a_query_asks_for_one()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        var client = await TestLogin.AsOwner(factory);
+
+        var answer = await client.GetAsync("/search");
+
+        Assert.Equal(HttpStatusCode.OK, answer.StatusCode);
+        Assert.Contains("name=\"q\"", await answer.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task Nothing_found_says_so()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        var client = await TestLogin.AsOwner(factory);
+
+        var html = await client.GetStringAsync("/search?q=мамонт");
+
+        Assert.Contains("Ничего не нашлось", html);
+    }
+
+    [Fact]
+    public async Task Typo_brings_the_guess()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        var api = TestPublisher.ClientWithToken(factory);
+        (await TestPublisher.Push(api, "proxmox", "---\ntitle: Proxmox\n---\n\nгипервизор дома"))
+            .EnsureSuccessStatusCode();
+
+        var client = await TestLogin.AsOwner(factory);
+        var html = await client.GetStringAsync("/search?q=proxmoks");
+
+        Assert.Contains("Возможно, вы искали", html);
+        Assert.Contains("href=\"/proxmox\"", html);
+    }
+
+    [Fact]
+    public async Task Reader_sees_a_private_article_without_a_link()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        var api = TestPublisher.ClientWithToken(factory);
+        (await TestPublisher.Push(api, "tayna", "---\ntitle: Тайный сервер\n---\n\nсекретный текст"))
+            .EnsureSuccessStatusCode();
+
+        var client = await TestLogin.AsReader(factory);
+        var html = await client.GetStringAsync("/search?q=серверы");
+
+        Assert.Contains("Тайный сервер", html);
+        Assert.DoesNotContain("href=\"/tayna\"", html);
+        Assert.DoesNotContain("секретный", html);
+    }
+
+    [Fact]
+    public async Task Tag_from_the_text_does_not_become_markup()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        var api = TestPublisher.ClientWithToken(factory);
+        (await TestPublisher.Push(api, "kod", "---\ntitle: Код\n---\n\nтег `<script>alert(1)</script>` в сервере"))
+            .EnsureSuccessStatusCode();
+
+        var client = await TestLogin.AsOwner(factory);
+        var html = await client.GetStringAsync("/search?q=сервере");
+
+        Assert.Contains("&lt;script&gt;", html);
+        Assert.DoesNotContain("<script>alert(1)</script>", html);
+    }
+
+    [Fact]
+    public async Task Query_in_the_field_survives()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        var client = await TestLogin.AsOwner(factory);
+
+        var html = await client.GetStringAsync("/search?q=тихий+сервер");
+
+        Assert.Contains("value=\"тихий сервер\"", html);
+    }
+
+    [Fact]
+    public async Task Query_with_a_quote_does_not_break_the_field()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        var client = await TestLogin.AsOwner(factory);
+
+        var html = await client.GetStringAsync("/search?q=%22%3Cscript%3E");
+
+        Assert.DoesNotContain("<script>", html);
+        Assert.Contains("&lt;script&gt;", html);
+    }
+
+    [Fact]
+    public async Task Search_needs_a_password()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+
+        var answer = await client.GetAsync("/search?q=сервер");
+
+        Assert.Equal(HttpStatusCode.Redirect, answer.StatusCode);
+    }
+
+    [Fact]
+    public async Task Header_of_a_guest_page_has_no_search()
+    {
+        // Гостевая страница по ссылке /s/{token}: там нет ни навигации, ни поиска.
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        var api = TestPublisher.ClientWithToken(factory);
+        (await TestPublisher.Push(api, "statya", "---\ntitle: Статья\n---\n\nТекст статьи."))
+            .EnsureSuccessStatusCode();
+
+        string token;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+            var article = db.Articles.Single(row => row.Slug == "statya");
+            article.Visibility = ArticleVisibility.Shared;
+            var link = new ShareLinkRow
+            {
+                Token = ShareToken.Create(), Slug = "statya", CreatedAt = DateTimeOffset.UtcNow,
+            };
+            db.ShareLinks.Add(link);
+            db.SaveChanges();
+            token = link.Token;
+        }
+
+        var html = await factory.CreateClient().GetStringAsync($"/s/{token}");
+
+        Assert.DoesNotContain("action=\"/search\"", html);
     }
 }

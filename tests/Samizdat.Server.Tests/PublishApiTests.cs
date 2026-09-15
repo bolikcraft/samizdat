@@ -247,5 +247,15 @@ public class PublishApiTests(DatabaseFixture database) : IDisposable
         Assert.DoesNotContain("версия раз", second);
     }
 
+    [Fact]
+    public async Task Slug_search_is_reserved()
+    {
+        var (_, client) = StartWithToken();
+
+        var response = await client.PutAsync("/api/articles/search", Article("---\ntitle: Поиск\n---\n\nтекст"));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
     public void Dispose() => Directory.Delete(dataRoot, recursive: true);
 }

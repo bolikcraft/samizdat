@@ -27,12 +27,22 @@ public sealed class ArticleSearch(SamizdatDbContext db)
         var text = Clean(query);
         if (text.Length == 0) return Empty;
 
+        // ts_headline молча вырезает из цитаты всё, что похоже на html-тег ("<script>" и подобное,
+        // символы `<>&"'`) — это поведение самой Postgres, отключить нельзя (баг #15277 их трекера).
+        // Поэтому перед вызовом текст экранируем, а после — экранирование снимаем в обратном
+        // порядке: наружу уходит тот же необработанный текст, что и раньше, только без выпавших кусков.
         const string sql = """
             WITH q AS (SELECT websearch_to_tsquery('russian', @query) AS query)
             SELECT a."Slug", a."Title", a."Folder",
                    (a."Visibility" = @shared OR @owner) AS can_open,
-                   CASE WHEN a."Visibility" = @shared OR @owner
-                        THEN ts_headline('russian', a."SearchText", q.query, @options) END AS snippet,
+                   CASE WHEN a."Visibility" = @shared OR @owner THEN
+                       replace(replace(replace(replace(replace(
+                           ts_headline('russian',
+                               replace(replace(replace(replace(replace(a."SearchText",
+                                   '&', '&amp;'), '<', '&lt;'), '>', '&gt;'), '"', '&quot;'), '''', '&#39;'),
+                               q.query, @options),
+                           '&#39;', ''''), '&quot;', '"'), '&gt;', '>'), '&lt;', '<'), '&amp;', '&')
+                       END AS snippet,
                    ts_rank_cd(CASE WHEN a."Visibility" = @shared OR @owner
                                    THEN a."SearchVector" ELSE a."MetaVector" END, q.query) AS rank
             FROM articles a, q
