@@ -248,4 +248,104 @@ public class IndexTests(DatabaseFixture database) : IDisposable
         Assert.True(row.SearchText.Length <= ArticleIndexer.MaxSearchText);
         Assert.StartsWith("slovo0 ", row.SearchText);
     }
+
+    [Fact]
+    public async Task Start_builds_the_index_of_an_old_article()
+    {
+        database.ResetDatabase();
+        Directory.CreateDirectory(Path.Combine(dataRoot, "articles", "staraya"));
+        await File.WriteAllTextAsync(Path.Combine(dataRoot, "articles", "staraya", "index.md"),
+                                     "---\ntitle: Старая\n---\n\nТекст про [[proxmox]].");
+
+        using (var first = CreateFactory())
+        using (var scope = first.Services.CreateScope())
+        {
+            // Строка от прежних этапов: текста и ссылок у неё нет.
+            var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+            db.Articles.Add(new ArticleRow { Slug = "staraya", Title = "Старая", ContentHash = "h1" });
+            db.SaveChanges();
+        }
+
+        using var factory = CreateFactory();
+        // Хост поднимается лениво: первый запрос запускает и достройку индекса.
+        await factory.CreateClient().GetAsync("/login");
+
+        using var check = factory.Services.CreateScope();
+        var after = check.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+        var row = after.Articles.Single();
+
+        Assert.Contains("Текст про", row.SearchText);
+        Assert.Equal("h1", row.IndexedHash);
+        Assert.Contains(after.ArticleLinks.ToList(), link => link.ToSlug == "proxmox");
+    }
+
+    [Fact]
+    public async Task Start_does_not_touch_an_article_that_is_already_indexed()
+    {
+        database.ResetDatabase();
+        Directory.CreateDirectory(Path.Combine(dataRoot, "articles", "statya"));
+        await File.WriteAllTextAsync(Path.Combine(dataRoot, "articles", "statya", "index.md"),
+                                     "---\ntitle: Статья\n---\n\nсвежий текст");
+
+        using (var first = CreateFactory())
+        using (var scope = first.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+            db.Articles.Add(new ArticleRow
+            {
+                Slug = "statya", Title = "Статья", ContentHash = "h1", IndexedHash = "h1",
+                SearchText = "старый текст",
+            });
+            db.SaveChanges();
+        }
+
+        using var factory = CreateFactory();
+        await factory.CreateClient().GetAsync("/login");
+
+        using var check = factory.Services.CreateScope();
+        var after = check.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+
+        Assert.Equal("старый текст", after.Articles.Single().SearchText);
+    }
+
+    [Fact]
+    public async Task Article_without_a_file_does_not_stop_the_start()
+    {
+        database.ResetDatabase();
+
+        using (var first = CreateFactory())
+        using (var scope = first.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+            db.Articles.Add(new ArticleRow { Slug = "propavshaya", Title = "Пропавшая", ContentHash = "h1" });
+            db.SaveChanges();
+        }
+
+        using var factory = CreateFactory();
+        var answer = await factory.CreateClient().GetAsync("/login");
+
+        Assert.True(answer.IsSuccessStatusCode);
+    }
+
+    [Fact]
+    public async Task Article_with_a_broken_front_matter_does_not_stop_the_start()
+    {
+        database.ResetDatabase();
+        Directory.CreateDirectory(Path.Combine(dataRoot, "articles", "krivaya"));
+        await File.WriteAllTextAsync(Path.Combine(dataRoot, "articles", "krivaya", "index.md"),
+                                     "---\ntitle: [не закрыт\n  - кривой отступ\n---\n\nтекст");
+
+        using (var first = CreateFactory())
+        using (var scope = first.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+            db.Articles.Add(new ArticleRow { Slug = "krivaya", Title = "Кривая", ContentHash = "h1" });
+            db.SaveChanges();
+        }
+
+        using var factory = CreateFactory();
+        var answer = await factory.CreateClient().GetAsync("/login");
+
+        Assert.True(answer.IsSuccessStatusCode);
+    }
 }

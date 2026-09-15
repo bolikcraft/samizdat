@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Samizdat.Server.Auth;
 using Samizdat.Server.Data;
+using Samizdat.Server.Search;
+using Samizdat.Server.Storage;
 
 namespace Samizdat.Server.Commands;
 
@@ -69,6 +71,19 @@ public static class ServerCommands
 
             Console.WriteLine(token);
             Console.Error.WriteLine("Токен показан один раз, сохраните его.");
+            return true;
+        }
+
+        if (args is ["reindex", ..])
+        {
+            using var scope = services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+            await db.Database.MigrateAsync();
+
+            var count = IndexBackfill.Run(db, scope.ServiceProvider.GetRequiredService<ArticleFiles>(),
+                                          scope.ServiceProvider.GetRequiredService<ILogger<Program>>(),
+                                          force: true);
+            Console.WriteLine($"Индекс собран заново: статей {count}.");
             return true;
         }
 

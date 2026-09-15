@@ -73,5 +73,33 @@ public class ServerCommandsTests(DatabaseFixture database) : IDisposable
         Assert.NotEqual(first.SessionStamp, user.SessionStamp);
     }
 
+    [Fact]
+    public async Task Reindex_rebuilds_the_index_of_every_article()
+    {
+        database.ResetDatabase();
+        Directory.CreateDirectory(Path.Combine(dataRoot, "articles", "statya"));
+        await File.WriteAllTextAsync(Path.Combine(dataRoot, "articles", "statya", "index.md"),
+                                     "---\ntitle: Статья\n---\n\nсвежий текст");
+
+        using var factory = StartServer();
+        using (var scope = factory.Services.CreateScope())
+        {
+            // Хэш совпадает — обычная достройка такую строку не тронет.
+            var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+            db.Articles.Add(new ArticleRow
+            {
+                Slug = "statya", Title = "Статья", ContentHash = "h1", IndexedHash = "h1",
+                SearchText = "старый текст",
+            });
+            db.SaveChanges();
+        }
+
+        Assert.True(await ServerCommands.TryRun(["reindex"], factory.Services));
+
+        using var check = factory.Services.CreateScope();
+        var after = check.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+        Assert.Contains("свежий текст", after.Articles.Single().SearchText);
+    }
+
     public void Dispose() => Directory.Delete(dataRoot, recursive: true);
 }

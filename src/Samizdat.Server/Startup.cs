@@ -79,7 +79,15 @@ public static class Startup
     public static void Configure(WebApplication app)
     {
         using (var scope = app.Services.CreateScope())
-            scope.ServiceProvider.GetRequiredService<SamizdatDbContext>().Database.Migrate();
+        {
+            var services = scope.ServiceProvider;
+            var db = services.GetRequiredService<SamizdatDbContext>();
+            db.Database.Migrate();
+
+            // До приёма запросов: иначе поиск первые минуты после выкладки новой версии пуст.
+            IndexBackfill.Run(db, services.GetRequiredService<ArticleFiles>(),
+                              services.GetRequiredService<ILogger<Program>>(), force: false);
+        }
 
         app.UseForwardedHeaders();
         app.MapErrorHandling();
