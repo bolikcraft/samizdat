@@ -25,13 +25,13 @@ public sealed class WikiLinkRenderer(string currentSlug, IArticleLookup articles
             return;
         }
 
-        if (!articles.Exists(link.Target))
+        if (articles.Resolve(link.Target) is not { } slug)
         {
             renderer.WriteEscape(link.Text);
             return;
         }
 
-        renderer.Write("<a href=\"/").WriteEscapeUrl(link.Target).Write("\">")
+        renderer.Write("<a href=\"/").WriteEscapeUrl(slug).Write("\">")
                 .WriteEscape(link.Text).Write("</a>");
     }
 }

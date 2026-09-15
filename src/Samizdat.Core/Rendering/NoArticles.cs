@@ -7,5 +7,5 @@ public sealed class NoArticles : IArticleLookup
 
     NoArticles() { }
 
-    public bool Exists(string slug) => false;
+    public string? Resolve(string target) => null;
 }

@@ -57,9 +57,26 @@ public class WikiLinkTests
         Assert.Contains("drugaya-statya", html);
         Assert.DoesNotContain("<a href=", html);
     }
+
+    [Fact]
+    public void Note_name_becomes_a_link_to_its_slug()
+    {
+        var html = renderer.Render("см. [[Заметка про Proxmox]]", "s", new FakeLookup("zametka-pro-proxmox"));
+
+        Assert.Contains("<a href=\"/zametka-pro-proxmox\">Заметка про Proxmox</a>", html);
+    }
+
+    [Fact]
+    public void Link_with_an_anchor_leads_to_the_article()
+    {
+        var html = renderer.Render("см. [[proxmox#Диски]]", "s", Known);
+
+        Assert.Contains("<a href=\"/proxmox\">", html);
+    }
 }
 
 public sealed class FakeLookup(params string[] slugs) : IArticleLookup
 {
-    public bool Exists(string slug) => slugs.Contains(slug);
+    public string? Resolve(string target)
+        => WikiLinkTarget.Candidates(target).FirstOrDefault(slugs.Contains);
 }
