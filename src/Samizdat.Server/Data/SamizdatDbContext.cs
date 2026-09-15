@@ -10,6 +10,7 @@ public sealed class SamizdatDbContext(DbContextOptions<SamizdatDbContext> option
     public DbSet<ApiTokenRow> ApiTokens => Set<ApiTokenRow>();
     public DbSet<SettingRow> Settings => Set<SettingRow>();
     public DbSet<ShareLinkRow> ShareLinks => Set<ShareLinkRow>();
+    public DbSet<InviteRow> Invites => Set<InviteRow>();
 
     /// Сравнение без оглядки на регистр: Ivan и ivan — один человек. Правило стоит на колонке,
     /// поэтому его держат разом и уникальный индекс, и поиск при входе.
@@ -72,6 +73,15 @@ public sealed class SamizdatDbContext(DbContextOptions<SamizdatDbContext> option
             link.Property(row => row.Note).HasMaxLength(200);
             // Каскад: статью снесли через push --prune — её ссылки не должны пережить статью.
             link.HasOne<ArticleRow>().WithMany().HasForeignKey(row => row.Slug).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        model.Entity<InviteRow>(invite =>
+        {
+            invite.ToTable("invites");
+            invite.HasIndex(row => row.Token).IsUnique();
+            invite.Property(row => row.Token).HasMaxLength(22);
+            invite.Property(row => row.Note).HasMaxLength(200);
+            invite.Property(row => row.UsedByLogin).HasMaxLength(100);
         });
     }
 }

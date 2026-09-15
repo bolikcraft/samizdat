@@ -116,6 +116,12 @@ public static class PageEndpoints
                 var parsed = FrontMatterParser.Parse(text);
                 var body = markdown.Render(parsed.Body, slug, articles);
 
+                // Формат считается тут же, внутри сборки страницы: ключ кэша — ContentHash, а он
+                // уже считается по вложениям. Добавили картинку — надпись поедет следом.
+                var canDownload = ArticleAccess.CanDownload(row.Visibility, ArticleAccess.RoleOf(user),
+                                                            settings.Download);
+                var asZip = files.Attachments(slug).Any();
+
                 return pages.Render("article.html", new()
                 {
                     ["page_title"] = parsed.FrontMatter.Title ?? slug,
@@ -129,6 +135,8 @@ public static class PageEndpoints
                         ["date"] = parsed.FrontMatter.Date?.ToString("yyyy-MM-dd"),
                         ["html"] = body,
                         ["is_shared"] = row.Visibility == ArticleVisibility.Shared,
+                        ["download_url"] = canDownload ? $"/download/{slug}" : null,
+                        ["download_label"] = asZip ? ".zip" : ".md",
                     },
                     ["nav"] = Navigation(db, currentSlug: slug, isOwner),
                     ["backlinks"] = Backlinks(db, slug, isOwner),

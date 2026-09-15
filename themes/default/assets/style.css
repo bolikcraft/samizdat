@@ -419,6 +419,8 @@ button.is-busy::after {
   button.is-busy::after { animation: none; }
 }
 .error { color: var(--danger); }
+.login .invite-note { margin: 0; color: var(--muted); font-size: 0.9rem; }
+.login-register { margin: 0 auto; max-width: 20rem; font-size: 0.9rem; }
 
 .settings-message {
   margin: 0.6rem 0 1.25rem;
@@ -500,6 +502,11 @@ button.is-busy::after {
 .scheme-choices label:has(input:checked) { background: var(--callout); font-weight: 600; }
 /* Правило ширины для полей ввода растягивало и радиокнопку, отгоняя подпись к правому краю. */
 .scheme-choices input { width: auto; margin: 0; accent-color: var(--accent); }
+
+/* Флажок-переключатель: та же поправка, что у радиокнопок схемы — иначе общее правило
+   для .settings-form input растягивает его в подписанный прямоугольник. */
+.settings-form label.check { display: flex; flex-direction: row; align-items: center; gap: 0.5rem; cursor: pointer; }
+.settings-form label.check input { width: auto; padding: 0; margin: 0; border: none; background: none; accent-color: var(--accent); }
 
 /* Форма загрузки и текущий фон стоят рядом, пока хватает ширины. */
 .inline-form { margin: 0; }
@@ -657,6 +664,7 @@ button.is-busy::after {
 }
 .settings-table td:first-child, .settings-table th:first-child { padding-left: 0; }
 .settings-table .row-actions { text-align: right; white-space: nowrap; }
+table.pending .row-actions { display: flex; gap: 0.4rem; justify-content: flex-end; white-space: nowrap; }
 
 /* Кнопки в таблицах настроек — «Отозвать» и «Скопировать» — стоят рядом и должны быть одного
    размера. Цвет разный: отзыв необратим, копирование — нет. */
@@ -670,9 +678,26 @@ button.is-busy::after {
 /* Сохранение заметки ничего не ломает, поэтому кнопка не красная, как отзыв, а акцентная. */
 .settings-table .note-form button { color: var(--accent); border-color: var(--accent); }
 .settings-table .note-form button:hover { background: var(--accent); color: var(--bg); }
+.settings-table .approve-form button { color: var(--accent); border-color: var(--accent); }
+.settings-table .approve-form button:hover { background: var(--accent); color: var(--bg); }
+.settings-form .signup-switch { display: flex; align-items: center; gap: 0.5rem; }
+/* Ширину полю формы задают в 100%, и галка растягивалась вместе с текстовыми полями, вытесняя
+   подпись в три строки. Та же оговорка стоит у переключателей цветовой схемы. */
+.settings-form .signup-switch input { width: auto; margin: 0; accent-color: var(--accent); }
 
 .visibility-form { display: flex; align-items: center; gap: 0.75rem; margin: 1rem 0 0; }
 .visibility-state { font-family: system-ui, sans-serif; font-size: 0.9rem; color: var(--muted); }
+
+/* Ссылка, а не кнопка формы, поэтому размеры повторены руками — общее правило кнопок темы
+   на неё не распространяется. Вид второстепенный: рамка вместо заливки, как у «Удалить». */
+.download { margin: 1rem 0 0; }
+.download-link {
+  display: inline-flex; align-items: center; min-height: 2.125rem; padding: 0 1rem;
+  border: 1px solid var(--accent); border-radius: 8px;
+  color: var(--accent); text-decoration: none;
+  font-family: system-ui, sans-serif; font-size: 0.875rem; font-weight: 600; line-height: 1.2;
+}
+.download-link:hover { background: var(--accent); color: var(--bg); }
 
 .share { margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--line); }
 .share > summary {

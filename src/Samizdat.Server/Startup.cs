@@ -95,10 +95,13 @@ public static class Startup
         app.UseAuthorization();
         app.UseAntiforgery();
         app.MapAuth();
+        app.MapRegistration();
         app.MapPages().RequireAuthorization();
         app.MapShare();
+        app.MapDownload();
         app.MapApi();
         app.MapSettings();
+        app.MapSignupSettings();
     }
 
     // Настройки лежат в appsettings.xml, а не в json. Источники json убираем и ставим xml на их

@@ -1,0 +1,15 @@
+{{~## Форма одна на оба пути: по приглашению и по открытой записи. Разница — в адресе отправки
+и в заметке приглашения над полями. ##~}}
+<form class="login" method="post" action="{{ action | html.escape }}">
+  {{ antiforgery }}
+  <h1>Регистрация</h1>
+  {{ if note }}<p class="invite-note">Приглашение: {{ note | html.escape }}</p>{{ end }}
+  {{ if error }}<p class="error">{{ error | html.escape }}</p>{{ end }}
+  <label>Логин <input name="login" value="{{ login | html.escape }}" maxlength="100" autofocus
+                      autocomplete="username" required></label>
+  <label>Пароль <input type="password" name="password" autocomplete="new-password"
+                       minlength="8" required></label>
+  <label>Повтор <input type="password" name="repeat" autocomplete="new-password"
+                       minlength="8" required></label>
+  <button type="submit">Завести учётку</button>
+</form>

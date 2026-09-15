@@ -51,6 +51,8 @@ public class PeopleTests : IDisposable
         Assert.DoesNotContain("/settings/appearance", html);
         Assert.DoesNotContain("/settings/background", html);
         Assert.DoesNotContain("/settings/tokens", html);
+        Assert.DoesNotContain("/settings/signup", html);
+        Assert.DoesNotContain("/settings/invites", html);
     }
 
     [Fact]
@@ -67,6 +69,8 @@ public class PeopleTests : IDisposable
         Assert.Contains("/settings/people", html);
         Assert.Contains("/settings/appearance", html);
         Assert.Contains("Пользователи", html);
+        Assert.Contains("/settings/invites", html);
+        Assert.Contains("Регистрация", html);
     }
 
     [Fact]
@@ -213,6 +217,22 @@ public class PeopleTests : IDisposable
         var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
         Assert.Empty(db.Users.Where(row => row.Login == "ivan"));
         Assert.Empty(db.ApiTokens.Where(row => row.UserId == ivan));
+    }
+
+    // Ждущего эта кнопка не должна снести в обход очереди: его место — раздел «Регистрация».
+    [Fact]
+    public async Task A_pending_person_is_not_deleted_from_the_people_table()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        AddPerson(factory, "hozyain", "parol", UserRole.Owner);
+        var gost = AddPendingPerson(factory, "gost");
+
+        var owner = await Login(factory, "hozyain", "parol");
+        var answer = await Post(owner, $"/settings/people/{gost}/delete", []);
+
+        Assert.Equal("/settings?err=not_pending#signup", answer.Headers.Location?.ToString());
+        Assert.Contains(Users(factory), row => row.Login == "gost");
     }
 
     [Fact]
@@ -429,6 +449,20 @@ public class PeopleTests : IDisposable
         {
             Login = login, PasswordHash = PasswordHasher.Hash(password), Role = role,
             CreatedAt = DateTimeOffset.UtcNow,
+        };
+        db.Users.Add(person);
+        db.SaveChanges();
+        return person.Id;
+    }
+
+    static int AddPendingPerson(WebApplicationFactory<Program> factory, string login)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+        var person = new UserRow
+        {
+            Login = login, PasswordHash = PasswordHasher.Hash("parol-gostya"), Role = UserRole.Reader,
+            CreatedAt = DateTimeOffset.UtcNow, ApprovedAt = null,
         };
         db.Users.Add(person);
         db.SaveChanges();

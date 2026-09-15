@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Samizdat.Server.Data;
@@ -11,9 +12,11 @@ using Samizdat.Server.Data;
 namespace Samizdat.Server.Data.Migrations
 {
     [DbContext(typeof(SamizdatDbContext))]
-    partial class SamizdatDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260915062738_Registration")]
+    partial class Registration
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -57,23 +60,6 @@ namespace Samizdat.Server.Data.Migrations
                     b.ToTable("api_tokens", (string)null);
                 });
 
-            modelBuilder.Entity("Samizdat.Server.Data.ArticleLinkRow", b =>
-                {
-                    b.Property<string>("FromSlug")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<string>("ToSlug")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.HasKey("FromSlug", "ToSlug");
-
-                    b.HasIndex("ToSlug");
-
-                    b.ToTable("article_links", (string)null);
-                });
-
             modelBuilder.Entity("Samizdat.Server.Data.ArticleRow", b =>
                 {
                     b.Property<string>("Slug")
@@ -96,14 +82,6 @@ namespace Samizdat.Server.Data.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)")
                         .HasDefaultValue("");
-
-                    b.Property<string>("IndexedHash")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("SearchText")
-                        .IsRequired()
-                        .HasColumnType("text");
 
                     b.Property<string>("Theme")
                         .HasColumnType("text");
@@ -275,15 +253,6 @@ namespace Samizdat.Server.Data.Migrations
                     b.HasOne("Samizdat.Server.Data.UserRow", null)
                         .WithMany()
                         .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("Samizdat.Server.Data.ArticleLinkRow", b =>
-                {
-                    b.HasOne("Samizdat.Server.Data.ArticleRow", null)
-                        .WithMany()
-                        .HasForeignKey("FromSlug")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

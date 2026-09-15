@@ -10,10 +10,12 @@ public sealed class ArticleFiles(string dataRoot)
     public static bool IsValidSlug(string slug)
         => slug.Length > 0 && slug == Path.GetFileName(slug) && !slug.StartsWith('.');
 
-    // Первый сегмент маршрутов, у которых есть литеральный обработчик GET: там статья с таким
-    // именем была бы недоступна. Регистр не важен — маршруты его не различают.
+    // Первый сегмент адресов сайта: статья с таким именем была бы недоступна за своим адресом.
+    // Имя занимают и наперёд, до появления самого маршрута. Регистр не важен — маршруты его
+    // не различают.
     static readonly HashSet<string> ReservedSlugs =
-        new(["s", "login", "settings", "assets", "background", "visibility", "share", "search"],
+        new(["s", "i", "login", "register", "settings", "assets", "background", "visibility",
+             "share", "download", "search"],
             StringComparer.OrdinalIgnoreCase);
 
     public static bool IsReservedSlug(string slug) => ReservedSlugs.Contains(slug);
@@ -35,6 +37,29 @@ public sealed class ArticleFiles(string dataRoot)
     public bool MarkdownExists(string slug)
         => IsValidSlug(slug) && File.Exists(Path.Combine(Folder(slug), "index.md"));
 
+    /// Байты файла как есть — для владельца, который качает копию своей заметки. ReadAllText съел бы
+    /// BOM, и «байт в байт» перестало бы быть правдой.
+    public byte[]? ReadMarkdownBytes(string slug)
+    {
+        if (!IsValidSlug(slug)) return null;
+        var file = Path.Combine(Folder(slug), "index.md");
+        return File.Exists(file) ? File.ReadAllBytes(file) : null;
+    }
+
+    /// Вложения статьи по алфавиту: имя и полный путь. Каждое имя проходит через AttachmentPath,
+    /// поэтому index.md сюда не попадает, а симлинк наружу отсеивается.
+    public IEnumerable<(string Name, string FullPath)> Attachments(string slug)
+    {
+        var folder = Folder(slug);
+        if (!IsValidSlug(slug) || !Directory.Exists(folder)) yield break;
+
+        foreach (var file in Directory.EnumerateFiles(folder).Order(StringComparer.Ordinal))
+        {
+            var name = Path.GetFileName(file);
+            if (AttachmentPath(slug, name) is { } full) yield return (name, full);
+        }
+    }
+
     /// null, если имя выводит за каталог статьи — текстом или через симлинк на чужой файл.
     public string? AttachmentPath(string slug, string name)
     {
@@ -42,7 +67,8 @@ public sealed class ArticleFiles(string dataRoot)
         // Вложения лежат в папке статьи плоско. Имя с каталогом отвергаем целиком: Path.GetFullPath
         // не разворачивает симлинк каталога, и "d/tayna.txt" увёл бы за пределы папки.
         if (name != Path.GetFileName(name)) return null;
-        // Исходник статьи отдаёт только /api: у гостя иначе утечёт фронтматтер.
+        // index.md отдают /api и /download своими путями с пересборкой шапки, а не этот метод:
+        // как вложение он ушёл бы как есть, и чужой фронтматтер утёк бы читателю.
         if (name.Equals("index.md", StringComparison.OrdinalIgnoreCase)) return null;
 
         var folder = Path.GetFullPath(Folder(slug)) + Path.DirectorySeparatorChar;

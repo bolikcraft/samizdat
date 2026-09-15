@@ -35,11 +35,13 @@ public static class SessionCookie
         if (login is not null && stamp is not null)
         {
             var db = context.HttpContext.RequestServices.GetRequiredService<SamizdatDbContext>();
+            // ApprovedAt едет тем же запросом, что и метка: лишнего обращения к базе это не стоит,
+            // а ждущий не пройдёт даже с подделанной cookie.
             var current = await db.Users.AsNoTracking()
                 .Where(row => row.Login == login)
-                .Select(row => row.SessionStamp)
+                .Select(row => new { row.SessionStamp, row.ApprovedAt })
                 .FirstOrDefaultAsync();
-            if (current == stamp) return;
+            if (current is not null && current.SessionStamp == stamp && current.ApprovedAt is not null) return;
         }
 
         context.RejectPrincipal();

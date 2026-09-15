@@ -8,14 +8,12 @@ using Samizdat.Server.Auth;
 using Samizdat.Server.Data;
 using Samizdat.Server.Rendering;
 using Samizdat.Server.Storage;
+using static Samizdat.Server.Endpoints.SettingsPage;
 
 namespace Samizdat.Server.Endpoints;
 
 public static class SettingsEndpoints
 {
-    /// Одна мера на все три места, где заводят пароль: свой, чужой и пароль нового человека.
-    const int MinPasswordLength = 8;
-
     const long MaxBackgroundBytes = 8 * 1024 * 1024;
 
     // Многочастная форма добавляет к файлу границы и заголовки полей — запас с лихвой их перекрывает.
@@ -72,7 +70,10 @@ public static class SettingsEndpoints
             }
 
             List<Dictionary<string, object?>> people = isOwner
-                ? db.Users.OrderBy(row => row.Login).ToList().Select(row => new Dictionary<string, object?>
+                // Ждущие сюда не попадают: они живут в очереди раздела «Регистрация», пока
+                // владелец не решит. Кнопки этого списка им не подходят.
+                ? db.Users.Where(row => row.ApprovedAt != null).OrderBy(row => row.Login).ToList()
+                    .Select(row => new Dictionary<string, object?>
                 {
                     ["id"] = row.Id,
                     ["login"] = row.Login,
@@ -97,6 +98,11 @@ public static class SettingsEndpoints
                 ["message_section"] = (err ?? ok) is { } code ? SectionOf(code) : null,
                 ["color_scheme"] = settings.ColorScheme,
                 ["background"] = BackgroundModel(settings, background, BackgroundCatalog.Read(theme)),
+                ["download"] = new Dictionary<string, object?>
+                {
+                    ["readers"] = settings.Download.Readers,
+                    ["guests"] = settings.Download.Guests,
+                },
                 ["themes"] = themes.AvailableThemes().Select(name => new Dictionary<string, object?>
                 {
                     ["name"] = name,
@@ -112,6 +118,7 @@ public static class SettingsEndpoints
                 }).ToList(),
                 ["links"] = links,
                 ["people"] = people,
+                ["signup"] = isOwner ? SignupSettingsEndpoints.Model(db, settings, context) : null,
             }), "text/html; charset=utf-8");
         });
 
@@ -147,6 +154,18 @@ public static class SettingsEndpoints
             if (colorScheme is "light" or "dark" or "system") settings.Set("theme.color_scheme", colorScheme);
 
             return Ok("appearance");
+        }).RequireValidToken().OwnerOnly();
+
+        group.MapPost("/articles", async (HttpContext context, SiteSettings settings) =>
+        {
+            var form = await context.Request.ReadFormAsync();
+
+            // Снятый флажок форма не присылает вовсе, поэтому пишем обе настройки разом,
+            // а не только те, что пришли: иначе выключить скачивание было бы нечем.
+            settings.Set("articles.download.readers", form["readers"].ToString() == "on" ? "on" : "");
+            settings.Set("articles.download.guests", form["guests"].ToString() == "on" ? "on" : "");
+
+            return Ok("articles");
         }).RequireValidToken().OwnerOnly();
 
         group.MapPost("/background", [RequestSizeLimit(MaxBackgroundRequestBytes)]
@@ -291,7 +310,7 @@ public static class SettingsEndpoints
             var login = form["login"].ToString().Trim();
             var password = form["password"].ToString();
 
-            if (login.Length == 0 || login.Length > 100) return Err("bad_person");
+            if (login.Length == 0 || login.Length > MaxLoginLength) return Err("bad_person");
             if (password.Length < MinPasswordLength) return Err("person_short_password");
 
             db.Users.Add(new UserRow
@@ -346,6 +365,10 @@ public static class SettingsEndpoints
             var person = db.Users.Find(id);
             if (person is null) return Results.NotFound();
 
+            // Ждущего эта кнопка не трогает: его разбирают в разделе «Регистрация», в обход
+            // очереди тут его снести нельзя.
+            if (person.ApprovedAt is null) return Err("not_pending");
+
             // Последнего владельца удалять нельзя: сайт остался бы без входа в настройки,
             // и поднять его можно было бы только командой в консоли.
             if (person.Role == UserRole.Owner && db.Users.Count(row => row.Role == UserRole.Owner) == 1)
@@ -369,32 +392,6 @@ public static class SettingsEndpoints
             return Ok("link_revoked");
         }).RequireValidToken().OwnerOnly();
     }
-
-    /// Маршрут только для владельца. Роль стоит на маршрутах, а не на группе: читателю нужен
-    /// вход в настройки ради своего пароля.
-    static RouteHandlerBuilder OwnerOnly(this RouteHandlerBuilder builder)
-        => builder.RequireAuthorization(policy => policy.RequireRole(nameof(UserRole.Owner)));
-
-    /// Возврат на страницу настроек с итогом действия: код итога в адресе, раздел — в якоре.
-    // Якорем страница выбирает раздел: без него открылся бы первый, а не тот, где нажали кнопку.
-    static IResult Ok(string code) => Results.Redirect($"/settings?ok={code}#{SectionOf(code)}");
-    static IResult Err(string code) => Results.Redirect($"/settings?err={code}#{SectionOf(code)}");
-
-    /// Раздел, которому принадлежит итог действия.
-    // Разделы переключаются якорем, без перезагрузки, поэтому сообщение стоит внутри своего
-    // раздела: одно общее над разделами оставалось висеть над чужой формой. Якорь возврата и
-    // место сообщения берутся отсюда оба — иначе сообщение попадало бы в скрытый раздел.
-    // Незнакомый код уходит в первый раздел: его же показывает страница без якоря.
-    static string SectionOf(string code) => code switch
-    {
-        "password" or "wrong_password" or "short_password" or "password_mismatch" => "security",
-        "token_created" or "token_note" or "token_revoked" => "tokens",
-        "link_revoked" => "links",
-        "person_added" or "person_password" or "person_deleted" => "people",
-        "bad_person" or "person_short_password" or "login_taken" => "people",
-        "last_owner" or "self_delete" or "other_owner" or "own_password" => "people",
-        _ => "appearance",
-    };
 
     /// Отсеивает слишком большое тело по Content-Length, ничего не читая.
     // Обязан стоять до RequireValidToken: тот ради токена читает многочастную форму сам, Kestrel
@@ -449,45 +446,4 @@ public static class SettingsEndpoints
         };
     }
 
-    /// null — человека в базе уже нет: его удалили, пока запрос шёл. Следующий запрос он же
-    /// и последний: проверка cookie погасит сессию.
-    static UserRow? CurrentUser(SamizdatDbContext db, ClaimsPrincipal user)
-        => db.Users.FirstOrDefault(row => row.Login == user.Identity!.Name);
-
-    static IResult LoggedOut() => Results.Redirect("/login");
-
-    static string? Message(string? ok, string? err) => err switch
-    {
-        "wrong_password" => "Неверный текущий пароль.",
-        "short_password" => $"Новый пароль должен быть не короче {MinPasswordLength} символов.",
-        "password_mismatch" => "Новый пароль и повтор не совпадают.",
-        "background_missing" => "Файл не выбран.",
-        "background_type" => "Это не картинка. Подойдёт jpeg, png или webp.",
-        "background_too_big" => "Картинка больше 8 МБ.",
-        "background_unknown" => "Такого фона нет в наборе темы.",
-        "bad_person" => "Логин не должен быть пустым.",
-        "person_short_password" => $"Пароль должен быть не короче {MinPasswordLength} символов.",
-        "login_taken" => "Такой логин уже занят.",
-        "last_owner" => "Это последний владелец, его нельзя удалить.",
-        "self_delete" => "Себя удалить нельзя.",
-        "other_owner" => "Другого владельца менять нельзя.",
-        "own_password" => "Свой пароль меняйте в разделе «Пароль»: там спрашивают текущий.",
-        not null => "Не удалось выполнить действие.",
-        null => ok switch
-        {
-            "password" => "Пароль изменён.",
-            "appearance" => "Настройки внешнего вида сохранены.",
-            "token_created" => "Токен создан.",
-            "token_note" => "Заметка сохранена.",
-            "token_revoked" => "Токен отозван.",
-            "link_revoked" => "Ссылка отозвана.",
-            "person_added" => "Пользователь заведён.",
-            "person_password" => "Пароль изменён.",
-            "person_deleted" => "Пользователь удалён.",
-            "background" => "Фон выбран.",
-            "background_color" => "Цвет фона выбран.",
-            "background_removed" => "Фон убран.",
-            _ => null,
-        },
-    };
 }

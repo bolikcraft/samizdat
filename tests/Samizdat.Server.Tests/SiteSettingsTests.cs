@@ -289,6 +289,45 @@ public class SiteSettingsTests : IDisposable
         Assert.NotEqual(first, settings.BackgroundUrl);
     }
 
+    [Fact]
+    public void Downloading_is_off_until_it_is_switched_on()
+    {
+        var factory = StartFactory();
+        using var scope = factory.Services.CreateScope();
+        var settings = scope.ServiceProvider.GetRequiredService<SiteSettings>();
+
+        Assert.Equal(new DownloadPolicy(false, false), settings.Download);
+    }
+
+    [Fact]
+    public void The_switches_are_read_back_from_the_database()
+    {
+        var factory = StartFactory();
+        SetSetting(factory, "articles.download.readers", "on");
+        SetSetting(factory, "articles.download.guests", "on");
+
+        using var scope = factory.Services.CreateScope();
+        var settings = scope.ServiceProvider.GetRequiredService<SiteSettings>();
+
+        Assert.Equal(new DownloadPolicy(true, true), settings.Download);
+    }
+
+    [Fact]
+    public void View_fingerprint_changes_with_the_download_switches()
+    {
+        var factory = StartFactory();
+        using var scope = factory.Services.CreateScope();
+        var settings = scope.ServiceProvider.GetRequiredService<SiteSettings>();
+
+        var before = settings.ViewFingerprint;
+        settings.Set("articles.download.readers", "on");
+        var afterReaders = settings.ViewFingerprint;
+        settings.Set("articles.download.guests", "on");
+
+        Assert.NotEqual(before, afterReaders);
+        Assert.NotEqual(afterReaders, settings.ViewFingerprint);
+    }
+
     static byte[] Jpeg() => [0xFF, 0xD8, 0xFF, 0xE0, 1, 2, 3, 4];
 
     sealed class CapturingLoggerProvider : ILoggerProvider

@@ -25,11 +25,11 @@ public static class ShareEndpoints
             context.Response.Headers.CacheControl = "no-store";
 
             var link = db.ShareLinks.FirstOrDefault(row => row.Token == token);
-            if (link is null) return NotFound(pages, settings);
-            if (!link.IsAlive(DateTimeOffset.UtcNow)) return Expired(pages, settings);
+            if (link is null) return GuestPages.NotFound(pages, settings);
+            if (!link.IsAlive(DateTimeOffset.UtcNow)) return GuestPages.Gone(pages, settings);
 
             var row = db.Articles.Find(link.Slug);
-            if (row is null || !files.MarkdownExists(link.Slug)) return NotFound(pages, settings);
+            if (row is null || !files.MarkdownExists(link.Slug)) return GuestPages.NotFound(pages, settings);
 
             // Видимость ссылке не указ: она про пользователей сайта, а ссылка — про постороннего,
             // и живёт своим сроком. Передумал — отзови её кнопкой.
@@ -44,6 +44,7 @@ public static class ShareEndpoints
             {
                 var text = files.ReadMarkdown(link.Slug)!;
                 var parsed = FrontMatterParser.Parse(text);
+                var asZip = files.Attachments(link.Slug).Any();
 
                 return pages.Render("article.html", new()
                 {
@@ -59,6 +60,10 @@ public static class ShareEndpoints
                         ["date"] = parsed.FrontMatter.Date?.ToString("yyyy-MM-dd"),
                         // NoArticles: любая вики-ссылка станет текстом, чужие slug не утекают.
                         ["html"] = markdown.Render(parsed.Body, link.Slug, NoArticles.Instance, AttachmentBase),
+                        ["download_url"] = ArticleAccess.CanDownloadByShare(settings.Download)
+                            ? DownloadUrl
+                            : null,
+                        ["download_label"] = asZip ? ".zip" : ".md",
                     },
                     // Гостю делиться нечем: ссылка у него уже есть, панель на его странице пуста.
                     ["share_panel"] = "",
@@ -73,7 +78,9 @@ public static class ShareEndpoints
                     .SetProperty(row => row.OpenedCount, row => row.OpenedCount + 1)
                     .SetProperty(row => row.LastOpenedAt, now));
 
-            return Results.Content(html.Replace(AttachmentBase, $"/s/{token}/"), "text/html; charset=utf-8");
+            return Results.Content(html.Replace(AttachmentBase, $"/s/{token}/")
+                                       .Replace(DownloadUrl, $"/download/s/{token}"),
+                                   "text/html; charset=utf-8");
         }).AllowAnonymous();
 
         // Счётчик открытий тут не трогаем: статья с тремя картинками дала бы четыре открытия.
@@ -196,19 +203,7 @@ public static class ShareEndpoints
     // Base вложений в кэшированном html — плейсхолдер: html один на статью, а токен у каждой ссылки свой.
     internal const string AttachmentBase = "__SHARE_BASE__/";
 
-    static IResult NotFound(PageRenderer pages, SiteSettings settings)
-        => Results.Content(pages.Render("404.html", new()
-        {
-            ["page_title"] = "Не найдено",
-            ["site"] = PageEndpoints.SiteModel(settings),
-            ["noindex"] = true,
-        }), "text/html; charset=utf-8", statusCode: 404);
-
-    static IResult Expired(PageRenderer pages, SiteSettings settings)
-        => Results.Content(pages.Render("share-expired.html", new()
-        {
-            ["page_title"] = "Ссылка не работает",
-            ["site"] = PageEndpoints.SiteModel(settings),
-            ["noindex"] = true,
-        }), "text/html; charset=utf-8", statusCode: 410);
+    // Адрес скачивания в кэшированном html — тоже плейсхолдер: html один на статью, а токен
+    // у каждой ссылки свой.
+    internal const string DownloadUrl = "__SHARE_DOWNLOAD__";
 }

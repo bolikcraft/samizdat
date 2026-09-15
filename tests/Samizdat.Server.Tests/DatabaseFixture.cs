@@ -26,7 +26,7 @@ public sealed class DatabaseFixture : IAsyncLifetime
     {
         using var db = CreateContext();
         db.Database.ExecuteSqlRaw(
-            "TRUNCATE TABLE articles, article_links, users, api_tokens, site_settings, share_links "
+            "TRUNCATE TABLE articles, article_links, users, api_tokens, site_settings, share_links, invites "
             + "RESTART IDENTITY CASCADE");
     }
 

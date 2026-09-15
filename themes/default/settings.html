@@ -112,6 +112,23 @@
 </section>
 {{~ end ~}}
 
+{{~ if user && user.is_owner ~}}
+<section class="settings-pane" id="articles">
+  <h2>Статьи</h2>
+  {{ if message_section == "articles" }}{{ message_block }}{{ end }}
+  <p class="hint">Кнопка «Скачать» под статьёй отдаёт её исходник в markdown. У пользователя и
+    гостя в шапке файла остаются только заголовок, описание и дата. Вы скачиваете статью всегда.</p>
+  <form method="post" action="/settings/articles" class="settings-form">
+    {{ antiforgery }}
+    <label class="check"><input type="checkbox" name="readers" value="on"{{ if download.readers }} checked{{ end }}>
+      Пользователи могут скачивать открытые им статьи</label>
+    <label class="check"><input type="checkbox" name="guests" value="on"{{ if download.guests }} checked{{ end }}>
+      Гости могут скачивать статью по ссылке «Поделиться»</label>
+    <button type="submit">Сохранить</button>
+  </form>
+</section>
+{{~ end ~}}
+
 <section class="settings-pane" id="security">
   <h2>Пароль</h2>
   {{ if message_section == "security" }}{{ message_block }}{{ end }}
@@ -168,6 +185,119 @@
     {{ end }}
     </tbody>
   </table>
+  </div>
+</section>
+{{~ end ~}}
+
+{{~ if user && user.is_owner ~}}
+<section class="settings-pane" id="signup">
+  <h2>Регистрация</h2>
+  {{ if message_section == "signup" }}{{ message_block }}{{ end }}
+
+  <div class="settings-block">
+    <h3>Открытая регистрация</h3>
+    <p class="hint">Пока выключена, завести учётку можно только по приглашению. Когда включена,
+      на странице входа появляется кнопка «Зарегистрироваться», а записавшиеся встают в очередь:
+      пускаете их вы.</p>
+    <form method="post" action="/settings/signup/open" class="settings-form">
+      {{ antiforgery }}
+      <label class="signup-switch">
+        <input type="checkbox" name="open"{{ if signup.open }} checked{{ end }}>
+        Разрешить записываться самостоятельно
+      </label>
+      <button type="submit">Сохранить</button>
+    </form>
+  </div>
+
+  <div class="settings-block">
+    <h3>Очередь заявок</h3>
+    {{ if signup.pending.size > 0 }}
+    <div class="table-scroll">
+    <table class="pending settings-table">
+      <thead><tr><th>Логин</th><th>Подана</th><th></th></tr></thead>
+      <tbody>
+      {{ for person in signup.pending }}
+      <tr>
+        <td>{{ person.login | html.escape }}</td>
+        <td>{{ person.created_at | html.escape }}</td>
+        <td class="row-actions">
+          <form method="post" action="/settings/signup/{{ person.id }}/approve" class="inline-form approve-form">
+            {{ antiforgery }}
+            <button type="submit">Пустить</button>
+          </form>
+          <form method="post" action="/settings/signup/{{ person.id }}/reject" class="inline-form">
+            {{ antiforgery }}
+            <button type="submit">Отказать</button>
+          </form>
+        </td>
+      </tr>
+      {{ end }}
+      </tbody>
+    </table>
+    </div>
+    {{ else }}
+    <p class="empty">Заявок нет.</p>
+    {{ end }}
+  </div>
+
+  <div class="settings-block">
+    <h3>Приглашения</h3>
+    <p class="hint">Ссылка срабатывает один раз: кто перешёл первым, тот и завёл учётку
+      читателя. Дальше она не работает и остаётся в списке следом. Заметку увидит тот, кому
+      отдали ссылку: она печатается в форме как «Приглашение: …».</p>
+    <form method="post" action="/settings/invites" class="settings-form">
+      {{ antiforgery }}
+      <label>Срок
+        <select name="days">
+          <option value="1">День</option>
+          <option value="7" selected>Неделя</option>
+          <option value="30">Месяц</option>
+          <option value="0">Без срока</option>
+        </select>
+      </label>
+      <label>Кому <input type="text" name="note" maxlength="200" autocomplete="off"
+                         placeholder="кому отдаёте ссылку"></label>
+      <button type="submit">Создать приглашение</button>
+    </form>
+    {{ if signup.invites.size > 0 }}
+    <div class="table-scroll">
+    <table class="invites settings-table">
+      <thead><tr><th>Ссылка</th><th>Кому</th><th>Состояние</th><th></th></tr></thead>
+      <tbody>
+      {{ for invite in signup.invites }}
+      <tr{{ if !invite.alive && !invite.used_at }} class="dead-link"{{ end }}>
+        <td>
+          <div class="link-cell">
+            <input class="link-url" type="text" readonly value="{{ invite.url | html.escape }}">
+            <button type="button" class="copy-link" data-url="{{ invite.url | html.escape }}">Скопировать</button>
+          </div>
+        </td>
+        <td>{{ if invite.note }}{{ invite.note | html.escape }}{{ else }}—{{ end }}</td>
+        <td>
+          {{~ if invite.used_at ~}}
+          завёл {{ invite.used_by | html.escape }}, {{ invite.used_at | html.escape }}
+          {{~ else if invite.alive ~}}
+          {{ if invite.expires_at }}до {{ invite.expires_at | html.escape }}{{ else }}без срока{{ end }}
+          {{~ else ~}}
+          не работает
+          {{~ end ~}}
+        </td>
+        <td class="row-actions">
+          {{ if invite.alive }}
+          <form method="post" action="/settings/invites/{{ invite.id }}/revoke" class="inline-form">
+            {{ antiforgery }}
+            <button type="submit">Отозвать</button>
+          </form>
+          {{ end }}
+        </td>
+      </tr>
+      {{ end }}
+      </tbody>
+    </table>
+    </div>
+    {{ else }}
+    <p class="empty">Приглашений пока нет.</p>
+    {{ end }}
   </div>
 </section>
 {{~ end ~}}

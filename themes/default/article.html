@@ -18,6 +18,11 @@
   {{ end }}
 </form>
 {{ end }}
+{{ if article.download_url }}
+<p class="download">
+  <a class="download-link" href="{{ article.download_url | html.escape }}" download>Скачать {{ article.download_label }}</a>
+</p>
+{{ end }}
 {{~## У гостевой страницы ключа backlinks в модели нет вовсе — проверка нужна, иначе рендер упадёт. ##~}}
 {{ if backlinks && (backlinks | array.size) > 0 }}
 <section class="backlinks">
