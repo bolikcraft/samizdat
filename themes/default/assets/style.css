@@ -771,3 +771,8 @@ button.is-busy::after {
   font: inherit; font-size: 0.85rem; color: var(--fg);
   background: var(--bg); border: 1px solid var(--line); border-radius: 8px;
 }
+
+.backlinks { margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--line); }
+.backlinks h2 { margin: 0 0 0.5rem; font-size: 1rem; color: var(--muted); }
+.backlinks ul { list-style: none; margin: 0; padding: 0; }
+.backlinks li { margin: 0.2rem 0; }

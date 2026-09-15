@@ -131,6 +131,7 @@ public static class PageEndpoints
                         ["is_shared"] = row.Visibility == ArticleVisibility.Shared,
                     },
                     ["nav"] = Navigation(db, currentSlug: slug, isOwner),
+                    ["backlinks"] = Backlinks(db, slug, isOwner),
                     ["user"] = UserModel(user),
                     // Плейсхолдер, не настоящий токен: страница кэшируется по slug и общая для всех
                     // гостей, а токен привязан к cookie конкретной сессии — см. Replace ниже.
@@ -244,6 +245,24 @@ public static class PageEndpoints
         ["login"] = user.Identity!.Name,
         ["is_owner"] = ArticleAccess.IsOwner(user),
     };
+
+    /// Кто ссылается на эту статью. Блок лежит внутри кэша страницы: он меняется только при
+    /// выкладке или удалении другой статьи, а это уже меняет отпечаток каталога.
+    static List<Dictionary<string, object?>> Backlinks(SamizdatDbContext db, string slug, bool isOwner)
+        => db.ArticleLinks
+            .Where(link => link.ToSlug == slug && link.FromSlug != slug)
+            .Join(db.Articles, link => link.FromSlug, article => article.Slug, (_, article) => article)
+            .OrderBy(article => article.Title)
+            .Select(article => new { article.Slug, article.Title, article.Visibility })
+            .ToList()
+            .Select(article => new Dictionary<string, object?>
+            {
+                ["slug"] = article.Slug,
+                ["title"] = article.Title,
+                // Закрытый источник читателю — строка без ссылки, как такая статья выглядит в дереве.
+                ["as_link"] = isOwner || article.Visibility == ArticleVisibility.Shared,
+            })
+            .ToList();
 
     internal static Dictionary<string, object?> Navigation(SamizdatDbContext db, string? currentSlug,
                                                            bool isOwner = true)

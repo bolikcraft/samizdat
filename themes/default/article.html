@@ -18,6 +18,17 @@
   {{ end }}
 </form>
 {{ end }}
+{{~## У гостевой страницы ключа backlinks в модели нет вовсе — проверка нужна, иначе рендер упадёт. ##~}}
+{{ if backlinks && (backlinks | array.size) > 0 }}
+<section class="backlinks">
+  <h2>Упоминается в</h2>
+  <ul>
+  {{ for link in backlinks }}
+    <li>{{ if link.as_link }}<a href="/{{ link.slug | html.escape }}">{{ link.title | html.escape }}</a>{{ else }}<span class="nav-closed">{{ link.title | html.escape }}</span>{{ end }}</li>
+  {{ end }}
+  </ul>
+</section>
+{{ end }}
 {{~## Блок «Поделиться» приходит готовым html: страница лежит в кэше, а ссылка меняется без
 правки статьи. Рисует его SharePanel при каждой отдаче. ##~}}
 {{ share_panel }}
