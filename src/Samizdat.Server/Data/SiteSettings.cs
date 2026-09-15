@@ -14,6 +14,10 @@ public sealed class SiteSettings(SamizdatDbContext db, IConfiguration configurat
     public string ThemeName => Get("theme.name", configuration["Samizdat:Theme"] ?? "default");
     public string ColorScheme => Get("theme.color_scheme", configuration["Samizdat:ColorScheme"] ?? "system");
 
+    /// Открытая регистрация. По умолчанию выключена: сайт личный, и пускать к нему кого попало
+    /// владелец должен решить сам.
+    public bool OpenRegistration => Get("auth.open_registration", "false") == "true";
+
     /// Одна настройка на все виды фона: пусто — фона нет, `preset:` — картинка из набора темы,
     /// `color:` — цвет из палитры, всё остальное — имя загруженного файла (так писала первая версия).
     public BackgroundChoice Background => Parse(Get("theme.background", ""));
