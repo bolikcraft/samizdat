@@ -1,7 +1,11 @@
+using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Samizdat.Server.Auth;
 using Samizdat.Server.Data;
+using Samizdat.Server.Search;
+using Samizdat.Server.Storage;
 
 namespace Samizdat.Server.Tests;
 
@@ -152,5 +156,60 @@ public class BacklinkTests(DatabaseFixture database) : IDisposable
         var html = await factory.CreateClient().GetStringAsync($"/s/{token}");
 
         Assert.DoesNotContain("Упоминается в", html);
+    }
+
+    [Fact]
+    public async Task Reindex_takes_the_stale_mention_out_of_the_cache()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        var api = TestPublisher.ClientWithToken(factory);
+        (await TestPublisher.Push(api, "proxmox", "---\ntitle: Proxmox\n---\n\nтекст")).EnsureSuccessStatusCode();
+        (await TestPublisher.Push(api, "dom", "---\ntitle: Дом\n---\n\nстоит [[proxmox]]")).EnsureSuccessStatusCode();
+
+        var client = await TestLogin.AsOwner(factory);
+        Assert.Contains("Упоминается в", await client.GetStringAsync("/proxmox"));
+
+        // Правка мимо PUT: ContentHash в базе не трогаем, поэтому без force reindex её не заметит.
+        var file = Path.Combine(dataRoot, "articles", "dom", "index.md");
+        File.WriteAllText(file, "---\ntitle: Дом\n---\n\nтекст без ссылки");
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var files = scope.ServiceProvider.GetRequiredService<ArticleFiles>();
+            var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+            IndexBackfill.Run(factory.Services, files, logger, force: true);
+        }
+
+        Assert.DoesNotContain("Упоминается в", await client.GetStringAsync("/proxmox"));
+    }
+
+    [Fact]
+    public async Task Source_with_several_forms_of_the_link_appears_once()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        var api = TestPublisher.ClientWithToken(factory);
+        (await TestPublisher.Push(api, "proxmox", "---\ntitle: Proxmox\n---\n\nтекст")).EnsureSuccessStatusCode();
+        (await TestPublisher.Push(api, "zametka-pro-proxmox", "---\ntitle: Заметка про Proxmox\n---\n\nтекст"))
+            .EnsureSuccessStatusCode();
+        (await TestPublisher.Push(api, "dom",
+            "---\ntitle: Дом\n---\n\nсм. [[proxmox]], [[Proxmox]] и [[Заметка про Proxmox]]"))
+            .EnsureSuccessStatusCode();
+
+        var client = await TestLogin.AsOwner(factory);
+        var html = await client.GetStringAsync("/proxmox");
+
+        var section = BacklinksSection(html);
+        Assert.Single(Regex.Matches(section, "Дом"));
+    }
+
+    // Заголовок статьи-источника есть ещё и в дереве навигации — искать нужно строго в блоке.
+    static string BacklinksSection(string html)
+    {
+        var start = html.IndexOf("<section class=\"backlinks\">", StringComparison.Ordinal);
+        Assert.True(start >= 0, "Блока «Упоминается в» нет на странице");
+        var end = html.IndexOf("</section>", start, StringComparison.Ordinal);
+        return html[start..end];
     }
 }

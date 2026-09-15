@@ -30,6 +30,16 @@ public static class IndexBackfill
             else failed++;
         }
 
+        // Reindex — отдельный процесс: сервер узнаёт о переписанных ссылках только из базы.
+        // Метка входит в CatalogFingerprint, иначе закэшированный блок «Упоминается в» не заметит,
+        // что кто-то поправил статью мимо PUT.
+        if (done > 0)
+        {
+            using var scope = services.CreateScope();
+            scope.ServiceProvider.GetRequiredService<SiteSettings>()
+                .Set("index.stamp", DateTimeOffset.UtcNow.Ticks.ToString());
+        }
+
         return new IndexBackfillResult(done, failed);
     }
 

@@ -246,8 +246,9 @@ public static class PageEndpoints
         ["is_owner"] = ArticleAccess.IsOwner(user),
     };
 
-    /// Кто ссылается на эту статью. Блок лежит внутри кэша страницы: он меняется только при
-    /// выкладке или удалении другой статьи, а это уже меняет отпечаток каталога.
+    /// Кто ссылается на эту статью. Блок лежит внутри кэша страницы и обновляется вместе с
+    /// отпечатком каталога: тот меняется при выкладке или удалении статьи, а также после reindex —
+    /// у CatalogFingerprint для этого своя метка в настройках.
     static List<Dictionary<string, object?>> Backlinks(SamizdatDbContext db, string slug, bool isOwner)
         => db.ArticleLinks
             .Where(link => link.ToSlug == slug && link.FromSlug != slug)
