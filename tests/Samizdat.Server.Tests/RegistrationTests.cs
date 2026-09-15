@@ -408,13 +408,29 @@ public class RegistrationTests : IDisposable
         database.ResetDatabase();
         using var factory = CreateFactory();
         OpenRegistration(factory);
-        for (var number = 0; number < 50; number++) AddPending(factory, $"gost{number}", "parol-gostya");
+        FillTheQueue(factory, 50);
         var client = factory.CreateClient();
 
         var answer = await client.PostAsync("/register", await RegisterFields(client, "ivan", "parol-ivana"));
 
         Assert.Contains("временно закрыта", await answer.Content.ReadAsStringAsync());
         Assert.Equal(50, Users(factory).Count);
+    }
+
+    [Fact]
+    public async Task Approved_people_do_not_fill_the_queue()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        OpenRegistration(factory);
+        FillTheQueue(factory, 50, approved: true);
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+
+        var answer = await client.PostAsync("/register", await RegisterFields(client, "ivan", "parol-ivana"));
+
+        Assert.Equal(HttpStatusCode.OK, answer.StatusCode);
+        Assert.Contains("Заявка отправлена", await answer.Content.ReadAsStringAsync());
+        Assert.Equal(51, Users(factory).Count);
     }
 
     [Fact]
@@ -469,6 +485,25 @@ public class RegistrationTests : IDisposable
             CreatedAt = DateTimeOffset.UtcNow,
             ApprovedAt = null,
         });
+        db.SaveChanges();
+    }
+
+    /// Очередь для проверки предела: пароль тут не проверяют, поэтому хэш подставной — считать
+    /// полсотни настоящих Argon2id дорого и незачем.
+    static void FillTheQueue(WebApplicationFactory<Program> factory, int count, bool approved = false)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+        var now = DateTimeOffset.UtcNow;
+        for (var number = 0; number < count; number++)
+            db.Users.Add(new UserRow
+            {
+                Login = $"gost{number}",
+                PasswordHash = "x",
+                Role = UserRole.Reader,
+                CreatedAt = now,
+                ApprovedAt = approved ? now : null,
+            });
         db.SaveChanges();
     }
 

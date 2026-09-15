@@ -15,6 +15,10 @@ public static class RegistrationEndpoints
     // заявок и упрётся, а не наплодит их тысячами.
     const int MaxPending = 50;
 
+    // Номер блокировки, под которой считают очередь. Число произвольное, важно лишь то, что
+    // его берут все заявки разом и никто больше.
+    const long QueueLock = 761_923_401;
+
     public static void MapRegistration(this WebApplication app)
     {
         app.MapGet("/i/{token}", (string token, HttpContext context, SamizdatDbContext db,
@@ -114,11 +118,22 @@ public static class RegistrationEndpoints
                 return Form(pages, settings, antiforgery, context, "/register", note: null,
                             form.Login, fault);
 
+            // Хэш считается до транзакции: Argon2id занимает десятые доли секунды, и соседняя
+            // заявка ждала бы их под блокировкой очереди.
+            var person = form.ToReader(DateTimeOffset.UtcNow, approved: false);
+
+            // Считают и вставляют под общей блокировкой: без неё параллельные заявки читают один
+            // и тот же счётчик и проходят предел все сразу.
+            await using var transaction = await db.Database.BeginTransactionAsync();
+            await db.Database.ExecuteSqlAsync($"SELECT pg_advisory_xact_lock({QueueLock})");
+
             if (await db.Users.CountAsync(row => row.ApprovedAt == null) >= MaxPending)
+            {
+                await transaction.RollbackAsync();
                 return Form(pages, settings, antiforgery, context, "/register", note: null, form.Login,
                             "Регистрация временно закрыта: слишком много заявок ждут ответа.");
+            }
 
-            var person = form.ToReader(DateTimeOffset.UtcNow, approved: false);
             db.Users.Add(person);
             try
             {
@@ -127,10 +142,14 @@ public static class RegistrationEndpoints
             catch (DbUpdateException error)
                 when (error.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
             {
+                await transaction.RollbackAsync();
+                // Забываем строку: в базе её нет, а трекер держал бы её к следующему сохранению.
+                db.Entry(person).State = EntityState.Detached;
                 return Form(pages, settings, antiforgery, context, "/register", note: null,
                             form.Login, "Такой логин уже занят.");
             }
 
+            await transaction.CommitAsync();
             return Results.Content(pages.Render("register-sent.html", new()
             {
                 ["page_title"] = "Заявка отправлена",
