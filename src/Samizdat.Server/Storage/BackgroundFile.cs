@@ -20,6 +20,10 @@ public sealed class BackgroundFile(string dataRoot)
 
     readonly string root = Path.Combine(dataRoot, "background");
 
+    /// Имя файла на диске для расширения — оно же значение настройки theme.background при выборе
+    /// своей картинки. Известно заранее, до записи: эндпоинт сверяет его с базой первым делом.
+    public static string NameFor(string extension) => $"background{extension}";
+
     /// Тип берём по первым байтам: расширение и Content-Type присылает браузер, им верить нельзя.
     public static string? ExtensionOf(ReadOnlySpan<byte> head)
     {
@@ -38,7 +42,7 @@ public sealed class BackgroundFile(string dataRoot)
             throw new ArgumentException($"Не умеем показывать {extension}", nameof(extension));
 
         Directory.CreateDirectory(root);
-        var name = $"background{extension}";
+        var name = NameFor(extension);
         var target = Path.Combine(root, name);
         // Суффикс делает имя уникальным: два одновременных сохранения не столкнутся на File.Create.
         var tmp = $"{target}.{Guid.NewGuid():N}.tmp";

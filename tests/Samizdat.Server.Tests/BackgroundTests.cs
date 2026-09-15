@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Samizdat.Server.Auth;
 using Samizdat.Server.Data;
@@ -321,6 +322,74 @@ public class BackgroundTests : IDisposable
 
         Assert.Equal(Png(), await client.GetByteArrayAsync("/background"));
         Assert.Single(Directory.EnumerateFiles(Path.Combine(dataRoot, "background")));
+    }
+
+    /// Честный отказ базы: ограничение на таблице запрещает любую запись строки theme.background —
+    /// и первую, и обновление. Настоящий PostgresException, а не подмена вызова.
+    static async Task BlockBackgroundSetting(WebApplicationFactory<Program> factory, Func<Task> whileBlocked)
+    {
+        // NOT VALID: строка theme.background уже может существовать — проверяем только то,
+        // что пишут заново, не сканируя и не браня то, что уже лежит в таблице.
+        using (var scope = factory.Services.CreateScope())
+            scope.ServiceProvider.GetRequiredService<SamizdatDbContext>().Database.ExecuteSqlRaw(
+                "ALTER TABLE site_settings ADD CONSTRAINT block_background "
+                + "CHECK (\"Key\" <> 'theme.background') NOT VALID");
+        try
+        {
+            await whileBlocked();
+        }
+        finally
+        {
+            using var scope = factory.Services.CreateScope();
+            scope.ServiceProvider.GetRequiredService<SamizdatDbContext>().Database.ExecuteSqlRaw(
+                "ALTER TABLE site_settings DROP CONSTRAINT block_background");
+        }
+    }
+
+    [Fact]
+    public async Task A_setting_write_that_fails_leaves_the_old_background_on_disk()
+    {
+        var factory = StartFactory();
+        var client = await OwnerClient(factory);
+        var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
+        await client.PostAsync("/settings/background", Upload(name, value, Jpeg(), "old.jpg"));
+
+        await BlockBackgroundSetting(factory, async () =>
+        {
+            (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
+            var response = await client.PostAsync("/settings/background", Upload(name, value, Png(), "new.png"));
+
+            Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
+        });
+
+        Assert.Equal(Jpeg(), await client.GetByteArrayAsync("/background"));
+        Assert.Single(Directory.EnumerateFiles(Path.Combine(dataRoot, "background")));
+        using var scope = factory.Services.CreateScope();
+        Assert.Equal("background.jpg",
+            scope.ServiceProvider.GetRequiredService<SiteSettings>().BackgroundFileName);
+    }
+
+    [Fact]
+    public async Task A_setting_write_that_fails_leaves_the_background_file_on_remove()
+    {
+        var factory = StartFactory();
+        var client = await OwnerClient(factory);
+        var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
+        await client.PostAsync("/settings/background", Upload(name, value, Jpeg(), "wall.jpg"));
+
+        await BlockBackgroundSetting(factory, async () =>
+        {
+            (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
+            var response = await client.PostAsync("/settings/background/remove", new FormUrlEncodedContent(
+                new Dictionary<string, string> { [name] = value }));
+
+            Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
+        });
+
+        Assert.Equal(Jpeg(), await client.GetByteArrayAsync("/background"));
+        using var scope = factory.Services.CreateScope();
+        Assert.Equal("background.jpg",
+            scope.ServiceProvider.GetRequiredService<SiteSettings>().BackgroundFileName);
     }
 
     [Fact]

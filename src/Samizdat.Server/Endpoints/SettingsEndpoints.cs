@@ -197,8 +197,11 @@ public static class SettingsEndpoints
             if (BackgroundFile.ExtensionOf(head.AsSpan(0, read)) is not { } extension)
                 return Err("background_type");
 
+            // Настройка меняется первой: имя файла известно по расширению заранее, до записи на
+            // диск. Откажет она — до Save дело не дойдёт, и прежний фон останется на месте.
+            settings.Set("theme.background", BackgroundFile.NameFor(extension));
             stream.Position = 0;
-            settings.Set("theme.background", background.Save(stream, extension));
+            background.Save(stream, extension);
             return Ok("background");
         }).RefuseAnOversizedBody().RequireValidToken().OwnerOnly();
 
@@ -250,8 +253,11 @@ public static class SettingsEndpoints
         // Удаление загруженной картинки. Если она стояла фоном, фон заодно снимается: файла больше нет.
         group.MapPost("/background/remove", (SiteSettings settings, BackgroundFile background) =>
         {
-            background.Remove();
+            // Настройка меняется первой: откажет она — до удаления файла дело не дойдёт, и фон
+            // останется прежним. Когда фоном стоит не своя картинка (набор темы, цвет), настройку
+            // не трогаем вовсе — файл всё равно убираем, он просто больше не выбран.
             if (settings.Background.Kind == BackgroundKind.Upload) settings.Set("theme.background", "");
+            background.Remove();
             return Ok("background_removed");
         }).RequireValidToken().OwnerOnly();
 
