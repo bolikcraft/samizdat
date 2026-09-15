@@ -51,6 +51,8 @@ public class PeopleTests : IDisposable
         Assert.DoesNotContain("/settings/appearance", html);
         Assert.DoesNotContain("/settings/background", html);
         Assert.DoesNotContain("/settings/tokens", html);
+        Assert.DoesNotContain("/settings/signup", html);
+        Assert.DoesNotContain("/settings/invites", html);
     }
 
     [Fact]
@@ -67,6 +69,8 @@ public class PeopleTests : IDisposable
         Assert.Contains("/settings/people", html);
         Assert.Contains("/settings/appearance", html);
         Assert.Contains("Пользователи", html);
+        Assert.Contains("/settings/invites", html);
+        Assert.Contains("Регистрация", html);
     }
 
     [Fact]
