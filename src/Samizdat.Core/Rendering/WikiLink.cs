@@ -12,6 +12,9 @@ public sealed class WikiLink : LeafInline
 
     public string Text => Label ?? Target;
 
+    /// Эмбед картинки, а не обычная ссылка или вложение другого типа.
+    public bool IsPictureEmbed => IsEmbed && IsImage(Target);
+
     public static bool IsImage(string target)
         => ImageExtensions.Contains(Path.GetExtension(Path.GetFileName(target)), StringComparer.OrdinalIgnoreCase);
 }

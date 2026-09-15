@@ -16,7 +16,7 @@ public sealed class WikiLinkRenderer(string currentSlug, IArticleLookup articles
         // so an embed can't escape it (e.g. "../../secret.png").
         var fileName = Path.GetFileName(link.Target);
 
-        if (link.IsEmbed && WikiLink.IsImage(fileName))
+        if (link.IsPictureEmbed)
         {
             // Alt falls back to the file name without extension, not the technical ".png" suffix.
             var alt = link.Label ?? Path.GetFileNameWithoutExtension(fileName);

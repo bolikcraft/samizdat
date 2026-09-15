@@ -42,7 +42,7 @@ public static class PlainText
     {
         protected override void Write(HtmlRenderer renderer, WikiLink link)
         {
-            if (link.IsEmbed && WikiLink.IsImage(link.Target)) return;
+            if (link.IsPictureEmbed) return;
             renderer.Write(link.Text);
         }
     }

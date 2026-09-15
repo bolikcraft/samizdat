@@ -71,4 +71,16 @@ public class WikiLinksTests
     [Fact]
     public void Text_without_links_gives_nothing()
         => Assert.Empty(WikiLinks.Targets("обычный текст без ссылок"));
+
+    [Fact]
+    public void Link_inside_a_nested_list_is_found()
+        => Assert.Equal(["proxmox"], WikiLinks.Targets("- первый\n  - вложенный [[proxmox]]\n"));
+
+    [Fact]
+    public void Link_inside_a_footnote_is_found()
+        => Assert.Equal(["proxmox"], WikiLinks.Targets("текст[^1]\n\n[^1]: см. [[proxmox]]"));
+
+    [Fact]
+    public void Link_inside_a_code_block_is_not_a_link()
+        => Assert.Empty(WikiLinks.Targets("```\n[[proxmox]]\n```"));
 }
