@@ -25,6 +25,12 @@ public static class AuthEndpoints
             if (user is null || !PasswordHasher.Verify(password, user.PasswordHash))
                 return LoginPage(pages, settings, "Неверный логин или пароль");
 
+            // Отдельное сообщение, а не «неверный пароль»: иначе человек решит, что опечатался,
+            // и будет бить в форму. То, что такой логин есть, форма регистрации и так говорит
+            // вслух словом «занят».
+            if (user.ApprovedAt is null)
+                return LoginPage(pages, settings, "Заявка ещё не одобрена. Дождитесь ответа владельца.");
+
             await SessionCookie.SignIn(context, user);
 
             return Results.Redirect("/");
