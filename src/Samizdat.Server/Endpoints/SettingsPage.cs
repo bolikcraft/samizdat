@@ -43,6 +43,7 @@ public static class SettingsPage
         "person_added" or "person_password" or "person_deleted" => "people",
         "bad_person" or "person_short_password" or "login_taken" => "people",
         "last_owner" or "self_delete" or "other_owner" or "own_password" => "people",
+        "articles" => "articles",
         "invite_created" or "invite_revoked" or "invite_note" or "invite_term" => "signup",
         "signup_open" or "signup_approved" or "signup_rejected" or "not_pending" => "signup",
         _ => "appearance",
@@ -72,6 +73,7 @@ public static class SettingsPage
         {
             "password" => "Пароль изменён.",
             "appearance" => "Настройки внешнего вида сохранены.",
+            "articles" => "Настройки статей сохранены.",
             "token_created" => "Токен создан.",
             "token_note" => "Заметка сохранена.",
             "token_revoked" => "Токен отозван.",

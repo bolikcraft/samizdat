@@ -164,7 +164,7 @@ public class SettingsPageTests : IDisposable
 
         // Раздел выбирается якорем. Ссылка без своей панели оставила бы страницу пустой.
         var sections = Regex.Matches(html, "href=\"#([a-z]+)\"").Select(match => match.Groups[1].Value).ToList();
-        Assert.Equal(["appearance", "security", "people", "signup", "tokens", "links"], sections);
+        Assert.Equal(["appearance", "articles", "security", "people", "signup", "tokens", "links"], sections);
         foreach (var section in sections)
             Assert.Contains($"class=\"settings-pane\" id=\"{section}\"", html);
     }

@@ -18,6 +18,11 @@
   {{ end }}
 </form>
 {{ end }}
+{{ if article.download_url }}
+<p class="download">
+  <a class="download-link" href="{{ article.download_url | html.escape }}" download>Скачать {{ article.download_label }}</a>
+</p>
+{{ end }}
 {{~## Блок «Поделиться» приходит готовым html: страница лежит в кэше, а ссылка меняется без
 правки статьи. Рисует его SharePanel при каждой отдаче. ##~}}
 {{ share_panel }}

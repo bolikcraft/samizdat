@@ -119,5 +119,41 @@ public class ArticleFilesTests : IDisposable
         Assert.Equal(["s"], files.AllSlugs());
     }
 
+    [Fact]
+    public void Download_is_a_reserved_slug()
+        => Assert.True(ArticleFiles.IsReservedSlug("download"));
+
+    [Fact]
+    public void Attachments_list_everything_but_the_source()
+    {
+        files.Replace("tayna", "текст"u8.ToArray(), [("ezh.png", [1, 2, 3]), ("abc.png", [4])]);
+
+        var names = files.Attachments("tayna").Select(one => one.Name).ToList();
+
+        // По алфавиту: имена в архиве должны лежать одинаково от прогона к прогону.
+        Assert.Equal(["abc.png", "ezh.png"], names);
+    }
+
+    [Fact]
+    public void A_symlink_out_of_the_folder_is_not_an_attachment()
+    {
+        files.Replace("tayna", "текст"u8.ToArray(), []);
+
+        var outside = Path.Combine(dataRoot, "chuzhoy.txt");
+        File.WriteAllText(outside, "не наше");
+        File.CreateSymbolicLink(Path.Combine(files.Folder("tayna"), "ssylka.txt"), outside);
+
+        Assert.Empty(files.Attachments("tayna"));
+    }
+
+    [Fact]
+    public void Markdown_bytes_come_back_untouched()
+    {
+        byte[] written = [0xEF, 0xBB, 0xBF, (byte)'a', (byte)'\r', (byte)'\n'];
+        files.Replace("tayna", written, []);
+
+        Assert.Equal(written, files.ReadMarkdownBytes("tayna"));
+    }
+
     public void Dispose() => Directory.Delete(dataRoot, recursive: true);
 }

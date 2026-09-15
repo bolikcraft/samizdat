@@ -490,6 +490,11 @@ button.is-busy::after {
 /* Правило ширины для полей ввода растягивало и радиокнопку, отгоняя подпись к правому краю. */
 .scheme-choices input { width: auto; margin: 0; accent-color: var(--accent); }
 
+/* Флажок-переключатель: та же поправка, что у радиокнопок схемы — иначе общее правило
+   для .settings-form input растягивает его в подписанный прямоугольник. */
+.settings-form label.check { display: flex; flex-direction: row; align-items: center; gap: 0.5rem; cursor: pointer; }
+.settings-form label.check input { width: auto; padding: 0; margin: 0; border: none; background: none; accent-color: var(--accent); }
+
 /* Форма загрузки и текущий фон стоят рядом, пока хватает ширины. */
 .inline-form { margin: 0; }
 
@@ -669,6 +674,17 @@ table.pending .row-actions { display: flex; gap: 0.4rem; justify-content: flex-e
 
 .visibility-form { display: flex; align-items: center; gap: 0.75rem; margin: 1rem 0 0; }
 .visibility-state { font-family: system-ui, sans-serif; font-size: 0.9rem; color: var(--muted); }
+
+/* Ссылка, а не кнопка формы, поэтому размеры повторены руками — общее правило кнопок темы
+   на неё не распространяется. Вид второстепенный: рамка вместо заливки, как у «Удалить». */
+.download { margin: 1rem 0 0; }
+.download-link {
+  display: inline-flex; align-items: center; min-height: 2.125rem; padding: 0 1rem;
+  border: 1px solid var(--accent); border-radius: 8px;
+  color: var(--accent); text-decoration: none;
+  font-family: system-ui, sans-serif; font-size: 0.875rem; font-weight: 600; line-height: 1.2;
+}
+.download-link:hover { background: var(--accent); color: var(--bg); }
 
 .share { margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--line); }
 .share > summary {

@@ -98,6 +98,11 @@ public static class SettingsEndpoints
                 ["message_section"] = (err ?? ok) is { } code ? SectionOf(code) : null,
                 ["color_scheme"] = settings.ColorScheme,
                 ["background"] = BackgroundModel(settings, background, BackgroundCatalog.Read(theme)),
+                ["download"] = new Dictionary<string, object?>
+                {
+                    ["readers"] = settings.Download.Readers,
+                    ["guests"] = settings.Download.Guests,
+                },
                 ["themes"] = themes.AvailableThemes().Select(name => new Dictionary<string, object?>
                 {
                     ["name"] = name,
@@ -149,6 +154,18 @@ public static class SettingsEndpoints
             if (colorScheme is "light" or "dark" or "system") settings.Set("theme.color_scheme", colorScheme);
 
             return Ok("appearance");
+        }).RequireValidToken().OwnerOnly();
+
+        group.MapPost("/articles", async (HttpContext context, SiteSettings settings) =>
+        {
+            var form = await context.Request.ReadFormAsync();
+
+            // Снятый флажок форма не присылает вовсе, поэтому пишем обе настройки разом,
+            // а не только те, что пришли: иначе выключить скачивание было бы нечем.
+            settings.Set("articles.download.readers", form["readers"].ToString() == "on" ? "on" : "");
+            settings.Set("articles.download.guests", form["guests"].ToString() == "on" ? "on" : "");
+
+            return Ok("articles");
         }).RequireValidToken().OwnerOnly();
 
         group.MapPost("/background", [RequestSizeLimit(MaxBackgroundRequestBytes)]

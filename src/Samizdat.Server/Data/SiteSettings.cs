@@ -1,3 +1,4 @@
+using Samizdat.Server.Auth;
 using Samizdat.Server.Storage;
 
 namespace Samizdat.Server.Data;
@@ -39,11 +40,16 @@ public sealed class SiteSettings(SamizdatDbContext db, IConfiguration configurat
     public string? BackgroundColor
         => Background is { Kind: BackgroundKind.Color, Value: var color } ? color : null;
 
+    /// Скачивание статьи читателем и гостем по ссылке. Владельца тут нет: он качает всегда.
+    public DownloadPolicy Download => new(Get("articles.download.readers", "") == "on",
+                                          Get("articles.download.guests", "") == "on");
+
     /// Всё, что вид страницы берёт из настроек. Задумана как часть ключа кэша страниц:
     /// layout.html рендерится внутри закэшированной страницы, и без этого отпечатка смена
-    /// схемы или фона была бы не видна на статье, отрендеренной раньше.
+    /// схемы, фона или разрешения скачивать была бы не видна на статье, отрендеренной раньше.
     public string ViewFingerprint
-        => $"{ThemeName}|{ColorScheme}|{Get("theme.background", "")}|{background.Version(BackgroundFileName)}";
+        => $"{ThemeName}|{ColorScheme}|{Get("theme.background", "")}|{background.Version(BackgroundFileName)}"
+           + $"|{Download.Readers}|{Download.Guests}";
 
     public string Get(string key, string fallback)
         => db.Settings.Find(key)?.Value is { Length: > 0 } value ? value : fallback;
