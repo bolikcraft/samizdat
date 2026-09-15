@@ -66,6 +66,28 @@ public class PlainTextTests
         var text = PlainText.Extract("абзац <b>жирный</b> дальше");
 
         Assert.DoesNotContain("<b>", text);
+        Assert.Contains("жирный", text);
+    }
+
+    [Fact]
+    public void Callout_without_a_title_gives_only_its_text()
+    {
+        var text = PlainText.Extract("> [!warning]\n> текст без заголовка\n");
+
+        Assert.Contains("текст без заголовка", text);
+        Assert.DoesNotContain("<svg", text);
+        Assert.DoesNotContain("markdown-alert", text);
+        Assert.DoesNotContain("Warning", text);
+    }
+
+    [Fact]
+    public void Callout_with_a_title_gives_the_title_and_the_text()
+    {
+        var text = PlainText.Extract("> [!note] Про сервер\n> текст коллаута\n");
+
+        Assert.Contains("Про сервер", text);
+        Assert.Contains("текст коллаута", text);
+        Assert.DoesNotContain("[!note]", text);
     }
 
     [Fact]
