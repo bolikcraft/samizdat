@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
@@ -26,11 +25,7 @@ public static class AuthEndpoints
             if (user is null || !PasswordHasher.Verify(password, user.PasswordHash))
                 return LoginPage(pages, settings, "Неверный логин или пароль");
 
-            var identity = new ClaimsIdentity(
-                [new Claim(ClaimTypes.Name, user.Login), new Claim(ClaimTypes.Role, user.Role.ToString())],
-                CookieAuthenticationDefaults.AuthenticationScheme);
-            await context.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme,
-                                      new ClaimsPrincipal(identity));
+            await SessionCookie.SignIn(context, user);
 
             return Results.Redirect("/");
         }).AllowAnonymous().DisableAntiforgery();

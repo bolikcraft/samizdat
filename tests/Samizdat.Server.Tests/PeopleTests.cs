@@ -144,6 +144,61 @@ public class PeopleTests : IDisposable
     }
 
     [Fact]
+    public async Task Deleted_person_loses_their_session()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        AddPerson(factory, "hozyain", "parol", UserRole.Owner);
+        var ivan = AddPerson(factory, "ivan", "parol-ivana", UserRole.Reader);
+
+        var client = await Login(factory, "ivan", "parol-ivana");
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/settings/")).StatusCode);
+
+        var owner = await Login(factory, "hozyain", "parol");
+        await Post(owner, $"/settings/people/{ivan}/delete", []);
+
+        var settings = await client.GetAsync("/settings/");
+        Assert.Equal(HttpStatusCode.Found, settings.StatusCode);
+        Assert.StartsWith("/login", settings.Headers.Location?.PathAndQuery);
+        Assert.Equal(HttpStatusCode.Found, (await client.GetAsync("/")).StatusCode);
+    }
+
+    [Fact]
+    public async Task New_password_from_the_owner_loses_the_session()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        AddPerson(factory, "hozyain", "parol", UserRole.Owner);
+        var ivan = AddPerson(factory, "ivan", "parol-ivana", UserRole.Reader);
+
+        var client = await Login(factory, "ivan", "parol-ivana");
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/settings/")).StatusCode);
+
+        var owner = await Login(factory, "hozyain", "parol");
+        await Post(owner, $"/settings/people/{ivan}/password", new() { ["password"] = "novyy-parol" });
+
+        var answer = await client.GetAsync("/settings/");
+        Assert.Equal(HttpStatusCode.Found, answer.StatusCode);
+        Assert.StartsWith("/login", answer.Headers.Location?.PathAndQuery);
+    }
+
+    [Fact]
+    public async Task Own_new_password_keeps_the_session()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        AddPerson(factory, "ivan", "staryy-parol", UserRole.Reader);
+
+        var client = await Login(factory, "ivan", "staryy-parol");
+        await Post(client, "/settings/password", new()
+        {
+            ["current"] = "staryy-parol", ["new"] = "novyy-parol", ["new2"] = "novyy-parol",
+        });
+
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/settings/")).StatusCode);
+    }
+
+    [Fact]
     public async Task Reader_changes_their_own_password()
     {
         database.ResetDatabase();

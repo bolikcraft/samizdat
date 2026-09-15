@@ -11,6 +11,9 @@ namespace Samizdat.Server.Endpoints;
 
 public static class SettingsEndpoints
 {
+    /// Одна мера на все три места, где заводят пароль: свой, чужой и пароль нового человека.
+    const int MinPasswordLength = 8;
+
     const long MaxBackgroundBytes = 8 * 1024 * 1024;
 
     // Многочастная форма добавляет к файлу границы и заголовки полей — запас с лихвой их перекрывает.
@@ -34,7 +37,7 @@ public static class SettingsEndpoints
         {
             // Читателю открыт один раздел — свой пароль, поэтому чужие списки ему и не собираем.
             var isOwner = ArticleAccess.IsOwner(user);
-            var person = CurrentUser(db, user);
+            if (CurrentUser(db, user) is not { } person) return LoggedOut();
 
             List<ApiTokenRow> tokens = isOwner
                 ? db.ApiTokens.Where(token => token.UserId == person.Id)
@@ -113,14 +116,18 @@ public static class SettingsEndpoints
             var next = form["new"].ToString();
             var repeat = form["new2"].ToString();
 
-            var owner = CurrentUser(db, user);
+            if (CurrentUser(db, user) is not { } person) return LoggedOut();
 
-            if (!PasswordHasher.Verify(current, owner.PasswordHash)) return Err("wrong_password");
-            if (next.Length < 8) return Err("short_password");
+            if (!PasswordHasher.Verify(current, person.PasswordHash)) return Err("wrong_password");
+            if (next.Length < MinPasswordLength) return Err("short_password");
             if (next != repeat) return Err("password_mismatch");
 
-            owner.PasswordHash = PasswordHasher.Hash(next);
+            person.PasswordHash = PasswordHasher.Hash(next);
+            // Новая метка гасит прочие сессии этого человека; свою тут же выдаём заново,
+            // иначе смена своего пароля выкидывала бы со страницы настроек.
+            person.SessionStamp = UserRow.NewSessionStamp();
             db.SaveChanges();
+            await SessionCookie.SignIn(context, person);
             return Ok("password");
         }).RequireValidToken();
 
@@ -228,7 +235,8 @@ public static class SettingsEndpoints
             var form = await context.Request.ReadFormAsync();
             var note = form["note"].ToString().Trim();
 
-            var owner = CurrentUser(db, user);
+            if (CurrentUser(db, user) is not { } owner) return LoggedOut();
+
             var token = ApiToken.Create();
             db.ApiTokens.Add(new ApiTokenRow
             {
@@ -249,7 +257,8 @@ public static class SettingsEndpoints
             var form = await context.Request.ReadFormAsync();
             var note = form["note"].ToString().Trim();
 
-            var owner = CurrentUser(db, user);
+            if (CurrentUser(db, user) is not { } owner) return LoggedOut();
+
             var token = db.ApiTokens.FirstOrDefault(row => row.Id == id);
             if (token is null || token.UserId != owner.Id) return Results.NotFound();
 
@@ -260,7 +269,8 @@ public static class SettingsEndpoints
 
         group.MapPost("/tokens/{id:int}/revoke", (int id, SamizdatDbContext db, ClaimsPrincipal user) =>
         {
-            var owner = CurrentUser(db, user);
+            if (CurrentUser(db, user) is not { } owner) return LoggedOut();
+
             var token = db.ApiTokens.FirstOrDefault(row => row.Id == id);
             if (token is null || token.UserId != owner.Id) return Results.NotFound();
 
@@ -300,6 +310,7 @@ public static class SettingsEndpoints
             if (person is null) return Results.NotFound();
 
             person.PasswordHash = PasswordHasher.Hash(password);
+            person.SessionStamp = UserRow.NewSessionStamp();
             await db.SaveChangesAsync();
             return Ok("person_password");
         }).RequireValidToken().OwnerOnly();
@@ -410,8 +421,12 @@ public static class SettingsEndpoints
         };
     }
 
-    static UserRow CurrentUser(SamizdatDbContext db, ClaimsPrincipal user)
-        => db.Users.First(row => row.Login == user.Identity!.Name);
+    /// null — человека в базе уже нет: его удалили, пока запрос шёл. Следующий запрос он же
+    /// и последний: проверка cookie погасит сессию.
+    static UserRow? CurrentUser(SamizdatDbContext db, ClaimsPrincipal user)
+        => db.Users.FirstOrDefault(row => row.Login == user.Identity!.Name);
+
+    static IResult LoggedOut() => Results.Redirect("/login");
 
     static string? Message(string? ok, string? err) => err switch
     {

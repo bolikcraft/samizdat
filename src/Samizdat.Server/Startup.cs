@@ -57,6 +57,10 @@ public static class Startup
                 options.ExpireTimeSpan = TimeSpan.FromDays(30);
                 options.SlidingExpiration = true;
 
+                // Cookie живёт месяц, поэтому её сверяют с базой на каждом запросе: удалённый
+                // человек и человек с новым паролем теряют доступ сразу.
+                options.Events.OnValidatePrincipal = SessionCookie.Validate;
+
                 // Своей страницы «доступа нет» у схемы нет: отказ по роли должен быть отказом,
                 // а не редиректом на чужой адрес. Страницу 403.html рисуют сами маршруты.
                 options.Events.OnRedirectToAccessDenied = context =>

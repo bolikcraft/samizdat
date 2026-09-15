@@ -16,4 +16,10 @@ public sealed class UserRow
     public required string PasswordHash { get; set; }
     public UserRole Role { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
+
+    /// Метка сессии: едет в cookie и сверяется с базой на каждом запросе. Новая метка гасит
+    /// выданные cookie — так смена пароля закрывает чужие сессии.
+    public string SessionStamp { get; set; } = NewSessionStamp();
+
+    public static string NewSessionStamp() => Guid.NewGuid().ToString("N");
 }
