@@ -86,6 +86,72 @@ public class VisibilityTests : IDisposable
     }
 
     [Fact]
+    public async Task Reader_wikilink_to_a_private_article_is_plain_text()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        await AddArticle(factory, "tayna", ArticleVisibility.Private);
+        await AddArticle(factory, "otkrytaya", ArticleVisibility.Shared, body: "Ссылка на [[tayna]].");
+
+        var client = await TestLogin.AsReader(factory);
+        var html = await client.GetStringAsync("/otkrytaya");
+
+        Assert.DoesNotContain("href=\"/tayna\"", html);
+        Assert.Contains("tayna", html);
+    }
+
+    [Fact]
+    public async Task Owner_wikilink_to_a_private_article_is_a_link()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        await AddArticle(factory, "tayna", ArticleVisibility.Private);
+        await AddArticle(factory, "otkrytaya", ArticleVisibility.Shared, body: "Ссылка на [[tayna]].");
+
+        var client = await TestLogin.AsOwner(factory);
+        var html = await client.GetStringAsync("/otkrytaya");
+
+        Assert.Contains("href=\"/tayna\"", html);
+    }
+
+    [Fact]
+    public async Task Sharing_the_target_makes_the_wikilink_appear_for_a_cached_reader()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        await AddArticle(factory, "tayna", ArticleVisibility.Private);
+        await AddArticle(factory, "otkrytaya", ArticleVisibility.Shared, body: "Ссылка на [[tayna]].");
+
+        var reader = await TestLogin.AsReader(factory);
+        var before = await reader.GetStringAsync("/otkrytaya");
+        Assert.DoesNotContain("href=\"/tayna\"", before);
+
+        var owner = await TestLogin.AsOwner(factory);
+        await TestLogin.Post(owner, "/visibility", new() { ["slug"] = "tayna", ["visibility"] = "shared" });
+
+        var after = await reader.GetStringAsync("/otkrytaya");
+        Assert.Contains("href=\"/tayna\"", after);
+    }
+
+    [Fact]
+    public async Task Reader_wikilink_by_note_name_to_a_private_article_is_also_plain_text()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        await AddArticle(factory, "taynaya-zametka", ArticleVisibility.Private, title: "Тайная заметка");
+        await AddArticle(factory, "otkrytaya", ArticleVisibility.Shared, body: "Смотри [[Тайная заметка]].");
+
+        var reader = await TestLogin.AsReader(factory);
+        var readerHtml = await reader.GetStringAsync("/otkrytaya");
+        Assert.DoesNotContain("href=\"/taynaya-zametka\"", readerHtml);
+        Assert.Contains("Тайная заметка", readerHtml);
+
+        var owner = await TestLogin.AsOwner(factory);
+        var ownerHtml = await owner.GetStringAsync("/otkrytaya");
+        Assert.Contains("href=\"/taynaya-zametka\"", ownerHtml);
+    }
+
+    [Fact]
     public async Task Owner_sees_every_article_as_a_link()
     {
         database.ResetDatabase();
@@ -183,17 +249,19 @@ public class VisibilityTests : IDisposable
             builder.UseSetting("hostBuilder:reloadConfigOnChange", "false");
         });
 
-    async Task AddArticle(WebApplicationFactory<Program> factory, string slug, ArticleVisibility visibility)
+    async Task AddArticle(WebApplicationFactory<Program> factory, string slug, ArticleVisibility visibility,
+                          string? body = null, string title = "Тайна")
     {
         var folder = Path.Combine(dataRoot, "articles", slug);
         Directory.CreateDirectory(folder);
-        await File.WriteAllTextAsync(Path.Combine(folder, "index.md"), "---\ntitle: Тайна\n---\n\nТекст.\n");
+        await File.WriteAllTextAsync(Path.Combine(folder, "index.md"),
+            $"---\ntitle: {title}\n---\n\n{body ?? "Текст."}\n");
 
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
         db.Articles.Add(new ArticleRow
         {
-            Slug = slug, Title = "Тайна", ContentHash = $"hash-{slug}", Visibility = visibility,
+            Slug = slug, Title = title, ContentHash = $"hash-{slug}", Visibility = visibility,
             UpdatedAt = DateTimeOffset.UtcNow,
         });
         await db.SaveChangesAsync();

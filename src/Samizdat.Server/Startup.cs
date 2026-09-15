@@ -38,7 +38,6 @@ public static class Startup
             options.UseNpgsql(builder.Configuration.GetConnectionString("Postgres")
                               ?? "Host=localhost;Database=samizdat;Username=samizdat"));
 
-        builder.Services.AddScoped<IArticleLookup, DbArticleLookup>();
         builder.Services.AddScoped<ArticleIndexer>();
         builder.Services.AddScoped<ArticleSearch>();
 

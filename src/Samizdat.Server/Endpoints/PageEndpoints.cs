@@ -83,7 +83,7 @@ public static class PageEndpoints
         });
 
         group.MapGet("/{slug}", (string slug, PageRenderer pages, ArticleFiles files,
-                                 ArticleRenderer markdown, IArticleLookup articles,
+                                 ArticleRenderer markdown,
                                  PageCache cache, IThemeSource theme, SamizdatDbContext db,
                                  SiteSettings settings, ClaimsPrincipal user, ILogger<Program> logger,
                                  IAntiforgery antiforgery, HttpContext context) =>
@@ -107,6 +107,9 @@ public static class PageEndpoints
             var key = new PageKey(Content: row.ContentHash, Theme: theme.Version,
                                   Catalog: CatalogFingerprint.Of(db), View: settings.ViewFingerprint);
             var isOwner = ArticleAccess.IsOwner(user);
+            // Строим здесь, не через DI: видимость статьи решает, какие вики-ссылки резолвятся,
+            // а isOwner — параметр обработчика, из контейнера его не достать.
+            var articles = new DbArticleLookup(db, isOwner);
             // Своя ячейка, а не роль в ключе: с общей ячейкой владелец и читатель вытесняли бы
             // страницы друг друга, и каждый второй запрос шёл бы в полный рендер.
             var cell = isOwner ? slug : $"reader/{slug}";
