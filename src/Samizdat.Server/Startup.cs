@@ -10,6 +10,7 @@ using Samizdat.Server.Auth;
 using Samizdat.Server.Data;
 using Samizdat.Server.Endpoints;
 using Samizdat.Server.Rendering;
+using Samizdat.Server.Search;
 using Samizdat.Server.Storage;
 
 namespace Samizdat.Server;
@@ -38,6 +39,7 @@ public static class Startup
                               ?? "Host=localhost;Database=samizdat;Username=samizdat"));
 
         builder.Services.AddScoped<IArticleLookup, DbArticleLookup>();
+        builder.Services.AddScoped<ArticleIndexer>();
 
         // Апач-прокси стоит в соседнем контейнере, не на loopback — доверяем заголовку без ограничения по сети.
         builder.Services.Configure<ForwardedHeadersOptions>(options =>

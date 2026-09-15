@@ -1,11 +1,9 @@
 using System.Net;
-using System.Net.Http.Headers;
-using System.Text;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Samizdat.Server.Auth;
 using Samizdat.Server.Data;
+using Samizdat.Server.Search;
 
 namespace Samizdat.Server.Tests;
 
@@ -25,40 +23,6 @@ public class IndexTests(DatabaseFixture database) : IDisposable
             // и наблюдатели inotify упираются в системный лимит.
             builder.UseSetting("hostBuilder:reloadConfigOnChange", "false");
         });
-
-    HttpClient CreateApiClient(WebApplicationFactory<Program> factory)
-    {
-        string token;
-        using (var scope = factory.Services.CreateScope())
-        {
-            var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
-            var owner = new UserRow
-            {
-                Login = $"owner-{Guid.NewGuid():N}",
-                PasswordHash = PasswordHasher.Hash("x"),
-                Role = UserRole.Owner,
-                CreatedAt = DateTimeOffset.UtcNow,
-            };
-            db.Users.Add(owner);
-            db.SaveChanges();
-
-            token = ApiToken.Create();
-            db.ApiTokens.Add(new ApiTokenRow
-            {
-                UserId = owner.Id,
-                TokenHash = ApiToken.HashOf(token),
-                CreatedAt = DateTimeOffset.UtcNow,
-            });
-            db.SaveChanges();
-        }
-
-        var client = factory.CreateClient();
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        return client;
-    }
-
-    static MultipartFormDataContent Article(string markdown) =>
-        new() { { new ByteArrayContent(Encoding.UTF8.GetBytes(markdown)), "index.md", "index.md" } };
 
     [Fact]
     public void Search_vector_sees_the_word_in_another_form()
@@ -148,15 +112,110 @@ public class IndexTests(DatabaseFixture database) : IDisposable
     {
         database.ResetDatabase();
         using var factory = CreateFactory();
-        var client = CreateApiClient(factory);
+        var client = TestPublisher.ClientWithToken(factory);
 
         // 1 МБ — предел tsvector на документ; такое описание валило выкладку пятисоткой.
         var description = string.Join(' ', Enumerable.Range(0, 150_000).Select(number => $"slovo{number}"));
 
-        var answer = await client.PutAsync(
-            "/api/articles/dlinnoe", Article($"---\ntitle: Длинное\ndescription: {description}\n---\nтекст\n"));
+        var answer = await TestPublisher.Push(
+            client, "dlinnoe", $"---\ntitle: Длинное\ndescription: {description}\n---\nтекст\n");
 
         Assert.Equal(HttpStatusCode.BadRequest, answer.StatusCode);
         Assert.Contains("слишком длинное", await answer.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task Publishing_fills_the_text_and_the_links()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        var client = TestPublisher.ClientWithToken(factory);
+
+        (await TestPublisher.Push(client, "pervaya", "---\ntitle: Первая\n---\n\nТекст про [[Вторая заметка]]."))
+            .EnsureSuccessStatusCode();
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+        var row = db.Articles.Single();
+
+        Assert.Contains("Текст про", row.SearchText);
+        Assert.Equal(row.ContentHash, row.IndexedHash);
+        Assert.Equal(["Вторая заметка", "vtoraya-zametka"],
+                     db.ArticleLinks.Select(link => link.ToSlug).ToList().Order());
+    }
+
+    [Fact]
+    public async Task Republishing_drops_a_link_that_is_gone()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        var client = TestPublisher.ClientWithToken(factory);
+
+        (await TestPublisher.Push(client, "pervaya", "---\ntitle: Первая\n---\n\n[[vtoraya]]"))
+            .EnsureSuccessStatusCode();
+        (await TestPublisher.Push(client, "pervaya", "---\ntitle: Первая\n---\n\nбез ссылок"))
+            .EnsureSuccessStatusCode();
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+
+        Assert.Empty(db.ArticleLinks.ToList());
+        Assert.Contains("без ссылок", db.Articles.Single().SearchText);
+    }
+
+    [Fact]
+    public async Task Republishing_keeps_a_link_that_stayed()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        var client = TestPublisher.ClientWithToken(factory);
+
+        (await TestPublisher.Push(client, "pervaya", "---\ntitle: Первая\n---\n\n[[vtoraya]]"))
+            .EnsureSuccessStatusCode();
+        (await TestPublisher.Push(client, "pervaya", "---\ntitle: Первая\n---\n\nдругой текст, та же [[vtoraya]]"))
+            .EnsureSuccessStatusCode();
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+
+        Assert.Equal("vtoraya", Assert.Single(db.ArticleLinks.ToList()).ToSlug);
+    }
+
+    [Fact]
+    public async Task Article_does_not_link_to_itself()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        var client = TestPublisher.ClientWithToken(factory);
+
+        (await TestPublisher.Push(client, "pervaya", "---\ntitle: Первая\n---\n\nсам на себя [[pervaya]]"))
+            .EnsureSuccessStatusCode();
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+
+        Assert.Empty(db.ArticleLinks.ToList());
+    }
+
+    [Fact]
+    public async Task Huge_article_is_published_with_a_trimmed_index()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        var client = TestPublisher.ClientWithToken(factory);
+
+        // У tsvector предел 1 МБ на документ: длинная статья должна выложиться, потеряв хвост индекса,
+        // а не получить отказ.
+        var body = string.Join(' ', Enumerable.Range(0, 200_000).Select(number => $"slovo{number}"));
+        var answer = await TestPublisher.Push(client, "dlinnaya", $"---\ntitle: Длинная\n---\n\n{body}");
+
+        Assert.True(answer.IsSuccessStatusCode);
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+        var row = db.Articles.Single();
+
+        Assert.True(row.SearchText.Length <= ArticleIndexer.MaxSearchText);
+        Assert.StartsWith("slovo0 ", row.SearchText);
     }
 }

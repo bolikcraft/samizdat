@@ -4,6 +4,7 @@ using Npgsql;
 using Samizdat.Core;
 using Samizdat.Server.Auth;
 using Samizdat.Server.Data;
+using Samizdat.Server.Search;
 using Samizdat.Server.Storage;
 
 namespace Samizdat.Server.Endpoints;
@@ -24,7 +25,8 @@ public static class ApiEndpoints
             Results.Ok(db.Articles.ToDictionary(article => article.Slug, article => article.ContentHash)));
 
         api.MapPut("/articles/{slug}", async (string slug, HttpRequest request,
-                                              ArticleFiles files, SamizdatDbContext db) =>
+                                              ArticleFiles files, SamizdatDbContext db,
+                                              ArticleIndexer indexer) =>
         {
             if (!ArticleFiles.IsValidSlug(slug)) return Results.BadRequest("Плохой slug");
             if (ArticleFiles.IsReservedSlug(slug))
@@ -75,6 +77,7 @@ public static class ApiEndpoints
             row.UpdatedAt = DateTimeOffset.UtcNow;
             try
             {
+                indexer.Index(row, parsed.Body);
                 await db.SaveChangesAsync();
             }
             // Описание из фронтматтера ничем не ограничено, а у tsvector предел 1 МБ на документ:
