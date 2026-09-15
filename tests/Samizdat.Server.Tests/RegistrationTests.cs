@@ -417,6 +417,29 @@ public class RegistrationTests : IDisposable
         Assert.Equal(50, Users(factory).Count);
     }
 
+    // Одно свободное место и заявки разом: pg_advisory_xact_lock обязан развести их по одной.
+    // Без него часть заявок читает один и тот же счётчик и проходит предел все сразу — но не
+    // каждый раз: пяти заявок для надёжной поимки мало, гонка ловится не всегда.
+    // Двадцать ловят её стабильно.
+    [Fact]
+    public async Task A_burst_of_requests_does_not_break_the_queue_limit()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        OpenRegistration(factory);
+        FillTheQueue(factory, 49);
+
+        var clients = Enumerable.Range(0, 20)
+            .Select(_ => factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false }))
+            .ToList();
+        var fields = await Task.WhenAll(clients.Select((client, i) =>
+            RegisterFields(client, $"vorvalsya{i}", "parol-vorvavshegosya")));
+
+        await Task.WhenAll(clients.Select((client, i) => client.PostAsync("/register", fields[i])));
+
+        Assert.Equal(50, Users(factory).Count);
+    }
+
     [Fact]
     public async Task Approved_people_do_not_fill_the_queue()
     {

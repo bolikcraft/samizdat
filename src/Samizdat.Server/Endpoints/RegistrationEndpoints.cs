@@ -19,6 +19,8 @@ public static class RegistrationEndpoints
     // его берут все заявки разом и никто больше.
     const long QueueLock = 761_923_401;
 
+    const string QueueFullMessage = "Регистрация временно закрыта: слишком много заявок ждут ответа.";
+
     public static void MapRegistration(this WebApplication app)
     {
         app.MapGet("/i/{token}", (string token, HttpContext context, SamizdatDbContext db,
@@ -118,6 +120,12 @@ public static class RegistrationEndpoints
                 return Form(pages, settings, antiforgery, context, "/register", note: null,
                             form.Login, fault);
 
+            // Дешёвый счёт до хэша: забитая очередь не должна стоить Argon2id на каждый запрос.
+            // Точную проверку делает второй счёт, под блокировкой.
+            if (await db.Users.CountAsync(row => row.ApprovedAt == null) >= MaxPending)
+                return Form(pages, settings, antiforgery, context, "/register", note: null,
+                            form.Login, QueueFullMessage);
+
             // Хэш считается до транзакции: Argon2id занимает десятые доли секунды, и соседняя
             // заявка ждала бы их под блокировкой очереди.
             var person = form.ToReader(DateTimeOffset.UtcNow, approved: false);
@@ -131,7 +139,7 @@ public static class RegistrationEndpoints
             {
                 await transaction.RollbackAsync();
                 return Form(pages, settings, antiforgery, context, "/register", note: null, form.Login,
-                            "Регистрация временно закрыта: слишком много заявок ждут ответа.");
+                            QueueFullMessage);
             }
 
             db.Users.Add(person);

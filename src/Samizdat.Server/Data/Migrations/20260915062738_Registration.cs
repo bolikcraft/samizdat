@@ -54,9 +54,15 @@ namespace Samizdat.Server.Data.Migrations
             migrationBuilder.DropTable(
                 name: "invites");
 
+            // Неразобранные заявки сносим вместе с колонкой: без неё они станут обычными
+            // учётками с паролем, который человек задал сам, и вход их пустит.
+            migrationBuilder.Sql("""DELETE FROM users WHERE "ApprovedAt" IS NULL;""");
+
             migrationBuilder.DropColumn(
                 name: "ApprovedAt",
                 table: "users");
+
+            migrationBuilder.Sql("DELETE FROM site_settings WHERE \"Key\" = 'auth.open_registration';");
         }
     }
 }
