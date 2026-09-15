@@ -50,10 +50,12 @@ public static class SettingsEndpoints
             if (newToken is not null) context.Response.Cookies.Delete(NewTokenCookie, NewTokenCookieOptions(context));
 
             var now = DateTimeOffset.UtcNow;
-            var titles = db.Articles.ToDictionary(article => article.Slug, article => article.Title);
-            // Живые сверху: мёртвые строки остаются как след, но не мешают найти рабочую ссылку.
-            List<Dictionary<string, object?>> links = isOwner
-                ? db.ShareLinks.ToList()
+            List<Dictionary<string, object?>> links = [];
+            if (isOwner)
+            {
+                var titles = db.Articles.ToDictionary(article => article.Slug, article => article.Title);
+                // Живые сверху: мёртвые строки остаются как след, но не мешают найти рабочую ссылку.
+                links = db.ShareLinks.ToList()
                     .OrderByDescending(link => link.IsAlive(now)).ThenByDescending(link => link.CreatedAt)
                     .Select(link => new Dictionary<string, object?>
                     {
@@ -66,8 +68,8 @@ public static class SettingsEndpoints
                         ["expires_at"] = link.ExpiresAt?.ToString("yyyy-MM-dd HH:mm"),
                         ["opened_count"] = link.OpenedCount,
                         ["last_opened_at"] = link.LastOpenedAt?.ToString("yyyy-MM-dd HH:mm"),
-                    }).ToList()
-                : [];
+                    }).ToList();
+            }
 
             List<Dictionary<string, object?>> people = isOwner
                 ? db.Users.OrderBy(row => row.Login).ToList().Select(row => new Dictionary<string, object?>

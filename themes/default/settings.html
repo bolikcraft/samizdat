@@ -12,7 +12,7 @@
 
 {{~## Читателю тут открыт один раздел — свой пароль: остальные и не рисуются. Первый видимый
 раздел он же и раздел без якоря, поэтому у читателя открывается «Пароль». ##~}}
-{{ if user && user.is_owner }}
+{{~ if user && user.is_owner ~}}
 <section class="settings-pane" id="appearance">
   <h2>Внешний вид</h2>
   {{ if message_section == "appearance" }}{{ message_block }}{{ end }}
@@ -110,7 +110,7 @@
     {{ end }}
   </div>
 </section>
-{{ end }}
+{{~ end ~}}
 
 <section class="settings-pane" id="security">
   <h2>Пароль</h2>
@@ -124,7 +124,7 @@
   </form>
 </section>
 
-{{ if user && user.is_owner }}
+{{~ if user && user.is_owner ~}}
 <section class="settings-pane" id="people">
   <h2>Пользователи</h2>
   {{ if message_section == "people" }}{{ message_block }}{{ end }}
@@ -170,9 +170,9 @@
   </table>
   </div>
 </section>
-{{ end }}
+{{~ end ~}}
 
-{{ if user && user.is_owner }}
+{{~ if user && user.is_owner ~}}
 <section class="settings-pane" id="tokens">
   <h2>Токены CLI</h2>
   {{ if message_section == "tokens" }}{{ message_block }}{{ end }}
@@ -263,7 +263,7 @@
   <p class="empty">Ссылок пока нет.</p>
   {{ end }}
 </section>
-{{ end }}
+{{~ end ~}}
 
 </div>
 
