@@ -354,6 +354,84 @@ public class RegistrationTests : IDisposable
         Assert.Null(Invites(factory).Single().RevokedAt);
     }
 
+    [Fact]
+    public async Task Registration_is_closed_until_the_owner_opens_it()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        var client = factory.CreateClient();
+
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/register")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound,
+            (await client.PostAsync("/register", Fields("ivan", "parol-ivana"))).StatusCode);
+        Assert.Empty(Users(factory));
+    }
+
+    [Fact]
+    public async Task An_open_registration_puts_the_person_in_the_queue_without_a_session()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        OpenRegistration(factory);
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+
+        var answer = await client.PostAsync("/register", await RegisterFields(client, "ivan", "parol-ivana"));
+
+        Assert.Equal(HttpStatusCode.OK, answer.StatusCode);
+        Assert.Contains("Заявка отправлена", await answer.Content.ReadAsStringAsync());
+
+        var person = Users(factory).Single();
+        Assert.Null(person.ApprovedAt);
+        Assert.Equal(UserRole.Reader, person.Role);
+        // Сессии нет: страница сайта по-прежнему уводит на вход.
+        Assert.Equal(HttpStatusCode.Found, (await client.GetAsync("/")).StatusCode);
+    }
+
+    [Fact]
+    public async Task A_busy_login_is_refused_on_the_open_form()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        OpenRegistration(factory);
+        AddPerson(factory, "ivan", "parol-ivana", UserRole.Reader);
+        var client = factory.CreateClient();
+
+        var answer = await client.PostAsync("/register", await RegisterFields(client, "ivan", "drugoy-parol"));
+
+        Assert.Contains("логин уже занят", await answer.Content.ReadAsStringAsync());
+        Assert.Single(Users(factory));
+    }
+
+    [Fact]
+    public async Task A_full_queue_closes_the_open_registration()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        OpenRegistration(factory);
+        for (var number = 0; number < 50; number++) AddPending(factory, $"gost{number}", "parol-gostya");
+        var client = factory.CreateClient();
+
+        var answer = await client.PostAsync("/register", await RegisterFields(client, "ivan", "parol-ivana"));
+
+        Assert.Contains("временно закрыта", await answer.Content.ReadAsStringAsync());
+        Assert.Equal(50, Users(factory).Count);
+    }
+
+    [Fact]
+    public async Task A_person_who_is_already_in_does_not_get_the_open_form()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        OpenRegistration(factory);
+        AddPerson(factory, "ivan", "parol-ivana", UserRole.Reader);
+        var client = await Login(factory, "ivan", "parol-ivana");
+
+        var answer = await client.GetAsync("/register");
+
+        Assert.Equal(HttpStatusCode.Redirect, answer.StatusCode);
+        Assert.Equal("/", answer.Headers.Location?.ToString());
+    }
+
     WebApplicationFactory<Program> CreateFactory() =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
@@ -477,5 +555,28 @@ public class RegistrationTests : IDisposable
         db.Invites.Add(invite);
         db.SaveChanges();
         return invite.Token;
+    }
+
+    /// Поля без antiforgery-поля — проверить, что POST без токена отказывает.
+    static FormUrlEncodedContent Fields(string login, string password)
+        => new(new Dictionary<string, string>
+        {
+            ["login"] = login, ["password"] = password, ["repeat"] = password,
+        });
+
+    static void OpenRegistration(WebApplicationFactory<Program> factory)
+    {
+        using var scope = factory.Services.CreateScope();
+        scope.ServiceProvider.GetRequiredService<SiteSettings>().Set("auth.open_registration", "true");
+    }
+
+    /// Открытая форма: сперва её берут, потом отправляют — antiforgery-поле и кука едут вместе.
+    static async Task<FormUrlEncodedContent> RegisterFields(HttpClient client, string login, string password)
+    {
+        var (name, value) = AntiforgeryToken(await client.GetStringAsync("/register"));
+        return new(new Dictionary<string, string>
+        {
+            ["login"] = login, ["password"] = password, ["repeat"] = password, [name] = value,
+        });
     }
 }

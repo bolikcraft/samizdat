@@ -11,6 +11,10 @@ namespace Samizdat.Server.Endpoints;
 /// запись. Оба анонимные — их зовут до всякого входа.
 public static class RegistrationEndpoints
 {
+    // Предел очереди — единственный барьер, пока нет ни почты, ни капчи: бот набьёт полсотни
+    // заявок и упрётся, а не наплодит их тысячами.
+    const int MaxPending = 50;
+
     public static void MapRegistration(this WebApplication app)
     {
         app.MapGet("/i/{token}", (string token, HttpContext context, SamizdatDbContext db,
@@ -90,7 +94,65 @@ public static class RegistrationEndpoints
             await SessionCookie.SignIn(context, person);
             return Results.Redirect("/");
         }).AllowAnonymous().RequireValidToken();
+
+        app.MapGet("/register", (HttpContext context, PageRenderer pages, SiteSettings settings,
+                                 IAntiforgery antiforgery) =>
+        {
+            if (context.User.Identity?.IsAuthenticated == true) return Results.Redirect("/");
+
+            return Form(pages, settings, antiforgery, context, "/register", note: null,
+                        login: "", error: null);
+        }).AllowAnonymous().RefuseWhenClosed();
+
+        app.MapPost("/register", async (HttpContext context, SamizdatDbContext db, PageRenderer pages,
+                                        SiteSettings settings, IAntiforgery antiforgery) =>
+        {
+            if (context.User.Identity?.IsAuthenticated == true) return Results.Redirect("/");
+
+            var form = await RegistrationForm.Read(context);
+            if (form.Fault() is { } fault)
+                return Form(pages, settings, antiforgery, context, "/register", note: null,
+                            form.Login, fault);
+
+            if (await db.Users.CountAsync(row => row.ApprovedAt == null) >= MaxPending)
+                return Form(pages, settings, antiforgery, context, "/register", note: null, form.Login,
+                            "Регистрация временно закрыта: слишком много заявок ждут ответа.");
+
+            var person = form.ToReader(DateTimeOffset.UtcNow, approved: false);
+            db.Users.Add(person);
+            try
+            {
+                await db.SaveChangesAsync();
+            }
+            catch (DbUpdateException error)
+                when (error.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+            {
+                return Form(pages, settings, antiforgery, context, "/register", note: null,
+                            form.Login, "Такой логин уже занят.");
+            }
+
+            return Results.Content(pages.Render("register-sent.html", new()
+            {
+                ["page_title"] = "Заявка отправлена",
+                ["site"] = PageEndpoints.SiteModel(settings),
+                ["noindex"] = true,
+            }), "text/html; charset=utf-8");
+        }).AllowAnonymous().RefuseWhenClosed().RequireValidToken();
     }
+
+    /// Закрытая регистрация отвечает «нет такой страницы» раньше, чем проверка токена.
+    // Обязан стоять до RequireValidToken: фильтры отрабатывают прежде тела обработчика, и форма
+    // без токена получала бы 400 — то есть ответ выдавал бы, что маршрут всё-таки есть.
+    static RouteHandlerBuilder RefuseWhenClosed(this RouteHandlerBuilder builder)
+        => builder.AddEndpointFilter(async (invocation, next) =>
+        {
+            var services = invocation.HttpContext.RequestServices;
+            var settings = services.GetRequiredService<SiteSettings>();
+
+            return settings.OpenRegistration
+                ? await next(invocation)
+                : GuestPages.NotFound(services.GetRequiredService<PageRenderer>(), settings);
+        });
 
     static IResult Form(PageRenderer pages, SiteSettings settings, IAntiforgery antiforgery,
                         HttpContext context, string action, string? note, string login, string? error)
