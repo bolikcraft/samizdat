@@ -6,6 +6,8 @@ public sealed class DbArticleLookup(SamizdatDbContext db) : IArticleLookup
 {
     // Список берётся один раз на запрос: в статье десятки ссылок, и запрос на каждую был бы
     // десятками запросов в базу на один рендер.
+    // Кэш живёт до конца scope и не сбрасывается: не резолвить после записи статьи в том же
+    // scope, иначе свежая статья сюда не попадёт.
     HashSet<string>? slugs;
 
     public string? Resolve(string target)

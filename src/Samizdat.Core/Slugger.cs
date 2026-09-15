@@ -4,7 +4,8 @@ namespace Samizdat.Core;
 
 public static class Slugger
 {
-    const string Fallback = "bez-nazvaniya";
+    /// Адрес для заголовка без букв и цифр.
+    public const string Fallback = "bez-nazvaniya";
 
     static readonly Dictionary<char, string> Cyrillic = new()
     {

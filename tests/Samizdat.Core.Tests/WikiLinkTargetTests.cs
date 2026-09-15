@@ -22,6 +22,18 @@ public class WikiLinkTargetTests
         => Assert.Equal(["Заметка", "zametka"], WikiLinkTarget.Candidates("Техника/Серверы/Заметка"));
 
     [Fact]
+    public void Folder_path_and_anchor_are_dropped_together()
+        => Assert.Equal(["Заметка", "zametka"], WikiLinkTarget.Candidates("Техника/Серверы/Заметка#Диски"));
+
+    [Fact]
     public void Empty_target_gives_nothing()
         => Assert.Empty(WikiLinkTarget.Candidates("#раздел"));
+
+    [Fact]
+    public void Target_without_letters_does_not_lead_to_the_fallback_slug()
+        => Assert.Equal(["!!!"], WikiLinkTarget.Candidates("!!!"));
+
+    [Fact]
+    public void Literal_fallback_slug_still_works()
+        => Assert.Equal(["bez-nazvaniya"], WikiLinkTarget.Candidates("bez-nazvaniya"));
 }

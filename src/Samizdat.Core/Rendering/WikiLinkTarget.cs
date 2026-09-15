@@ -14,7 +14,10 @@ public static class WikiLinkTarget
         if (name.Length == 0) return [];
 
         var slug = Slugger.FromTitle(name);
-        return slug == name ? [name] : [name, slug];
+        if (slug == name) return [name];
+
+        // Цель без букв и цифр даёт запасное имя, а оно у чужой статьи своё: ссылка ушла бы не туда.
+        return slug == Slugger.Fallback ? [name] : [name, slug];
     }
 
     /// Без якоря "#раздел" и без пути папки: ссылка ведёт на статью целиком.
