@@ -13,7 +13,7 @@ public sealed class ArticleFiles(string dataRoot)
     // Первый сегмент маршрутов, у которых есть литеральный обработчик GET: там статья с таким
     // именем была бы недоступна. Регистр не важен — маршруты его не различают.
     static readonly HashSet<string> ReservedSlugs =
-        new(["s", "login", "settings", "assets", "background", "visibility", "share"],
+        new(["s", "login", "settings", "assets", "background", "visibility", "share", "download"],
             StringComparer.OrdinalIgnoreCase);
 
     public static bool IsReservedSlug(string slug) => ReservedSlugs.Contains(slug);
@@ -34,6 +34,29 @@ public sealed class ArticleFiles(string dataRoot)
     /// Проверка без чтения содержимого — для отбраковки осиротевшей в БД строки на горячем пути кэша.
     public bool MarkdownExists(string slug)
         => IsValidSlug(slug) && File.Exists(Path.Combine(Folder(slug), "index.md"));
+
+    /// Байты файла как есть — для владельца, который качает копию своей заметки. ReadAllText съел бы
+    /// BOM, и «байт в байт» перестало бы быть правдой.
+    public byte[]? ReadMarkdownBytes(string slug)
+    {
+        if (!IsValidSlug(slug)) return null;
+        var file = Path.Combine(Folder(slug), "index.md");
+        return File.Exists(file) ? File.ReadAllBytes(file) : null;
+    }
+
+    /// Вложения статьи по алфавиту: имя и полный путь. Каждое имя проходит через AttachmentPath,
+    /// поэтому index.md сюда не попадает, а симлинк наружу отсеивается.
+    public IEnumerable<(string Name, string FullPath)> Attachments(string slug)
+    {
+        var folder = Folder(slug);
+        if (!IsValidSlug(slug) || !Directory.Exists(folder)) yield break;
+
+        foreach (var file in Directory.EnumerateFiles(folder).Order(StringComparer.Ordinal))
+        {
+            var name = Path.GetFileName(file);
+            if (AttachmentPath(slug, name) is { } full) yield return (name, full);
+        }
+    }
 
     /// null, если имя выводит за каталог статьи — текстом или через симлинк на чужой файл.
     public string? AttachmentPath(string slug, string name)
