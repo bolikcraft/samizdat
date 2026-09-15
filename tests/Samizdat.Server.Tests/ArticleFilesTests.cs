@@ -1,3 +1,4 @@
+using System.Runtime.Versioning;
 using Samizdat.Server.Storage;
 
 namespace Samizdat.Server.Tests;
@@ -117,6 +118,32 @@ public class ArticleFilesTests : IDisposable
 
         Assert.Equal("v1", files.ReadMarkdown("s"));
         Assert.Equal(["s"], files.AllSlugs());
+    }
+
+    // Каталог новой версии на момент Rollback всегда свежесозданный (переехал из staging), поэтому
+    // права из прошлого запроса на него уже не действуют — отбирать их нужно после BeginReplace,
+    // не до него. Это и воспроизводит отказ Rollback, который должен ловить ApiEndpoints.
+    // Права доступа Unix: тест воспроизводим только на Linux/macOS, как и Testcontainers-стенд в CI.
+    [Fact]
+    [SupportedOSPlatform("linux")]
+    public void Rollback_can_fail_and_reports_the_same_exception_types_ApiEndpoints_catches()
+    {
+        files.Replace("s", "v1"u8.ToArray(), []);
+        var write = files.BeginReplace("s", "v2"u8.ToArray(), []);
+        var target = files.Folder("s");
+        File.SetUnixFileMode(target, UnixFileMode.UserRead | UnixFileMode.UserExecute);
+
+        try
+        {
+            var error = Record.Exception(() => write.Rollback());
+
+            Assert.True(error is IOException or UnauthorizedAccessException,
+                $"неожиданный тип исключения: {error?.GetType()}");
+        }
+        finally
+        {
+            File.SetUnixFileMode(target, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        }
     }
 
     [Fact]

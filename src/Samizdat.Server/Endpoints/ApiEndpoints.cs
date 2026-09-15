@@ -26,7 +26,7 @@ public static class ApiEndpoints
 
         api.MapPut("/articles/{slug}", async (string slug, HttpRequest request,
                                               ArticleFiles files, SamizdatDbContext db,
-                                              ArticleIndexer indexer) =>
+                                              ArticleIndexer indexer, ILogger<Program> logger) =>
         {
             if (!ArticleFiles.IsValidSlug(slug)) return Results.BadRequest("Плохой slug");
             if (ArticleFiles.IsReservedSlug(slug))
@@ -77,6 +77,23 @@ public static class ApiEndpoints
             row.Theme = parsed.FrontMatter.Theme;
             row.ContentHash = ArticleHash.Compute(markdown, attachments, folder);
             row.UpdatedAt = DateTimeOffset.UtcNow;
+
+            // Сам откат может отказать (площадка потеряла право записи, диск отвалился). Тогда файлы
+            // на диске так и останутся отвергнутой базой версией — но об этом должен узнать владелец
+            // через лог, а не вместо ответа: подмена собой исходной причины отказа только запутает.
+            void RollbackFileWrite()
+            {
+                try
+                {
+                    write.Rollback();
+                }
+                catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+                {
+                    logger.LogError(error, "Статья {Slug}: не удалось откатить запись на диске, " +
+                                            "там осталась версия, отвергнутая базой", slug);
+                }
+            }
+
             try
             {
                 indexer.Index(row, parsed.Body);
@@ -87,12 +104,12 @@ public static class ApiEndpoints
             catch (DbUpdateException error) when (error.InnerException is PostgresException
                 { SqlState: PostgresErrorCodes.ProgramLimitExceeded })
             {
-                write.Rollback();
+                RollbackFileWrite();
                 return Results.BadRequest($"{slug}: описание слишком длинное для поискового индекса");
             }
             catch
             {
-                write.Rollback();
+                RollbackFileWrite();
                 throw;
             }
 
