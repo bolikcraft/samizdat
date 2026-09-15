@@ -32,8 +32,11 @@ public class ArticleFilesTests : IDisposable
     // Все эти сегменты — литеральные маршруты, которые побеждают /{slug}: статья с таким именем
     // была бы недоступна за своим адресом.
     [Theory]
+    [InlineData("i")]
+    [InlineData("I")]
     [InlineData("login")]
     [InlineData("Login")]
+    [InlineData("register")]
     [InlineData("settings")]
     [InlineData("assets")]
     [InlineData("background")]

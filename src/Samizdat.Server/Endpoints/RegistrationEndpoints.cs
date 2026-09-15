@@ -12,9 +12,13 @@ public static class RegistrationEndpoints
 {
     public static void MapRegistration(this WebApplication app)
     {
-        app.MapGet("/i/{token}", (string token, SamizdatDbContext db, PageRenderer pages,
-                                  SiteSettings settings) =>
+        app.MapGet("/i/{token}", (string token, HttpContext context, SamizdatDbContext db,
+                                  PageRenderer pages, SiteSettings settings) =>
         {
+            // Ставим до любого ответа: после того как ссылку погасили, форма не должна лежать
+            // в браузере или прокси.
+            context.Response.Headers.CacheControl = "no-store";
+
             var invite = db.Invites.AsNoTracking().FirstOrDefault(row => row.Token == token);
             if (invite is null) return NotFound(pages, settings);
             if (!invite.IsAlive(DateTimeOffset.UtcNow)) return Dead(pages, settings);
