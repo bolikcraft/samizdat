@@ -15,4 +15,10 @@ public sealed class ArticleRow
     /// Когда видимость меняли последний раз. Входит в отпечаток каталога: по нему сбрасывается
     /// кэш страниц, иначе закрытая статья продолжала бы открываться из него.
     public DateTimeOffset? VisibilityChangedAt { get; set; }
+
+    /// Текст статьи без разметки. Поисковые векторы над ним считает сама база.
+    public string SearchText { get; set; } = "";
+
+    /// ContentHash на момент сборки индекса. Расходится — сервер достроит индекс при старте.
+    public string IndexedHash { get; set; } = "";
 }

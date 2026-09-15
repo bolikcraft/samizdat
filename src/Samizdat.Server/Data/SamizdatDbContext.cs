@@ -5,6 +5,7 @@ namespace Samizdat.Server.Data;
 public sealed class SamizdatDbContext(DbContextOptions<SamizdatDbContext> options) : DbContext(options)
 {
     public DbSet<ArticleRow> Articles => Set<ArticleRow>();
+    public DbSet<ArticleLinkRow> ArticleLinks => Set<ArticleLinkRow>();
     public DbSet<UserRow> Users => Set<UserRow>();
     public DbSet<ApiTokenRow> ApiTokens => Set<ApiTokenRow>();
     public DbSet<SettingRow> Settings => Set<SettingRow>();
@@ -25,6 +26,18 @@ public sealed class SamizdatDbContext(DbContextOptions<SamizdatDbContext> option
             article.Property(row => row.Slug).HasMaxLength(200);
             article.Property(row => row.Title).HasMaxLength(500);
             article.Property(row => row.Folder).HasMaxLength(1000).HasDefaultValue("");
+        });
+
+        model.Entity<ArticleLinkRow>(link =>
+        {
+            link.ToTable("article_links");
+            link.HasKey(row => new { row.FromSlug, row.ToSlug });
+            link.Property(row => row.FromSlug).HasMaxLength(200);
+            link.Property(row => row.ToSlug).HasMaxLength(200);
+            link.HasIndex(row => row.ToSlug);
+            // Каскад: статью снесли через push --prune — её исходящие ссылки уходят с ней.
+            link.HasOne<ArticleRow>().WithMany().HasForeignKey(row => row.FromSlug)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         model.Entity<UserRow>(user =>
