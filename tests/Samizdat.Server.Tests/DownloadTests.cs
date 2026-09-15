@@ -334,4 +334,105 @@ public class DownloadTests : IDisposable
         Assert.Equal(HttpStatusCode.Redirect, answer.StatusCode);
         return client;
     }
+
+    [Fact]
+    public async Task Owner_sees_the_button_on_the_article()
+    {
+        using var factory = CreateFactory();
+        AddArticle(factory, "tayna", ArticleVisibility.Private);
+        AddPerson(factory, "hozyain", "parol", UserRole.Owner);
+
+        var client = await Login(factory, "hozyain", "parol");
+        var html = await client.GetStringAsync("/tayna");
+
+        Assert.Contains("href=\"/download/tayna\"", html);
+        Assert.Contains("Скачать .md", html);
+    }
+
+    [Fact]
+    public async Task The_button_says_zip_when_the_article_has_attachments()
+    {
+        using var factory = CreateFactory();
+        AddArticle(factory, "tayna", ArticleVisibility.Private);
+        await File.WriteAllBytesAsync(Path.Combine(dataRoot, "articles", "tayna", "ezh.png"), [1, 2, 3]);
+        AddPerson(factory, "hozyain", "parol", UserRole.Owner);
+
+        var client = await Login(factory, "hozyain", "parol");
+        var html = await client.GetStringAsync("/tayna");
+
+        Assert.Contains("Скачать .zip", html);
+    }
+
+    [Fact]
+    public async Task Reader_sees_no_button_while_the_switch_is_off()
+    {
+        using var factory = CreateFactory();
+        AddArticle(factory, "otkrytaya", ArticleVisibility.Shared);
+        AddPerson(factory, "ivan", "parol", UserRole.Reader);
+
+        var client = await Login(factory, "ivan", "parol");
+        var html = await client.GetStringAsync("/otkrytaya");
+
+        Assert.DoesNotContain("/download/otkrytaya", html);
+    }
+
+    [Fact]
+    public async Task The_button_appears_on_a_page_that_already_sat_in_the_cache()
+    {
+        using var factory = CreateFactory();
+        AddArticle(factory, "otkrytaya", ArticleVisibility.Shared);
+        AddPerson(factory, "ivan", "parol", UserRole.Reader);
+
+        var client = await Login(factory, "ivan", "parol");
+        Assert.DoesNotContain("/download/otkrytaya", await client.GetStringAsync("/otkrytaya"));
+
+        SetSetting(factory, "articles.download.readers", "on");
+
+        Assert.Contains("href=\"/download/otkrytaya\"", await client.GetStringAsync("/otkrytaya"));
+    }
+
+    [Fact]
+    public async Task A_guest_page_carries_the_address_of_its_own_link()
+    {
+        using var factory = CreateFactory();
+        AddArticle(factory, "tayna", ArticleVisibility.Private);
+        SetSetting(factory, "articles.download.guests", "on");
+        var first = AddLink(factory, "tayna");
+
+        var client = factory.CreateClient();
+        var html = await client.GetStringAsync($"/s/{first}");
+
+        Assert.Contains($"href=\"/download/s/{first}\"", html);
+    }
+
+    [Fact]
+    public async Task Two_links_to_one_article_do_not_share_a_download_address()
+    {
+        using var factory = CreateFactory();
+        AddArticle(factory, "tayna", ArticleVisibility.Private);
+        SetSetting(factory, "articles.download.guests", "on");
+        var first = AddLink(factory, "tayna");
+        var second = AddLink(factory, "tayna");
+
+        var client = factory.CreateClient();
+        // Первая страница кладёт статью в кэш — вторая обязана получить свой адрес, а не её.
+        await client.GetStringAsync($"/s/{first}");
+        var html = await client.GetStringAsync($"/s/{second}");
+
+        Assert.Contains($"href=\"/download/s/{second}\"", html);
+        Assert.DoesNotContain(first, html);
+    }
+
+    [Fact]
+    public async Task A_guest_sees_no_button_while_the_guest_switch_is_off()
+    {
+        using var factory = CreateFactory();
+        AddArticle(factory, "tayna", ArticleVisibility.Private);
+        var token = AddLink(factory, "tayna");
+
+        var client = factory.CreateClient();
+        var html = await client.GetStringAsync($"/s/{token}");
+
+        Assert.DoesNotContain("/download/s/", html);
+    }
 }

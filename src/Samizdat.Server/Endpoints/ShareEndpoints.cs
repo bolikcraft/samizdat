@@ -44,6 +44,7 @@ public static class ShareEndpoints
             {
                 var text = files.ReadMarkdown(link.Slug)!;
                 var parsed = FrontMatterParser.Parse(text);
+                var asZip = files.Attachments(link.Slug).Any();
 
                 return pages.Render("article.html", new()
                 {
@@ -59,6 +60,10 @@ public static class ShareEndpoints
                         ["date"] = parsed.FrontMatter.Date?.ToString("yyyy-MM-dd"),
                         // NoArticles: любая вики-ссылка станет текстом, чужие slug не утекают.
                         ["html"] = markdown.Render(parsed.Body, link.Slug, NoArticles.Instance, AttachmentBase),
+                        ["download_url"] = ArticleAccess.CanDownloadByShare(settings.Download)
+                            ? DownloadUrl
+                            : null,
+                        ["download_label"] = asZip ? ".zip" : ".md",
                     },
                     // Гостю делиться нечем: ссылка у него уже есть, панель на его странице пуста.
                     ["share_panel"] = "",
@@ -73,7 +78,9 @@ public static class ShareEndpoints
                     .SetProperty(row => row.OpenedCount, row => row.OpenedCount + 1)
                     .SetProperty(row => row.LastOpenedAt, now));
 
-            return Results.Content(html.Replace(AttachmentBase, $"/s/{token}/"), "text/html; charset=utf-8");
+            return Results.Content(html.Replace(AttachmentBase, $"/s/{token}/")
+                                       .Replace(DownloadUrl, $"/download/s/{token}"),
+                                   "text/html; charset=utf-8");
         }).AllowAnonymous();
 
         // Счётчик открытий тут не трогаем: статья с тремя картинками дала бы четыре открытия.
@@ -195,6 +202,10 @@ public static class ShareEndpoints
 
     // Base вложений в кэшированном html — плейсхолдер: html один на статью, а токен у каждой ссылки свой.
     internal const string AttachmentBase = "__SHARE_BASE__/";
+
+    // Адрес скачивания в кэшированном html — тоже плейсхолдер: html один на статью, а токен
+    // у каждой ссылки свой.
+    internal const string DownloadUrl = "__SHARE_DOWNLOAD__";
 
     static IResult NotFound(PageRenderer pages, SiteSettings settings)
         => Results.Content(pages.Render("404.html", new()
