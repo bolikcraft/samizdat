@@ -110,6 +110,7 @@ public static class SettingsEndpoints
                 }).ToList(),
                 ["links"] = links,
                 ["people"] = people,
+                ["signup"] = isOwner ? SignupSettingsEndpoints.Model(db, settings, context) : null,
             }), "text/html; charset=utf-8");
         });
 

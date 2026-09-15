@@ -173,6 +173,72 @@
 {{~ end ~}}
 
 {{~ if user && user.is_owner ~}}
+<section class="settings-pane" id="signup">
+  <h2>Регистрация</h2>
+  {{ if message_section == "signup" }}{{ message_block }}{{ end }}
+
+  <div class="settings-block">
+    <h3>Приглашения</h3>
+    <p class="hint">Ссылка срабатывает один раз: кто перешёл первым, тот и завёл учётку
+      читателя. Дальше она не работает и остаётся в списке следом.</p>
+    <form method="post" action="/settings/invites" class="settings-form">
+      {{ antiforgery }}
+      <label>Срок
+        <select name="days">
+          <option value="1">День</option>
+          <option value="7" selected>Неделя</option>
+          <option value="30">Месяц</option>
+          <option value="0">Без срока</option>
+        </select>
+      </label>
+      <label>Кому <input type="text" name="note" maxlength="200" autocomplete="off"
+                         placeholder="кому отдаёте ссылку"></label>
+      <button type="submit">Создать приглашение</button>
+    </form>
+    {{ if signup.invites.size > 0 }}
+    <div class="table-scroll">
+    <table class="invites settings-table">
+      <thead><tr><th>Ссылка</th><th>Кому</th><th>Состояние</th><th></th></tr></thead>
+      <tbody>
+      {{ for invite in signup.invites }}
+      <tr{{ if !invite.alive }} class="dead-link"{{ end }}>
+        <td>
+          <div class="link-cell">
+            <input class="link-url" type="text" readonly value="{{ invite.url | html.escape }}">
+            <button type="button" class="copy-link" data-url="{{ invite.url | html.escape }}">Скопировать</button>
+          </div>
+        </td>
+        <td>{{ if invite.note }}{{ invite.note | html.escape }}{{ else }}—{{ end }}</td>
+        <td>
+          {{~ if invite.used_at ~}}
+          завёл {{ invite.used_by | html.escape }}, {{ invite.used_at | html.escape }}
+          {{~ else if invite.alive ~}}
+          {{ if invite.expires_at }}до {{ invite.expires_at | html.escape }}{{ else }}без срока{{ end }}
+          {{~ else ~}}
+          не работает
+          {{~ end ~}}
+        </td>
+        <td class="row-actions">
+          {{ if invite.alive }}
+          <form method="post" action="/settings/invites/{{ invite.id }}/revoke" class="inline-form">
+            {{ antiforgery }}
+            <button type="submit">Отозвать</button>
+          </form>
+          {{ end }}
+        </td>
+      </tr>
+      {{ end }}
+      </tbody>
+    </table>
+    </div>
+    {{ else }}
+    <p class="empty">Приглашений пока нет.</p>
+    {{ end }}
+  </div>
+</section>
+{{~ end ~}}
+
+{{~ if user && user.is_owner ~}}
 <section class="settings-pane" id="tokens">
   <h2>Токены CLI</h2>
   {{ if message_section == "tokens" }}{{ message_block }}{{ end }}

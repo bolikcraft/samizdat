@@ -240,6 +240,73 @@ public class RegistrationTests : IDisposable
         Assert.Null(Invites(factory).Single().UsedAt);
     }
 
+    [Fact]
+    public async Task Owner_makes_an_invite_and_sees_its_link_in_the_settings()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        AddPerson(factory, "hozyain", "parol-hozyaina", UserRole.Owner);
+        var owner = await Login(factory, "hozyain", "parol-hozyaina");
+
+        var answer = await Post(owner, "/settings/invites",
+            new() { ["note"] = "для Ивана", ["days"] = "7" });
+
+        Assert.Equal(HttpStatusCode.Redirect, answer.StatusCode);
+        Assert.Equal("/settings?ok=invite_created#signup", answer.Headers.Location?.ToString());
+
+        var invite = Invites(factory).Single();
+        Assert.Equal("для Ивана", invite.Note);
+        Assert.NotNull(invite.ExpiresAt);
+
+        var html = await owner.GetStringAsync("/settings/");
+        Assert.Contains($"/i/{invite.Token}", html);
+    }
+
+    [Fact]
+    public async Task Owner_revokes_an_invite_and_it_stops_working()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        AddPerson(factory, "hozyain", "parol-hozyaina", UserRole.Owner);
+        var token = AddInvite(factory, note: null);
+        var id = Invites(factory).Single().Id;
+        var owner = await Login(factory, "hozyain", "parol-hozyaina");
+
+        var answer = await Post(owner, $"/settings/invites/{id}/revoke", new());
+
+        Assert.Equal("/settings?ok=invite_revoked#signup", answer.Headers.Location?.ToString());
+        Assert.Equal(HttpStatusCode.Gone,
+            (await factory.CreateClient().GetAsync($"/i/{token}")).StatusCode);
+    }
+
+    [Fact]
+    public async Task A_reader_cannot_make_an_invite()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        AddPerson(factory, "ivan", "parol-ivana", UserRole.Reader);
+        var reader = await Login(factory, "ivan", "parol-ivana");
+
+        var answer = await Post(reader, "/settings/invites", new() { ["days"] = "7" });
+
+        Assert.Equal(HttpStatusCode.Forbidden, answer.StatusCode);
+        Assert.Empty(Invites(factory));
+    }
+
+    [Fact]
+    public async Task An_unknown_term_is_refused()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        AddPerson(factory, "hozyain", "parol-hozyaina", UserRole.Owner);
+        var owner = await Login(factory, "hozyain", "parol-hozyaina");
+
+        var answer = await Post(owner, "/settings/invites", new() { ["days"] = "9999" });
+
+        Assert.Equal("/settings?err=invite_term#signup", answer.Headers.Location?.ToString());
+        Assert.Empty(Invites(factory));
+    }
+
     WebApplicationFactory<Program> CreateFactory() =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {

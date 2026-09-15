@@ -90,6 +90,7 @@ public static class Startup
         app.MapShare();
         app.MapApi();
         app.MapSettings();
+        app.MapSignupSettings();
     }
 
     // Настройки лежат в appsettings.xml, а не в json. Источники json убираем и ставим xml на их

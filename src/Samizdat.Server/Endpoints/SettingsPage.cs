@@ -43,6 +43,8 @@ public static class SettingsPage
         "person_added" or "person_password" or "person_deleted" => "people",
         "bad_person" or "person_short_password" or "login_taken" => "people",
         "last_owner" or "self_delete" or "other_owner" or "own_password" => "people",
+        "invite_created" or "invite_revoked" or "invite_note" or "invite_term" => "signup",
+        "signup_open" or "signup_approved" or "signup_rejected" or "not_pending" => "signup",
         _ => "appearance",
     };
 
@@ -62,6 +64,9 @@ public static class SettingsPage
         "self_delete" => "Себя удалить нельзя.",
         "other_owner" => "Другого владельца менять нельзя.",
         "own_password" => "Свой пароль меняйте в разделе «Пароль»: там спрашивают текущий.",
+        "invite_note" => "Заметка длиннее 200 символов.",
+        "invite_term" => "Такого срока нет в списке.",
+        "not_pending" => "Этот человек уже не в очереди.",
         not null => "Не удалось выполнить действие.",
         null => ok switch
         {
@@ -77,6 +82,11 @@ public static class SettingsPage
             "background" => "Фон выбран.",
             "background_color" => "Цвет фона выбран.",
             "background_removed" => "Фон убран.",
+            "invite_created" => "Приглашение создано.",
+            "invite_revoked" => "Приглашение отозвано.",
+            "signup_open" => "Настройка регистрации сохранена.",
+            "signup_approved" => "Пользователь пущен.",
+            "signup_rejected" => "Заявка отклонена.",
             _ => null,
         },
     };
