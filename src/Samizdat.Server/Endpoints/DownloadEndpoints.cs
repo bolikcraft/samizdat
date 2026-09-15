@@ -25,6 +25,24 @@ public static class DownloadEndpoints
 
             return Package(files, slug, asIs: role == UserRole.Owner);
         }).RequireAuthorization();
+
+        // Гостевой адрес трёхсегментный, а slug у статьи односегментный — со строкой выше не спорит.
+        app.MapGet("/download/s/{token}", (string token, ArticleFiles files, SamizdatDbContext db,
+                                           SiteSettings settings, HttpContext context) =>
+        {
+            // Как и остальные гостевые маршруты: после отзыва ссылки файл не должен лежать в прокси.
+            context.Response.Headers.CacheControl = "no-store";
+
+            var link = db.ShareLinks.FirstOrDefault(row => row.Token == token);
+            if (link is null || !link.IsAlive(DateTimeOffset.UtcNow)) return Results.NotFound();
+            if (!ArticleAccess.CanDownloadByShare(settings.Download)) return Results.NotFound();
+
+            // Slug берётся из ссылки, а не из запроса: по чужой статье этот токен не пройдёт.
+            if (!files.MarkdownExists(link.Slug)) return Results.NotFound();
+
+            // Счётчик открытий не трогаем: скачивание — не открытие страницы.
+            return Package(files, link.Slug, asIs: false);
+        }).AllowAnonymous();
     }
 
     /// asIs — файл владельцу, байт в байт. Остальным шапка пересобирается.

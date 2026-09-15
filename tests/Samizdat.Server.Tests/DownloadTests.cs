@@ -200,6 +200,86 @@ public class DownloadTests : IDisposable
         Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/download/otkrytaya")).StatusCode);
     }
 
+    [Fact]
+    public async Task A_guest_downloads_by_a_link_when_the_switch_is_on()
+    {
+        using var factory = CreateFactory();
+        AddArticle(factory, "tayna", ArticleVisibility.Private,
+                   "---\ntitle: Тайна\ntags: [заметки]\n---\n\nТекст.\n");
+        SetSetting(factory, "articles.download.guests", "on");
+        var token = AddLink(factory, "tayna");
+
+        var client = factory.CreateClient();
+        var answer = await client.GetAsync($"/download/s/{token}");
+
+        Assert.Equal(HttpStatusCode.OK, answer.StatusCode);
+        Assert.Equal("no-store", answer.Headers.CacheControl?.ToString());
+
+        var text = await answer.Content.ReadAsStringAsync();
+        Assert.Contains("title: Тайна", text);
+        Assert.DoesNotContain("tags", text);
+    }
+
+    [Fact]
+    public async Task A_guest_gets_nothing_while_the_guest_switch_is_off()
+    {
+        using var factory = CreateFactory();
+        AddArticle(factory, "tayna", ArticleVisibility.Private);
+        // Переключатель читателей гостя не касается.
+        SetSetting(factory, "articles.download.readers", "on");
+        var token = AddLink(factory, "tayna");
+
+        var client = factory.CreateClient();
+
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"/download/s/{token}")).StatusCode);
+    }
+
+    [Fact]
+    public async Task A_revoked_link_downloads_nothing()
+    {
+        using var factory = CreateFactory();
+        AddArticle(factory, "tayna", ArticleVisibility.Private);
+        SetSetting(factory, "articles.download.guests", "on");
+        var token = AddLink(factory, "tayna", revoked: true);
+
+        var client = factory.CreateClient();
+
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"/download/s/{token}")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Downloading_does_not_count_as_opening_the_link()
+    {
+        using var factory = CreateFactory();
+        AddArticle(factory, "tayna", ArticleVisibility.Private);
+        SetSetting(factory, "articles.download.guests", "on");
+        var token = AddLink(factory, "tayna");
+
+        var client = factory.CreateClient();
+        await client.GetAsync($"/download/s/{token}");
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+        Assert.Equal(0, db.ShareLinks.Single().OpenedCount);
+    }
+
+    static string AddLink(WebApplicationFactory<Program> factory, string slug, bool revoked = false)
+    {
+        var token = ShareToken.Create();
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+        db.ShareLinks.Add(new ShareLinkRow
+        {
+            Token = token,
+            Slug = slug,
+            CreatedAt = DateTimeOffset.UtcNow,
+            RevokedAt = revoked ? DateTimeOffset.UtcNow : null,
+        });
+        db.SaveChanges();
+        return token;
+    }
+
     WebApplicationFactory<Program> CreateFactory() =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
