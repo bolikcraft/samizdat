@@ -40,6 +40,7 @@ public static class Startup
 
         builder.Services.AddScoped<IArticleLookup, DbArticleLookup>();
         builder.Services.AddScoped<ArticleIndexer>();
+        builder.Services.AddScoped<ArticleSearch>();
 
         // Апач-прокси стоит в соседнем контейнере, не на loopback — доверяем заголовку без ограничения по сети.
         builder.Services.Configure<ForwardedHeadersOptions>(options =>
