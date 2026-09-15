@@ -372,6 +372,49 @@ public class ArticleSearchTests(DatabaseFixture database) : IDisposable
 
         Assert.Contains("🚀", hit.Snippet, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public async Task Long_article_with_a_match_in_the_middle_gets_ellipsis_on_both_ends()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        var before = string.Join(" ", Enumerable.Repeat("слово", 40));
+        var after = string.Join(" ", Enumerable.Repeat("слово", 40));
+        AddArticle(factory, "dom", "Дом", $"{before} тут стоит старый сервер в подвале дома {after}",
+                   ArticleVisibility.Private);
+
+        var hit = Assert.Single(await Find(factory, "сервер", isOwner: true));
+
+        Assert.StartsWith(SearchSnippet.Ellipsis, hit.Snippet, StringComparison.Ordinal);
+        Assert.EndsWith(SearchSnippet.Ellipsis, hit.Snippet, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Short_article_that_fits_whole_has_no_ellipsis()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        AddArticle(factory, "dom", "Дом", "тут стоит тихий сервер", ArticleVisibility.Private);
+
+        var hit = Assert.Single(await Find(factory, "сервер", isOwner: true));
+
+        Assert.DoesNotContain(SearchSnippet.Ellipsis, hit.Snippet, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Match_at_the_start_of_a_long_article_has_no_leading_ellipsis()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        var after = string.Join(" ", Enumerable.Repeat("слово", 40));
+        AddArticle(factory, "dom", "Дом", $"Сервер стоит в подвале дома тихо и совсем незаметно {after}",
+                   ArticleVisibility.Private);
+
+        var hit = Assert.Single(await Find(factory, "сервер", isOwner: true));
+
+        Assert.False(hit.Snippet!.StartsWith(SearchSnippet.Ellipsis, StringComparison.Ordinal));
+        Assert.EndsWith(SearchSnippet.Ellipsis, hit.Snippet, StringComparison.Ordinal);
+    }
 }
 
 [Collection("db")]

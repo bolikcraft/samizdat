@@ -42,21 +42,38 @@ public sealed class ArticleSearch(SamizdatDbContext db)
                                  ELSE a."Description" || E'\n\n' || a."SearchText"
                             END AS text
                      FROM articles a
+                 ),
+                 headline AS (
+                     SELECT source."Slug", source.text,
+                            replace(replace(replace(replace(replace(
+                                ts_headline('russian',
+                                    replace(replace(replace(replace(replace(source.text,
+                                        '&', '&amp;'), '<', '&lt;'), '>', '&gt;'), '"', '&quot;'), '''', '&#39;'),
+                                    q.query, @options),
+                                '&#39;', ''''), '&quot;', '"'), '&gt;', '>'), '&lt;', '<'), '&amp;', '&') AS snippet
+                     FROM source, q
+                 ),
+                 -- Многоточие ставим, только если ts_headline реально отрезал край: сравниваем начало
+                 -- и конец цитаты без маркеров подсветки с началом и концом источника.
+                 edges AS (
+                     SELECT headline."Slug", headline.text, headline.snippet,
+                            replace(replace(headline.snippet, @mark0, ''), @mark1, '') AS plain
+                     FROM headline
                  )
             SELECT a."Slug", a."Title", a."Folder",
                    (a."Visibility" = @shared OR @owner) AS can_open,
                    CASE WHEN a."Visibility" = @shared OR @owner THEN
-                       replace(replace(replace(replace(replace(
-                           ts_headline('russian',
-                               replace(replace(replace(replace(replace(source.text,
-                                   '&', '&amp;'), '<', '&lt;'), '>', '&gt;'), '"', '&quot;'), '''', '&#39;'),
-                               q.query, @options),
-                           '&#39;', ''''), '&quot;', '"'), '&gt;', '>'), '&lt;', '<'), '&amp;', '&')
+                       (CASE WHEN strpos(edges.text, split_part(edges.plain, @delimiter, 1)) = 1
+                             THEN '' ELSE @ellipsis || ' ' END)
+                       || edges.snippet ||
+                       (CASE WHEN right(edges.text, char_length(split_part(edges.plain, @delimiter, -1)))
+                                  = split_part(edges.plain, @delimiter, -1)
+                             THEN '' ELSE ' ' || @ellipsis END)
                        END AS snippet,
                    ts_rank_cd(CASE WHEN a."Visibility" = @shared OR @owner
                                    THEN a."SearchVector" ELSE a."MetaVector" END, q.query) AS rank
             FROM articles a
-            JOIN source ON source."Slug" = a."Slug"
+            JOIN edges ON edges."Slug" = a."Slug"
             CROSS JOIN q
             WHERE ((a."Visibility" = @shared OR @owner) AND a."SearchVector" @@ q.query)
                OR a."MetaVector" @@ q.query
@@ -65,7 +82,9 @@ public sealed class ArticleSearch(SamizdatDbContext db)
             """;
 
         return Run(sql, ("query", text), ("owner", isOwner), ("shared", (int)ArticleVisibility.Shared),
-                   ("options", SearchSnippet.Options), ("limit", Limit));
+                   ("options", SearchSnippet.Options), ("limit", Limit),
+                   ("mark0", SearchSnippet.Start.ToString()), ("mark1", SearchSnippet.Stop.ToString()),
+                   ("delimiter", SearchSnippet.FragmentDelimiter), ("ellipsis", SearchSnippet.Ellipsis));
     }
 
     /// Запасной путь: полнотекст не нашёл ничего, ищем похожие куски слов. Индексов у триграмм нет
