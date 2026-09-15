@@ -47,6 +47,17 @@ public class InitMigrationTests : IAsyncLifetime
         Assert.Equal(["admin", "second"], logins);
     }
 
+    // Заполнение колонки в миграции: без него существующие читатели на работающем сервере
+    // остались бы с пустой датой, то есть без входа.
+    [Fact]
+    public async Task Migration_marks_the_seeded_owner_as_approved()
+    {
+        await using var db = CreateContext();
+        await db.Database.MigrateAsync();
+
+        Assert.NotNull((await db.Users.SingleAsync()).ApprovedAt);
+    }
+
     SamizdatDbContext CreateContext()
     {
         var options = new DbContextOptionsBuilder<SamizdatDbContext>()
