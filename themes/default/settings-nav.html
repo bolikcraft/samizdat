@@ -1,10 +1,12 @@
 {{~## Тот же переключатель, что у дерева статей: на узком экране список разделов свёрнут. ##~}}
 <details class="nav-switch"><summary>Настройки</summary></details>
 <div class="sidebar-body">
+  {{~## Читателю в настройках доступен один раздел — свой пароль. ##~}}
   <nav class="settings-nav">
-    <a href="#appearance">Внешний вид</a>
+    {{ if user && user.is_owner }}<a href="#appearance">Внешний вид</a>{{ end }}
     <a href="#security">Пароль</a>
+    {{ if user && user.is_owner }}<a href="#people">Пользователи</a>
     <a href="#tokens">Токены CLI</a>
-    <a href="#links">Ссылки</a>
+    <a href="#links">Ссылки</a>{{ end }}
   </nav>
 </div>

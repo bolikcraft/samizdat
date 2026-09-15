@@ -23,17 +23,23 @@ public static class SettingsEndpoints
 
     public static void MapSettings(this WebApplication app)
     {
-        var group = app.MapGroup("/settings")
-            .RequireAuthorization(policy => policy.RequireRole(nameof(UserRole.Owner)));
+        // Группа требует вход; роль проверяется на каждом маршруте: читателю тут доступен
+        // один раздел — свой пароль.
+        var group = app.MapGroup("/settings").RequireAuthorization();
 
         group.MapGet("/", (PageRenderer pages, SamizdatDbContext db, SiteSettings settings, ClaimsPrincipal user,
                            ThemeFactory themes, IThemeSource theme, BackgroundFile background,
                            IAntiforgery antiforgery, HttpContext context,
                            string? ok, string? err) =>
         {
-            var owner = CurrentUser(db, user);
-            var tokens = db.ApiTokens.Where(token => token.UserId == owner.Id)
-                .OrderByDescending(token => token.CreatedAt).ToList();
+            // Читателю открыт один раздел — свой пароль, поэтому чужие списки ему и не собираем.
+            var isOwner = ArticleAccess.IsOwner(user);
+            var person = CurrentUser(db, user);
+
+            List<ApiTokenRow> tokens = isOwner
+                ? db.ApiTokens.Where(token => token.UserId == person.Id)
+                    .OrderByDescending(token => token.CreatedAt).ToList()
+                : [];
 
             var newToken = context.Request.Cookies[NewTokenCookie];
             if (newToken is not null) context.Response.Cookies.Delete(NewTokenCookie, NewTokenCookieOptions(context));
@@ -41,20 +47,33 @@ public static class SettingsEndpoints
             var now = DateTimeOffset.UtcNow;
             var titles = db.Articles.ToDictionary(article => article.Slug, article => article.Title);
             // Живые сверху: мёртвые строки остаются как след, но не мешают найти рабочую ссылку.
-            var links = db.ShareLinks.ToList()
-                .OrderByDescending(link => link.IsAlive(now)).ThenByDescending(link => link.CreatedAt)
-                .Select(link => new Dictionary<string, object?>
+            List<Dictionary<string, object?>> links = isOwner
+                ? db.ShareLinks.ToList()
+                    .OrderByDescending(link => link.IsAlive(now)).ThenByDescending(link => link.CreatedAt)
+                    .Select(link => new Dictionary<string, object?>
+                    {
+                        ["id"] = link.Id,
+                        ["slug"] = link.Slug,
+                        ["title"] = titles.GetValueOrDefault(link.Slug, link.Slug),
+                        ["note"] = link.Note,
+                        ["url"] = $"{context.Request.Scheme}://{context.Request.Host}/s/{link.Token}",
+                        ["alive"] = link.IsAlive(now),
+                        ["expires_at"] = link.ExpiresAt?.ToString("yyyy-MM-dd HH:mm"),
+                        ["opened_count"] = link.OpenedCount,
+                        ["last_opened_at"] = link.LastOpenedAt?.ToString("yyyy-MM-dd HH:mm"),
+                    }).ToList()
+                : [];
+
+            List<Dictionary<string, object?>> people = isOwner
+                ? db.Users.OrderBy(row => row.Login).ToList().Select(row => new Dictionary<string, object?>
                 {
-                    ["id"] = link.Id,
-                    ["slug"] = link.Slug,
-                    ["title"] = titles.GetValueOrDefault(link.Slug, link.Slug),
-                    ["note"] = link.Note,
-                    ["url"] = $"{context.Request.Scheme}://{context.Request.Host}/s/{link.Token}",
-                    ["alive"] = link.IsAlive(now),
-                    ["expires_at"] = link.ExpiresAt?.ToString("yyyy-MM-dd HH:mm"),
-                    ["opened_count"] = link.OpenedCount,
-                    ["last_opened_at"] = link.LastOpenedAt?.ToString("yyyy-MM-dd HH:mm"),
-                }).ToList();
+                    ["id"] = row.Id,
+                    ["login"] = row.Login,
+                    ["role"] = row.Role == UserRole.Owner ? "владелец" : "читатель",
+                    ["created_at"] = row.CreatedAt.ToString("yyyy-MM-dd"),
+                    ["is_me"] = row.Login == person.Login,
+                }).ToList()
+                : [];
 
             return Results.Content(pages.Render("settings.html", new()
             {
@@ -83,6 +102,7 @@ public static class SettingsEndpoints
                     ["last_used_at"] = token.LastUsedAt?.ToString("yyyy-MM-dd HH:mm"),
                 }).ToList(),
                 ["links"] = links,
+                ["people"] = people,
             }), "text/html; charset=utf-8");
         });
 
@@ -114,7 +134,7 @@ public static class SettingsEndpoints
             if (colorScheme is "light" or "dark" or "system") settings.Set("theme.color_scheme", colorScheme);
 
             return Ok("appearance");
-        }).RequireValidToken();
+        }).RequireValidToken().OwnerOnly();
 
         group.MapPost("/background", [RequestSizeLimit(MaxBackgroundRequestBytes)]
             async (HttpContext context, SiteSettings settings, BackgroundFile background) =>
@@ -148,7 +168,7 @@ public static class SettingsEndpoints
             stream.Position = 0;
             settings.Set("theme.background", background.Save(stream, extension));
             return Ok("background");
-        }).RefuseAnOversizedBody().RequireValidToken();
+        }).RefuseAnOversizedBody().RequireValidToken().OwnerOnly();
 
         // Выбор готового фона: картинка из набора темы, цвет из палитры, своя загруженная
         // картинка или ничего. Значение попадает в настройку как есть, поэтому всё, кроме пустоты,
@@ -193,7 +213,7 @@ public static class SettingsEndpoints
             }
 
             return Err("background_unknown");
-        }).RequireValidToken();
+        }).RequireValidToken().OwnerOnly();
 
         // Удаление загруженной картинки. Если она стояла фоном, фон заодно снимается: файла больше нет.
         group.MapPost("/background/remove", (SiteSettings settings, BackgroundFile background) =>
@@ -201,7 +221,7 @@ public static class SettingsEndpoints
             background.Remove();
             if (settings.Background.Kind == BackgroundKind.Upload) settings.Set("theme.background", "");
             return Ok("background_removed");
-        }).RequireValidToken();
+        }).RequireValidToken().OwnerOnly();
 
         group.MapPost("/tokens", async (HttpContext context, SamizdatDbContext db, ClaimsPrincipal user) =>
         {
@@ -221,7 +241,7 @@ public static class SettingsEndpoints
 
             context.Response.Cookies.Append(NewTokenCookie, token, NewTokenCookieOptions(context));
             return Ok("token_created");
-        }).RequireValidToken();
+        }).RequireValidToken().OwnerOnly();
 
         group.MapPost("/tokens/{id:int}/note", async (int id, HttpContext context,
                                                      SamizdatDbContext db, ClaimsPrincipal user) =>
@@ -236,7 +256,7 @@ public static class SettingsEndpoints
             token.Note = note.Length > 0 ? note : null;
             db.SaveChanges();
             return Ok("token_note");
-        }).RequireValidToken();
+        }).RequireValidToken().OwnerOnly();
 
         group.MapPost("/tokens/{id:int}/revoke", (int id, SamizdatDbContext db, ClaimsPrincipal user) =>
         {
@@ -247,7 +267,58 @@ public static class SettingsEndpoints
             db.ApiTokens.Remove(token);
             db.SaveChanges();
             return Ok("token_revoked");
-        }).RequireValidToken();
+        }).RequireValidToken().OwnerOnly();
+
+        group.MapPost("/people", async (HttpContext context, SamizdatDbContext db) =>
+        {
+            var form = await context.Request.ReadFormAsync();
+            var login = form["login"].ToString().Trim();
+            var password = form["password"].ToString();
+
+            if (login.Length == 0 || login.Length > 100 || password.Length == 0) return Err("bad_person");
+            // Занятый логин ловим сами: иначе уникальный индекс дал бы владельцу голый 500.
+            if (db.Users.Any(row => row.Login == login)) return Err("login_taken");
+
+            db.Users.Add(new UserRow
+            {
+                Login = login,
+                PasswordHash = PasswordHasher.Hash(password),
+                Role = UserRole.Reader,
+                CreatedAt = DateTimeOffset.UtcNow,
+            });
+            await db.SaveChangesAsync();
+            return Ok("person_added");
+        }).RequireValidToken().OwnerOnly();
+
+        group.MapPost("/people/{id:int}/password", async (int id, HttpContext context, SamizdatDbContext db) =>
+        {
+            var form = await context.Request.ReadFormAsync();
+            var password = form["password"].ToString();
+            if (password.Length == 0) return Err("bad_person");
+
+            var person = db.Users.Find(id);
+            if (person is null) return Results.NotFound();
+
+            person.PasswordHash = PasswordHasher.Hash(password);
+            await db.SaveChangesAsync();
+            return Ok("person_password");
+        }).RequireValidToken().OwnerOnly();
+
+        group.MapPost("/people/{id:int}/delete", async (int id, SamizdatDbContext db, ClaimsPrincipal user) =>
+        {
+            var person = db.Users.Find(id);
+            if (person is null) return Results.NotFound();
+
+            // Последнего владельца удалять нельзя: сайт остался бы без входа в настройки,
+            // и поднять его можно было бы только командой в консоли.
+            if (person.Role == UserRole.Owner && db.Users.Count(row => row.Role == UserRole.Owner) == 1)
+                return Err("last_owner");
+            if (person.Login == user.Identity!.Name) return Err("self_delete");
+
+            db.Users.Remove(person);
+            await db.SaveChangesAsync();
+            return Ok("person_deleted");
+        }).RequireValidToken().OwnerOnly();
 
         // Отзыв мягкий: строка остаётся, чтобы гость получил 410 «ссылка не работает», а не 404.
         group.MapPost("/links/{id:int}/revoke", (int id, SamizdatDbContext db) =>
@@ -258,8 +329,13 @@ public static class SettingsEndpoints
             link.RevokedAt = DateTimeOffset.UtcNow;
             db.SaveChanges();
             return Ok("link_revoked");
-        }).RequireValidToken();
+        }).RequireValidToken().OwnerOnly();
     }
+
+    /// Маршрут только для владельца. Роль стоит на маршрутах, а не на группе: читателю нужен
+    /// вход в настройки ради своего пароля.
+    static RouteHandlerBuilder OwnerOnly(this RouteHandlerBuilder builder)
+        => builder.RequireAuthorization(policy => policy.RequireRole(nameof(UserRole.Owner)));
 
     /// Возврат на страницу настроек с итогом действия: код итога в адресе, раздел — в якоре.
     // Якорем страница выбирает раздел: без него открылся бы первый, а не тот, где нажали кнопку.
@@ -276,6 +352,8 @@ public static class SettingsEndpoints
         "password" or "wrong_password" or "short_password" or "password_mismatch" => "security",
         "token_created" or "token_note" or "token_revoked" => "tokens",
         "link_revoked" => "links",
+        "person_added" or "person_password" or "person_deleted" => "people",
+        "bad_person" or "login_taken" or "last_owner" or "self_delete" => "people",
         _ => "appearance",
     };
 
@@ -344,6 +422,10 @@ public static class SettingsEndpoints
         "background_type" => "Это не картинка. Подойдёт jpeg, png или webp.",
         "background_too_big" => "Картинка больше 8 МБ.",
         "background_unknown" => "Такого фона нет в наборе темы.",
+        "bad_person" => "Логин и пароль не должны быть пустыми.",
+        "login_taken" => "Такой логин уже занят.",
+        "last_owner" => "Это последний владелец, его нельзя удалить.",
+        "self_delete" => "Себя удалить нельзя.",
         not null => "Не удалось выполнить действие.",
         null => ok switch
         {
@@ -353,6 +435,9 @@ public static class SettingsEndpoints
             "token_note" => "Заметка сохранена.",
             "token_revoked" => "Токен отозван.",
             "link_revoked" => "Ссылка отозвана.",
+            "person_added" => "Пользователь заведён.",
+            "person_password" => "Пароль изменён.",
+            "person_deleted" => "Пользователь удалён.",
             "background" => "Фон выбран.",
             "background_color" => "Цвет фона выбран.",
             "background_removed" => "Фон убран.",
