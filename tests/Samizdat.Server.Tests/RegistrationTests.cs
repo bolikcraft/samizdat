@@ -509,10 +509,56 @@ public class RegistrationTests : IDisposable
         var id = Users(factory).Single(row => row.Login == "ivan").Id;
         var owner = await Login(factory, "hozyain", "parol-hozyaina");
 
+        var approved = await Post(owner, $"/settings/signup/{id}/approve", new());
         var rejected = await Post(owner, $"/settings/signup/{id}/reject", new());
 
+        Assert.Equal("/settings?err=not_pending#signup", approved.Headers.Location?.ToString());
         Assert.Equal("/settings?err=not_pending#signup", rejected.Headers.Location?.ToString());
         Assert.Contains(Users(factory), row => row.Login == "ivan");
+    }
+
+    [Fact]
+    public async Task The_queue_buttons_answer_404_for_a_person_who_is_not_there()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        AddPerson(factory, "hozyain", "parol-hozyaina", UserRole.Owner);
+        var owner = await Login(factory, "hozyain", "parol-hozyaina");
+
+        Assert.Equal(HttpStatusCode.NotFound,
+            (await Post(owner, "/settings/signup/4242/approve", new())).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound,
+            (await Post(owner, "/settings/signup/4242/reject", new())).StatusCode);
+    }
+
+    // Гашение с условием внутри UPDATE/DELETE обязано пустить только одного: без него оба запроса
+    // проходили проверку в C# и один пускал уже снесённого, а другой сносил уже пущенного.
+    [Fact]
+    public async Task Racing_approve_and_reject_settle_on_one_outcome()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        AddPerson(factory, "hozyain", "parol-hozyaina", UserRole.Owner);
+        AddPending(factory, "gost", "parol-gostya");
+        var id = Users(factory).Single(row => row.Login == "gost").Id;
+        var owner = await Login(factory, "hozyain", "parol-hozyaina");
+        var (name, value) = AntiforgeryToken(await owner.GetStringAsync("/settings/"));
+
+        var answers = await Task.WhenAll(
+            owner.PostAsync($"/settings/signup/{id}/approve",
+                new FormUrlEncodedContent(new Dictionary<string, string> { [name] = value })),
+            owner.PostAsync($"/settings/signup/{id}/reject",
+                new FormUrlEncodedContent(new Dictionary<string, string> { [name] = value })));
+
+        var person = Users(factory).SingleOrDefault(row => row.Login == "gost");
+        var wonByApprove = answers[0].Headers.Location?.ToString() == "/settings?ok=signup_approved#signup";
+        var wonByReject = answers[1].Headers.Location?.ToString() == "/settings?ok=signup_rejected#signup";
+
+        // Ровно один из запросов победил, и база согласна с тем, кто именно: человек либо
+        // одобрен и цел, либо снесён — не оба сразу и не ни одного.
+        Assert.True(wonByApprove ^ wonByReject);
+        if (wonByApprove) Assert.NotNull(person?.ApprovedAt);
+        else Assert.Null(person);
     }
 
     [Fact]

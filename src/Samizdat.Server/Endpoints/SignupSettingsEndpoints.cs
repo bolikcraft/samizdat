@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using Samizdat.Server.Auth;
 using Samizdat.Server.Data;
 using static Samizdat.Server.Endpoints.SettingsPage;
@@ -27,28 +28,34 @@ public static class SignupSettingsEndpoints
 
         group.MapPost("/signup/{id:int}/approve", (int id, SamizdatDbContext db) =>
         {
-            var person = db.Users.Find(id);
+            var person = db.Users.AsNoTracking().FirstOrDefault(row => row.Id == id);
             if (person is null) return Results.NotFound();
             // Только ждущего: живого человека эти кнопки не трогают, иначе «отказать» стало бы
-            // вторым способом удалить кого угодно в обход раздела «Пользователи».
+            // вторым способом удалить кого угодно в обход раздела «Пользователи». Ждущий не
+            // бывает владельцем — пустую дату ставит только открытая регистрация, а она заводит
+            // читателя.
             if (person.ApprovedAt is not null) return Err("not_pending");
 
-            person.ApprovedAt = DateTimeOffset.UtcNow;
-            db.SaveChanges();
-            return Ok("signup_approved");
+            // Условие внутри UPDATE, а не только проверка выше: без него соседняя вкладка
+            // успевает снести человека между чтением и записью.
+            var changed = db.Users.Where(row => row.Id == id && row.ApprovedAt == null)
+                .ExecuteUpdate(set => set.SetProperty(row => row.ApprovedAt, DateTimeOffset.UtcNow));
+
+            return changed == 0 ? Err("not_pending") : Ok("signup_approved");
         }).RequireValidToken().OwnerOnly();
 
-        // Отказ сносит строку, а не помечает её: ждущая заявка держит логин занятым уникальным
-        // индексом, и помеченная держала бы его вечно.
         group.MapPost("/signup/{id:int}/reject", (int id, SamizdatDbContext db) =>
         {
-            var person = db.Users.Find(id);
+            var person = db.Users.AsNoTracking().FirstOrDefault(row => row.Id == id);
             if (person is null) return Results.NotFound();
             if (person.ApprovedAt is not null) return Err("not_pending");
 
-            db.Users.Remove(person);
-            db.SaveChanges();
-            return Ok("signup_rejected");
+            // Отказ сносит строку, а не помечает её: ждущая заявка держит логин занятым
+            // уникальным индексом, и помеченная держала бы его вечно. Условие внутри DELETE —
+            // по той же причине, что и в approve: соседняя вкладка не должна снести уже пущенного.
+            var changed = db.Users.Where(row => row.Id == id && row.ApprovedAt == null).ExecuteDelete();
+
+            return changed == 0 ? Err("not_pending") : Ok("signup_rejected");
         }).RequireValidToken().OwnerOnly();
 
         group.MapPost("/invites", async (HttpContext context, SamizdatDbContext db) =>

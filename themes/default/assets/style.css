@@ -644,7 +644,7 @@ button.is-busy::after {
   font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted);
 }
 .settings-table td:first-child, .settings-table th:first-child { padding-left: 0; }
-.settings-table .row-actions { text-align: right; white-space: nowrap; }
+.settings-table .row-actions { display: flex; gap: 0.4rem; justify-content: flex-end; white-space: nowrap; }
 
 /* Кнопки в таблицах настроек — «Отозвать» и «Скопировать» — стоят рядом и должны быть одного
    размера. Цвет разный: отзыв необратим, копирование — нет. */
@@ -660,7 +660,7 @@ button.is-busy::after {
 .settings-table .note-form button:hover { background: var(--accent); color: var(--bg); }
 .settings-table .approve-form button { color: var(--accent); border-color: var(--accent); }
 .settings-table .approve-form button:hover { background: var(--accent); color: var(--bg); }
-.signup-switch { display: flex; align-items: center; gap: 0.5rem; }
+.settings-form .signup-switch { display: flex; align-items: center; gap: 0.5rem; }
 
 .visibility-form { display: flex; align-items: center; gap: 0.75rem; margin: 1rem 0 0; }
 .visibility-state { font-family: system-ui, sans-serif; font-size: 0.9rem; color: var(--muted); }
