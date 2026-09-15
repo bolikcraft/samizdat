@@ -5,53 +5,67 @@ using Samizdat.Server.Storage;
 
 namespace Samizdat.Server.Search;
 
+/// Сколько статей проиндексировано и сколько не вышло.
+public readonly record struct IndexBackfillResult(int Done, int Failed);
+
 /// Достраивает индекс статьям, выложенным до этого этапа, и по команде пересобирает его целиком.
 public static class IndexBackfill
 {
     /// force — считать заново всё, не глядя на IndexedHash: нужно, когда поменялся сам разбор.
-    public static int Run(SamizdatDbContext db, ArticleFiles files, ILogger logger, bool force)
+    public static IndexBackfillResult Run(IServiceProvider services, ArticleFiles files, ILogger logger, bool force)
     {
-        var rows = force
-            ? db.Articles.ToList()
-            : db.Articles.Where(article => article.IndexedHash != article.ContentHash).ToList();
-        if (rows.Count == 0) return 0;
-
-        var indexer = new ArticleIndexer(db);
-        var done = 0;
-
-        foreach (var row in rows)
+        List<string> slugs;
+        using (var scope = services.CreateScope())
         {
-            var text = files.ReadMarkdown(row.Slug);
-            if (text is null)
-            {
-                logger.LogWarning("Статья {Slug} есть в базе, но не на диске: индекс останется пустым",
-                                  row.Slug);
-                continue;
-            }
-
-            try
-            {
-                indexer.Index(row, FrontMatterParser.Parse(text).Body);
-                done++;
-            }
-            catch (FrontMatterException error)
-            {
-                logger.LogWarning(error, "Статью {Slug} не удалось разобрать: индекс останется пустым",
-                                  row.Slug);
-            }
+            var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+            slugs = (force ? db.Articles : db.Articles.Where(row => row.IndexedHash != row.ContentHash))
+                .Select(row => row.Slug).ToList();
         }
 
-        // Упавший старт хуже поиска без одной статьи, поэтому отказ записи только пишем в лог.
+        var done = 0;
+        var failed = 0;
+        foreach (var slug in slugs)
+        {
+            if (Index(services, files, logger, slug)) done++;
+            else failed++;
+        }
+
+        return new IndexBackfillResult(done, failed);
+    }
+
+    /// Своя единица работы на статью: отказ записи на одной не должен оставить без индекса соседей.
+    static bool Index(IServiceProvider services, ArticleFiles files, ILogger logger, string slug)
+    {
+        var text = files.ReadMarkdown(slug);
+        if (text is null)
+        {
+            logger.LogWarning("Статья {Slug} есть в базе, но не на диске: индекс останется пустым", slug);
+            return false;
+        }
+
+        using var scope = services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+
+        // Статью могли снести, пока шла достройка.
+        var row = db.Articles.FirstOrDefault(article => article.Slug == slug);
+        if (row is null) return false;
+
         try
         {
+            new ArticleIndexer(db).Index(row, FrontMatterParser.Parse(text).Body);
             db.SaveChanges();
+            return true;
         }
+        catch (FrontMatterException error)
+        {
+            logger.LogWarning(error, "Статью {Slug} не удалось разобрать: индекс останется пустым", slug);
+            return false;
+        }
+        // Сервер должен подняться и с неполным индексом: упавший старт хуже поиска без одной статьи.
         catch (DbUpdateException error)
         {
-            logger.LogError(error, "Индекс не записан: статьи останутся без поиска");
-            return 0;
+            logger.LogError(error, "Индекс статьи {Slug} не записан", slug);
+            return false;
         }
-
-        return done;
     }
 }

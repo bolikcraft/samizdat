@@ -80,10 +80,12 @@ public static class ServerCommands
             var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
             await db.Database.MigrateAsync();
 
-            var count = IndexBackfill.Run(db, scope.ServiceProvider.GetRequiredService<ArticleFiles>(),
-                                          scope.ServiceProvider.GetRequiredService<ILogger<Program>>(),
-                                          force: true);
-            Console.WriteLine($"Индекс собран заново: статей {count}.");
+            var result = IndexBackfill.Run(services, scope.ServiceProvider.GetRequiredService<ArticleFiles>(),
+                                           scope.ServiceProvider.GetRequiredService<ILogger<Program>>(),
+                                           force: true);
+            Console.WriteLine($"Индекс собран заново: статей {result.Done}, не вышло {result.Failed}.");
+            if (result.Failed > 0)
+                Console.Error.WriteLine("Часть статей не проиндексирована, подробности в логе.");
             return true;
         }
 

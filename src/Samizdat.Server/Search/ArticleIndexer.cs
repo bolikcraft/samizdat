@@ -11,6 +11,9 @@ public sealed class ArticleIndexer(SamizdatDbContext db)
     /// с запасом: длинная статья должна выложиться, потеряв хвост индекса, а не упасть отказом.
     public const int MaxSearchText = 400_000;
 
+    /// Предел slug статьи — у цели ссылки та же колонка varchar(200).
+    public const int MaxSlug = 200;
+
     /// body — текст статьи без фронтматтера.
     public void Index(ArticleRow row, string body)
     {
@@ -24,6 +27,9 @@ public sealed class ArticleIndexer(SamizdatDbContext db)
             .Select(WikiLinkTarget.Candidates)
             .Where(candidates => !candidates.Contains(row.Slug, StringComparer.Ordinal))
             .SelectMany(candidates => candidates)
+            // Цель длиннее slug молча отбрасываем: совпасть ей всё равно не с чем, а в колонку
+            // она не влезает и валит выкладку отказом базы.
+            .Where(target => target.Length <= MaxSlug)
             .ToHashSet(StringComparer.Ordinal);
 
         var existing = db.ArticleLinks.Where(link => link.FromSlug == row.Slug).ToList();

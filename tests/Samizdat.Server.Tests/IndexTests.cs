@@ -250,6 +250,70 @@ public class IndexTests(DatabaseFixture database) : IDisposable
     }
 
     [Fact]
+    public async Task Link_to_a_very_long_name_does_not_break_publishing()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        var client = TestPublisher.ClientWithToken(factory);
+
+        // Заголовок заметки длиннее slug (varchar(200)): такая цель не может совпасть ни с одной
+        // статьёй, но раньше валила выкладку ошибкой базы.
+        var name = new string('я', 300);
+        var answer = await TestPublisher.Push(client, "statya", $"---\ntitle: Статья\n---\n\nсм. [[{name}]]");
+
+        Assert.True(answer.IsSuccessStatusCode);
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+        Assert.All(db.ArticleLinks.ToList(), link => Assert.True(link.ToSlug.Length <= 200));
+    }
+
+    [Fact]
+    public async Task One_broken_article_does_not_stop_the_index_of_the_others()
+    {
+        database.ResetDatabase();
+        await WriteArticleFile("krivaya", $"---\ntitle: Кривая\n---\n\n{ManyWords("slovo", 40_000)}");
+        await WriteArticleFile("horoshaya", "---\ntitle: Хорошая\n---\n\nобычный текст");
+
+        using (var first = CreateFactory())
+        using (var scope = first.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+            // Описание одно влезает в tsvector, а вместе с текстом статьи уже нет: запись такой
+            // строки отказом базы не должна оставить соседнюю статью без индекса.
+            db.Articles.Add(new ArticleRow
+            {
+                Slug = "krivaya", Title = "Кривая", ContentHash = "h1",
+                Description = ManyWords("opisanie", 40_000),
+            });
+            db.Articles.Add(new ArticleRow { Slug = "horoshaya", Title = "Хорошая", ContentHash = "h2" });
+            db.SaveChanges();
+        }
+
+        using var factory = CreateFactory();
+        var answer = await factory.CreateClient().GetAsync("/login");
+        Assert.True(answer.IsSuccessStatusCode);
+
+        using var check = factory.Services.CreateScope();
+        var after = check.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+        var good = after.Articles.Single(row => row.Slug == "horoshaya");
+        var broken = after.Articles.Single(row => row.Slug == "krivaya");
+
+        Assert.Contains("обычный текст", good.SearchText);
+        Assert.Equal(good.ContentHash, good.IndexedHash);
+        Assert.Equal("", broken.SearchText);
+    }
+
+    Task WriteArticleFile(string slug, string text)
+    {
+        Directory.CreateDirectory(Path.Combine(dataRoot, "articles", slug));
+        return File.WriteAllTextAsync(Path.Combine(dataRoot, "articles", slug, "index.md"), text);
+    }
+
+    static string ManyWords(string prefix, int count)
+        => string.Join(' ', Enumerable.Range(0, count).Select(number => $"{prefix}{number}"));
+
+    [Fact]
     public async Task Start_builds_the_index_of_an_old_article()
     {
         database.ResetDatabase();

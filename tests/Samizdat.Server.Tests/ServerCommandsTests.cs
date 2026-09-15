@@ -101,5 +101,29 @@ public class ServerCommandsTests(DatabaseFixture database) : IDisposable
         Assert.Contains("свежий текст", after.Articles.Single().SearchText);
     }
 
+    [Fact]
+    public async Task Reindex_does_not_stop_on_an_article_without_a_file()
+    {
+        database.ResetDatabase();
+        Directory.CreateDirectory(Path.Combine(dataRoot, "articles", "statya"));
+        await File.WriteAllTextAsync(Path.Combine(dataRoot, "articles", "statya", "index.md"),
+                                     "---\ntitle: Статья\n---\n\nсвежий текст");
+
+        using var factory = StartServer();
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+            db.Articles.Add(new ArticleRow { Slug = "propavshaya", Title = "Пропавшая", ContentHash = "h1" });
+            db.Articles.Add(new ArticleRow { Slug = "statya", Title = "Статья", ContentHash = "h2" });
+            db.SaveChanges();
+        }
+
+        Assert.True(await ServerCommands.TryRun(["reindex"], factory.Services));
+
+        using var check = factory.Services.CreateScope();
+        var after = check.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+        Assert.Contains("свежий текст", after.Articles.Single(row => row.Slug == "statya").SearchText);
+    }
+
     public void Dispose() => Directory.Delete(dataRoot, recursive: true);
 }

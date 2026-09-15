@@ -81,11 +81,10 @@ public static class Startup
         using (var scope = app.Services.CreateScope())
         {
             var services = scope.ServiceProvider;
-            var db = services.GetRequiredService<SamizdatDbContext>();
-            db.Database.Migrate();
+            services.GetRequiredService<SamizdatDbContext>().Database.Migrate();
 
             // До приёма запросов: иначе поиск первые минуты после выкладки новой версии пуст.
-            IndexBackfill.Run(db, services.GetRequiredService<ArticleFiles>(),
+            IndexBackfill.Run(app.Services, services.GetRequiredService<ArticleFiles>(),
                               services.GetRequiredService<ILogger<Program>>(), force: false);
         }
 
