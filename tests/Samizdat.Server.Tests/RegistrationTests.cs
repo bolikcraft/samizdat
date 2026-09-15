@@ -50,6 +50,21 @@ public class RegistrationTests : IDisposable
     }
 
     [Fact]
+    public async Task A_live_invite_shows_the_form_and_stays_out_of_caches()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        var token = AddInvite(factory, note: "для Ивана");
+        var client = factory.CreateClient();
+
+        var answer = await client.GetAsync($"/i/{token}");
+
+        Assert.Equal(HttpStatusCode.OK, answer.StatusCode);
+        Assert.Contains("для Ивана", await answer.Content.ReadAsStringAsync());
+        Assert.True(answer.Headers.CacheControl?.NoStore);
+    }
+
+    [Fact]
     public async Task An_invite_makes_a_reader_who_is_let_in_at_once()
     {
         database.ResetDatabase();
@@ -57,10 +72,12 @@ public class RegistrationTests : IDisposable
         var token = AddInvite(factory, note: "для Ивана");
 
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
-        var answer = await client.PostAsync($"/i/{token}", Fields("ivan", "parol-ivana"));
+        var answer = await client.PostAsync($"/i/{token}", await InviteFields(client, token, "ivan", "parol-ivana"));
 
         Assert.Equal(HttpStatusCode.Redirect, answer.StatusCode);
         Assert.Equal("/", answer.Headers.Location?.ToString());
+        // Учётка не просто заведена: этой же cookie человек уже ходит по сайту.
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/")).StatusCode);
 
         var person = Users(factory).Single(row => row.Login == "ivan");
         Assert.Equal(UserRole.Reader, person.Role);
@@ -77,13 +94,31 @@ public class RegistrationTests : IDisposable
         database.ResetDatabase();
         using var factory = CreateFactory();
         var token = AddInvite(factory, note: null);
-        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
-        await client.PostAsync($"/i/{token}", Fields("ivan", "parol-ivana"));
+        var first = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        // Второй клиент, а не первый: первый после входа ушёл бы на главную, а не на страницу
+        // «ссылка не работает». Форму он берёт заранее — потом её уже не дадут.
+        var second = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        var fields = await InviteFields(second, token, "petr", "parol-petra");
+        await first.PostAsync($"/i/{token}", await InviteFields(first, token, "ivan", "parol-ivana"));
 
-        var again = await client.PostAsync($"/i/{token}", Fields("petr", "parol-petra"));
+        var again = await second.PostAsync($"/i/{token}", fields);
 
         Assert.Equal(HttpStatusCode.Gone, again.StatusCode);
         Assert.Single(Users(factory));
+    }
+
+    [Fact]
+    public async Task A_used_invite_shows_a_dead_page()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        var token = AddInvite(factory, note: null);
+        var first = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        await first.PostAsync($"/i/{token}", await InviteFields(first, token, "ivan", "parol-ivana"));
+
+        var answer = await factory.CreateClient().GetAsync($"/i/{token}");
+
+        Assert.Equal(HttpStatusCode.Gone, answer.StatusCode);
     }
 
     [Fact]
@@ -100,6 +135,43 @@ public class RegistrationTests : IDisposable
         Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/i/takogo-net")).StatusCode);
     }
 
+    // Чужая страница не должна сжечь приглашение на подставную учётку и выдать браузеру её cookie.
+    [Fact]
+    public async Task A_post_without_a_token_is_refused()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        var token = AddInvite(factory, note: null);
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+
+        var answer = await client.PostAsync($"/i/{token}", new FormUrlEncodedContent(
+            new Dictionary<string, string>
+            {
+                ["login"] = "ivan", ["password"] = "parol-ivana", ["repeat"] = "parol-ivana",
+            }));
+
+        Assert.Equal(HttpStatusCode.BadRequest, answer.StatusCode);
+        Assert.Empty(Users(factory));
+        Assert.Null(Invites(factory).Single().UsedAt);
+    }
+
+    // Вошедший не заводит вторую учётку и не теряет свою сессию на чужой ссылке.
+    [Fact]
+    public async Task A_person_who_is_already_in_goes_to_the_main_page()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        AddPerson(factory, "ivan", "parol-ivana", UserRole.Reader);
+        var token = AddInvite(factory, note: null);
+        var client = await Login(factory, "ivan", "parol-ivana");
+
+        var page = await client.GetAsync($"/i/{token}");
+
+        Assert.Equal(HttpStatusCode.Redirect, page.StatusCode);
+        Assert.Equal("/", page.Headers.Location?.ToString());
+        Assert.Null(Invites(factory).Single().UsedAt);
+    }
+
     // Два человека открыли одну ссылку разом. Гашение с условием внутри UPDATE обязано пустить
     // только одного: без него оба проходили проверку IsAlive и заводили по учётке.
     [Fact]
@@ -111,16 +183,23 @@ public class RegistrationTests : IDisposable
         var first = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
         var second = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
+        // Форму берут по очереди, пока ссылка жива, а отправляют разом: гонка в отправке.
+        var firstFields = await InviteFields(first, token, "ivan", "parol-ivana");
+        var secondFields = await InviteFields(second, token, "petr", "parol-petra");
+
         var answers = await Task.WhenAll(
-            first.PostAsync($"/i/{token}", Fields("ivan", "parol-ivana")),
-            second.PostAsync($"/i/{token}", Fields("petr", "parol-petra")));
+            first.PostAsync($"/i/{token}", firstFields),
+            second.PostAsync($"/i/{token}", secondFields));
 
         Assert.Single(Users(factory));
         Assert.Equal(1, answers.Count(answer => answer.StatusCode == HttpStatusCode.Redirect));
     }
 
-    [Fact]
-    public async Task A_busy_login_keeps_the_invite_alive()
+    // Регистр логина роли не играет: столбец сверяется по case_insensitive.
+    [Theory]
+    [InlineData("ivan")]
+    [InlineData("Ivan")]
+    public async Task A_busy_login_keeps_the_invite_alive(string wanted)
     {
         database.ResetDatabase();
         using var factory = CreateFactory();
@@ -128,7 +207,7 @@ public class RegistrationTests : IDisposable
         var token = AddInvite(factory, note: null);
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
-        var answer = await client.PostAsync($"/i/{token}", Fields("ivan", "drugoy-parol"));
+        var answer = await client.PostAsync($"/i/{token}", await InviteFields(client, token, wanted, "drugoy-parol"));
 
         Assert.Equal(HttpStatusCode.OK, answer.StatusCode);
         Assert.Contains("логин уже занят", await answer.Content.ReadAsStringAsync());
@@ -139,6 +218,7 @@ public class RegistrationTests : IDisposable
     [InlineData("ivan", "korotko", "korotko", "не короче")]
     [InlineData("ivan", "parol-ivana", "drugoy-parol", "не совпадают")]
     [InlineData("", "parol-ivana", "parol-ivana", "не должен быть пустым")]
+    [InlineData(LoginOverTheLimit, "parol-ivana", "parol-ivana", "длиннее 100")]
     public async Task A_bad_form_shows_the_reason_and_keeps_the_invite(string login, string password,
                                                                       string repeat, string expected)
     {
@@ -146,11 +226,12 @@ public class RegistrationTests : IDisposable
         using var factory = CreateFactory();
         var token = AddInvite(factory, note: null);
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        var (name, value) = AntiforgeryToken(await client.GetStringAsync($"/i/{token}"));
 
         var answer = await client.PostAsync($"/i/{token}", new FormUrlEncodedContent(
             new Dictionary<string, string>
             {
-                ["login"] = login, ["password"] = password, ["repeat"] = repeat,
+                ["login"] = login, ["password"] = password, ["repeat"] = repeat, [name] = value,
             }));
 
         Assert.Equal(HttpStatusCode.OK, answer.StatusCode);
@@ -247,11 +328,22 @@ public class RegistrationTests : IDisposable
         return (match.Groups[1].Value, match.Groups[2].Value);
     }
 
-    static FormUrlEncodedContent Fields(string login, string password) => new(
-        new Dictionary<string, string>
+    /// Форма приглашения: сперва её берут, потом отправляют — antiforgery-поле и кука едут вместе.
+    static async Task<FormUrlEncodedContent> InviteFields(HttpClient client, string token,
+                                                          string login, string password)
+    {
+        var (name, value) = AntiforgeryToken(await client.GetStringAsync($"/i/{token}"));
+        return new(new Dictionary<string, string>
         {
-            ["login"] = login, ["password"] = password, ["repeat"] = password,
+            ["login"] = login, ["password"] = password, ["repeat"] = password, [name] = value,
         });
+    }
+
+    // Столбец логина держит сто знаков; тут на один больше. Собран из частей: в InlineData
+    // нужна константа, а строка в сто один знак не влезает в строку файла.
+    const string TenLetters = "iiiiiiiiii";
+    const string LoginOverTheLimit = TenLetters + TenLetters + TenLetters + TenLetters + TenLetters
+                                     + TenLetters + TenLetters + TenLetters + TenLetters + TenLetters + "i";
 
     static string AddInvite(WebApplicationFactory<Program> factory, string? note,
                             DateTimeOffset? expiresAt = null, DateTimeOffset? revokedAt = null)

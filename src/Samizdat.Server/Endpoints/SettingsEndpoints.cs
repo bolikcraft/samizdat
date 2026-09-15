@@ -289,7 +289,7 @@ public static class SettingsEndpoints
             var login = form["login"].ToString().Trim();
             var password = form["password"].ToString();
 
-            if (login.Length == 0 || login.Length > 100) return Err("bad_person");
+            if (login.Length == 0 || login.Length > MaxLoginLength) return Err("bad_person");
             if (password.Length < MinPasswordLength) return Err("person_short_password");
 
             db.Users.Add(new UserRow

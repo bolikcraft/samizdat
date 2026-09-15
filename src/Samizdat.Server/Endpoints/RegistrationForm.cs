@@ -5,10 +5,8 @@ namespace Samizdat.Server.Endpoints;
 
 /// Поля обеих форм регистрации и их проверка. Форма одна на приглашение и на открытую запись:
 /// правила у них общие, разная только судьба заведённой строки.
-public readonly record struct RegistrationForm(string Login, string Password, string Repeat)
+internal readonly record struct RegistrationForm(string Login, string Password, string Repeat)
 {
-    public const int MaxLoginLength = 100;
-
     public static async Task<RegistrationForm> Read(HttpContext context)
     {
         var form = await context.Request.ReadFormAsync();
@@ -21,9 +19,13 @@ public readonly record struct RegistrationForm(string Login, string Password, st
     public string? Fault() => this switch
     {
         { Login.Length: 0 } => "Логин не должен быть пустым.",
-        { Login.Length: > MaxLoginLength } => $"Логин длиннее {MaxLoginLength} знаков.",
+        { Login.Length: > SettingsPage.MaxLoginLength } =>
+            $"Логин длиннее {SettingsPage.MaxLoginLength} символов.",
         { Password.Length: < SettingsPage.MinPasswordLength } =>
-            $"Пароль должен быть не короче {SettingsPage.MinPasswordLength} знаков.",
+            $"Пароль должен быть не короче {SettingsPage.MinPasswordLength} символов.",
+        // Верхняя граница есть у хэша: Argon2id считает по всей строке, и мегабайт пароля
+        // занял бы процессор надолго.
+        { Password.Length: > 200 } => "Пароль длиннее 200 символов.",
         _ when Password != Repeat => "Пароль и повтор не совпадают.",
         _ => null,
     };

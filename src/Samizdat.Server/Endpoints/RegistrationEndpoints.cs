@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using Samizdat.Core.Themes;
@@ -13,30 +14,45 @@ public static class RegistrationEndpoints
     public static void MapRegistration(this WebApplication app)
     {
         app.MapGet("/i/{token}", (string token, HttpContext context, SamizdatDbContext db,
-                                  PageRenderer pages, SiteSettings settings) =>
+                                  PageRenderer pages, SiteSettings settings, IAntiforgery antiforgery) =>
         {
             // Ставим до любого ответа: после того как ссылку погасили, форма не должна лежать
             // в браузере или прокси.
             context.Response.Headers.CacheControl = "no-store";
 
-            var invite = db.Invites.AsNoTracking().FirstOrDefault(row => row.Token == token);
-            if (invite is null) return NotFound(pages, settings);
-            if (!invite.IsAlive(DateTimeOffset.UtcNow)) return Dead(pages, settings);
+            // Вошедшему учётка уже не нужна, а ссылку он бы сжёг и потерял свою сессию.
+            if (context.User.Identity?.IsAuthenticated == true) return Results.Redirect("/");
 
-            return Form(pages, settings, $"/i/{token}", invite.Note, error: null);
+            var invite = db.Invites.AsNoTracking().FirstOrDefault(row => row.Token == token);
+            if (invite is null) return GuestPages.NotFound(pages, settings);
+            if (!invite.IsAlive(DateTimeOffset.UtcNow)) return GuestPages.Gone(pages, settings);
+
+            return Form(pages, settings, antiforgery, context, $"/i/{token}", invite.Note,
+                        login: "", error: null);
         }).AllowAnonymous();
 
         app.MapPost("/i/{token}", async (string token, HttpContext context, SamizdatDbContext db,
-                                         PageRenderer pages, SiteSettings settings) =>
+                                         PageRenderer pages, SiteSettings settings,
+                                         IAntiforgery antiforgery) =>
         {
-            var invite = db.Invites.AsNoTracking().FirstOrDefault(row => row.Token == token);
-            if (invite is null) return NotFound(pages, settings);
-            if (!invite.IsAlive(DateTimeOffset.UtcNow)) return Dead(pages, settings);
+            if (context.User.Identity?.IsAuthenticated == true) return Results.Redirect("/");
+
+            // Развилка 404/410 и источник заметки для формы. Настоящий замок ниже — условие
+            // внутри UPDATE; без него эта проверка пропускает обе вкладки разом.
+            var invite = await db.Invites.AsNoTracking().FirstOrDefaultAsync(row => row.Token == token);
+            if (invite is null) return GuestPages.NotFound(pages, settings);
+            if (!invite.IsAlive(DateTimeOffset.UtcNow)) return GuestPages.Gone(pages, settings);
 
             var form = await RegistrationForm.Read(context);
-            if (form.Fault() is { } fault) return Form(pages, settings, $"/i/{token}", invite.Note, fault);
+            if (form.Fault() is { } fault)
+                return Form(pages, settings, antiforgery, context, $"/i/{token}", invite.Note,
+                            form.Login, fault);
 
+            // Хэш считается до транзакции: Argon2id занимает десятые доли секунды, и соседняя
+            // вкладка ждала бы их на блокировке строки.
             var now = DateTimeOffset.UtcNow;
+            var person = form.ToReader(now, approved: true);
+
             await using var transaction = await db.Database.BeginTransactionAsync();
 
             // Условие внутри UPDATE, а не проверка перед ним: две вкладки на одной ссылке ждут
@@ -47,9 +63,12 @@ public static class RegistrationEndpoints
                 .ExecuteUpdateAsync(set => set
                     .SetProperty(row => row.UsedAt, now)
                     .SetProperty(row => row.UsedByLogin, form.Login));
-            if (burned == 0) return Dead(pages, settings);
+            if (burned == 0)
+            {
+                await transaction.RollbackAsync();
+                return GuestPages.Gone(pages, settings);
+            }
 
-            var person = form.ToReader(now, approved: true);
             db.Users.Add(person);
             try
             {
@@ -61,39 +80,29 @@ public static class RegistrationEndpoints
                 // Занятый логин слышим от базы, как везде. Откат возвращает и гашение: сгорать
                 // из-за чужого логина ссылка не должна.
                 await transaction.RollbackAsync();
-                return Form(pages, settings, $"/i/{token}", invite.Note, "Такой логин уже занят.");
+                // Забываем строку: в базе её нет, а трекер держал бы её к следующему сохранению.
+                db.Entry(person).State = EntityState.Detached;
+                return Form(pages, settings, antiforgery, context, $"/i/{token}", invite.Note,
+                            form.Login, "Такой логин уже занят.");
             }
 
             await transaction.CommitAsync();
             await SessionCookie.SignIn(context, person);
             return Results.Redirect("/");
-        }).AllowAnonymous().DisableAntiforgery();
+        }).AllowAnonymous().RequireValidToken();
     }
 
-    static IResult Form(PageRenderer pages, SiteSettings settings, string action, string? note, string? error)
+    static IResult Form(PageRenderer pages, SiteSettings settings, IAntiforgery antiforgery,
+                        HttpContext context, string action, string? note, string login, string? error)
         => Results.Content(pages.Render("register.html", new()
         {
             ["page_title"] = "Регистрация",
             ["site"] = PageEndpoints.SiteModel(settings),
             ["noindex"] = true,
+            ["antiforgery"] = AntiforgeryHtml.Field(antiforgery, context),
             ["action"] = action,
             ["note"] = note,
+            ["login"] = login,
             ["error"] = error,
         }), "text/html; charset=utf-8");
-
-    static IResult NotFound(PageRenderer pages, SiteSettings settings)
-        => Results.Content(pages.Render("404.html", new()
-        {
-            ["page_title"] = "Не найдено",
-            ["site"] = PageEndpoints.SiteModel(settings),
-            ["noindex"] = true,
-        }), "text/html; charset=utf-8", statusCode: 404);
-
-    static IResult Dead(PageRenderer pages, SiteSettings settings)
-        => Results.Content(pages.Render("share-expired.html", new()
-        {
-            ["page_title"] = "Ссылка не работает",
-            ["site"] = PageEndpoints.SiteModel(settings),
-            ["noindex"] = true,
-        }), "text/html; charset=utf-8", statusCode: 410);
 }
