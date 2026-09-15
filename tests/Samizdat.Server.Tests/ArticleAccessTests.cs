@@ -29,4 +29,23 @@ public class ArticleAccessTests
     [InlineData(null, false)]
     public void Only_the_owner_switches_visibility(UserRole? role, bool allowed)
         => Assert.Equal(allowed, ArticleAccess.CanSwitchVisibility(role));
+
+    [Theory]
+    // Владельцу переключатель не указ: своё он качает всегда.
+    [InlineData(ArticleVisibility.Private, UserRole.Owner, false, true)]
+    [InlineData(ArticleVisibility.Shared, UserRole.Owner, false, true)]
+    [InlineData(ArticleVisibility.Shared, UserRole.Reader, false, false)]
+    [InlineData(ArticleVisibility.Shared, UserRole.Reader, true, true)]
+    // Закрытую статью читатель не качает даже при включенном переключателе: он её и не видит.
+    [InlineData(ArticleVisibility.Private, UserRole.Reader, true, false)]
+    [InlineData(ArticleVisibility.Shared, null, true, false)]
+    public void Downloading_follows_the_switch_for_everyone_but_the_owner(
+        ArticleVisibility visibility, UserRole? role, bool readers, bool allowed)
+        => Assert.Equal(allowed, ArticleAccess.CanDownload(visibility, role, new DownloadPolicy(readers, false)));
+
+    [Theory]
+    [InlineData(true, true)]
+    [InlineData(false, false)]
+    public void A_guest_downloads_only_when_the_guest_switch_is_on(bool guests, bool allowed)
+        => Assert.Equal(allowed, ArticleAccess.CanDownloadByShare(new DownloadPolicy(false, guests)));
 }
