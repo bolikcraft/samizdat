@@ -6,6 +6,13 @@ namespace Samizdat.Core.Rendering;
 /// Текст статьи без разметки — то, что ищет полнотекстовый поиск.
 public static class PlainText
 {
+    /// Управляющими символами размечается подсветка цитаты (см. SearchSnippet), в тексте статьи им
+    /// не место. Перевод строки и табуляция законны и остаются.
+    public static string WithoutControls(string text)
+        => text.Any(Forbidden) ? new string(text.Where(symbol => !Forbidden(symbol)).ToArray()) : text;
+
+    static bool Forbidden(char symbol) => symbol < ' ' && symbol is not ('\n' or '\r' or '\t');
+
     public static string Extract(string markdown)
     {
         // Без CalloutTransformer цитата "[!warning]" осталась бы AlertBlock — его встроенный

@@ -7,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Samizdat.Server.Auth;
 using Samizdat.Server.Data;
+using Samizdat.Server.Search;
 
 namespace Samizdat.Server.Tests;
 
@@ -203,6 +204,23 @@ public class PageEndpointsTests : IDisposable
         {
             File.Delete(secret);
         }
+    }
+
+    [Fact]
+    public async Task Control_character_from_the_front_matter_does_not_reach_the_page()
+    {
+        var factory = StartFactory();
+        var api = TestPublisher.ClientWithToken(factory);
+        // Заголовок и описание страница берёт заново из файла, в обход чистки перед выкладкой.
+        var matter = $"title: Тайный{SearchSnippet.Start}сервер\ndescription: про{SearchSnippet.Stop}дом";
+        (await TestPublisher.Push(api, "statya", $"---\n{matter}\n---\n\nтекст")).EnsureSuccessStatusCode();
+
+        var client = LoginClient(factory);
+        var html = await client.GetStringAsync("/statya");
+
+        Assert.DoesNotContain(SearchSnippet.Start.ToString(), html, StringComparison.Ordinal);
+        Assert.DoesNotContain(SearchSnippet.Stop.ToString(), html, StringComparison.Ordinal);
+        Assert.Contains("Тайныйсервер", html);
     }
 
     [Fact]

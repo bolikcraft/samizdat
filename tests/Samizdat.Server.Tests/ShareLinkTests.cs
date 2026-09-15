@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Samizdat.Server.Auth;
 using Samizdat.Server.Data;
+using Samizdat.Server.Search;
 
 namespace Samizdat.Server.Tests;
 
@@ -226,6 +227,23 @@ public class ShareLinkTests : IDisposable
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Contains("Текст статьи.", html);
         Assert.Contains("Про ежей", html);
+    }
+
+    [Fact]
+    public async Task Control_character_from_the_front_matter_does_not_reach_the_guest_page()
+    {
+        using var factory = StartFactory();
+        var api = TestPublisher.ClientWithToken(factory);
+        // Гостевая страница берёт заголовок и описание заново из файла, в обход чистки перед выкладкой.
+        var matter = $"title: Тайный{SearchSnippet.Start}сервер\ndescription: про{SearchSnippet.Stop}дом";
+        (await TestPublisher.Push(api, "statya", $"---\n{matter}\n---\n\nтекст")).EnsureSuccessStatusCode();
+        var token = AddLink(factory, "statya");
+
+        var html = await factory.CreateClient().GetStringAsync($"/s/{token}");
+
+        Assert.DoesNotContain(SearchSnippet.Start.ToString(), html, StringComparison.Ordinal);
+        Assert.DoesNotContain(SearchSnippet.Stop.ToString(), html, StringComparison.Ordinal);
+        Assert.Contains("Тайныйсервер", html);
     }
 
     [Fact]

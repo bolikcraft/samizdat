@@ -98,4 +98,20 @@ public class PlainTextTests
         Assert.Contains("мой сайт", text);
         Assert.DoesNotContain("example.com", text);
     }
+
+    [Fact]
+    public void WithoutControls_drops_c0_but_keeps_newline_and_tab()
+    {
+        var text = PlainText.WithoutControls("допосле\nстрока\tхвост");
+
+        Assert.Equal("допосле\nстрока\tхвост", text);
+    }
+
+    [Fact]
+    public void WithoutControls_leaves_a_clean_string_untouched()
+    {
+        const string text = "обычный текст";
+
+        Assert.Same(text, PlainText.WithoutControls(text));
+    }
 }

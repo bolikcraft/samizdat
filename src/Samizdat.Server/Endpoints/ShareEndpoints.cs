@@ -44,6 +44,12 @@ public static class ShareEndpoints
             {
                 var text = files.ReadMarkdown(link.Slug)!;
                 var parsed = FrontMatterParser.Parse(text);
+                // Заголовок и описание идут в <title> и <h1> как есть: чистим сразу после разбора,
+                // а не в базе — при выкладке эти поля не проходят через ArticleIndexer.
+                parsed.FrontMatter.Title = parsed.FrontMatter.Title is null
+                    ? null : PlainText.WithoutControls(parsed.FrontMatter.Title);
+                parsed.FrontMatter.Description = parsed.FrontMatter.Description is null
+                    ? null : PlainText.WithoutControls(parsed.FrontMatter.Description);
                 var asZip = files.Attachments(link.Slug).Any();
 
                 return pages.Render("article.html", new()

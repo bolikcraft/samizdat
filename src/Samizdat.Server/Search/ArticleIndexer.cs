@@ -18,9 +18,9 @@ public sealed class ArticleIndexer(SamizdatDbContext db)
     public void Index(ArticleRow row, string body)
     {
         // Заголовок и описание чистим здесь же: они идут в поисковые векторы и на страницу находок.
-        row.Title = WithoutControls(row.Title);
-        row.Description = row.Description is null ? null : WithoutControls(row.Description);
-        row.SearchText = Trim(WithoutControls(PlainText.Extract(body)));
+        row.Title = PlainText.WithoutControls(row.Title);
+        row.Description = row.Description is null ? null : PlainText.WithoutControls(row.Description);
+        row.SearchText = Trim(PlainText.WithoutControls(PlainText.Extract(body)));
         row.IndexedHash = row.ContentHash;
 
         // Пишем обе формы цели: рендер ищет сперва буквальный slug, потом транслитерацию имени
@@ -45,13 +45,6 @@ public sealed class ArticleIndexer(SamizdatDbContext db)
         foreach (var target in wanted.Where(target => existing.All(link => link.ToSlug != target)))
             db.ArticleLinks.Add(new ArticleLinkRow { FromSlug = row.Slug, ToSlug = target });
     }
-
-    /// Управляющими символами размечается подсветка цитаты, в тексте статьи им не место. Перевод
-    /// строки и табуляция законны и остаются. Одно место на все поля, что уходят в поиск.
-    static string WithoutControls(string text)
-        => text.Any(Forbidden) ? new string(text.Where(symbol => !Forbidden(symbol)).ToArray()) : text;
-
-    static bool Forbidden(char symbol) => symbol < ' ' && symbol is not ('\n' or '\r' or '\t');
 
     static string Trim(string text)
     {
