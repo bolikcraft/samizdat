@@ -3,12 +3,14 @@
   var STORAGE_PREFIX = "samizdat:nav:";
 
   // Кнопка «Скопировать» стоит и в настройках, и в блоке «Поделиться» на статье. Обработчик
-  // живёт тут, а не в странице: на статье встроенный <script> запрещён.
-  document.querySelectorAll(".copy-link").forEach(function (button) {
-    button.addEventListener("click", function () {
-      navigator.clipboard.writeText(button.dataset.url).then(function () {
-        button.textContent = "Скопировано";
-      });
+  // живёт тут, а не в странице: на статье встроенный <script> запрещён. Слушаем документ, а не
+  // кнопки: блок «Поделиться» переписывается после отправки формы, и кнопка в нём каждый раз новая.
+  document.addEventListener("click", function (event) {
+    var button = event.target.closest(".copy-link");
+    if (!button) return;
+
+    navigator.clipboard.writeText(button.dataset.url).then(function () {
+      button.textContent = "Скопировано";
     });
   });
 

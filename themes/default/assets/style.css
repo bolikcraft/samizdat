@@ -388,7 +388,22 @@ blockquote { margin: 1.2rem 0; padding-left: 1rem; border-left: 4px solid var(--
   line-height: 1.2; cursor: pointer;
 }
 .login button, .settings-form button, .share-form button, .visibility-form button {
-  background: var(--accent); color: var(--bg);
+  background: var(--accent); color: var(--bg); --busy-ink: var(--bg);
+}
+/* Пока форма отправляется, подпись гаснет и на её месте крутится колечко: так ширина кнопки
+   не прыгает. Цвет колечка — --busy-ink, потому что currentColor уже прозрачный. */
+button.is-busy { position: relative; color: transparent; pointer-events: none; }
+button.is-busy::after {
+  content: ""; position: absolute; top: 50%; left: 50%;
+  width: 0.85rem; height: 0.85rem; margin: -0.475rem 0 0 -0.475rem;
+  border: 2px solid var(--busy-ink, var(--accent)); border-right-color: transparent;
+  border-radius: 50%;
+  animation: busy-spin 0.7s linear infinite;
+}
+@keyframes busy-spin { to { transform: rotate(1turn); } }
+/* Без движения колечко остаётся стоять: «идёт отправка» видно и так. */
+@media (prefers-reduced-motion: reduce) {
+  button.is-busy::after { animation: none; }
 }
 .error { color: var(--danger); }
 
@@ -634,7 +649,7 @@ blockquote { margin: 1.2rem 0; padding-left: 1rem; border-left: 4px solid var(--
    размера. Цвет разный: отзыв необратим, копирование — нет. */
 .settings-table .inline-form button, .copy-link { background: none; }
 .settings-table .inline-form button {
-  color: var(--danger); border: 1px solid var(--danger);
+  color: var(--danger); border: 1px solid var(--danger); --busy-ink: var(--danger);
 }
 .settings-table .inline-form button:hover { background: var(--danger); color: var(--bg); }
 .copy-link { color: var(--accent); border: 1px solid var(--accent); }
