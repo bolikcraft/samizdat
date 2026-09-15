@@ -14,4 +14,14 @@ public class SluggerTests
     [Fact]
     public void Result_is_stable_for_same_input()
         => Assert.Equal(Slugger.FromTitle("Тест"), Slugger.FromTitle("Тест"));
+
+    [Fact]
+    public void Try_gives_nothing_when_there_is_nothing_to_translate()
+        => Assert.Null(Slugger.TryFromTitle("---"));
+
+    [Theory]
+    [InlineData("Привет, мир!")]
+    [InlineData("Без названия")]
+    public void Try_gives_the_same_slug_as_FromTitle(string title)
+        => Assert.Equal(Slugger.FromTitle(title), Slugger.TryFromTitle(title));
 }

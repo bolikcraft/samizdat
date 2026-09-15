@@ -17,7 +17,11 @@ public static class Slugger
         ['э'] = "e", ['ю'] = "yu", ['я'] = "ya",
     };
 
-    public static string FromTitle(string title)
+    public static string FromTitle(string title) => TryFromTitle(title) ?? Fallback;
+
+    /// null, если переводить было нечего. Отличает пустой разбор от заголовка, который сам
+    /// дал слово-заглушку.
+    public static string? TryFromTitle(string title)
     {
         var result = new StringBuilder(title.Length);
         foreach (var symbol in title.ToLowerInvariant())
@@ -31,6 +35,6 @@ public static class Slugger
         }
 
         var slug = string.Join('-', result.ToString().Split('-', StringSplitOptions.RemoveEmptyEntries));
-        return slug.Length == 0 ? Fallback : slug;
+        return slug.Length == 0 ? null : slug;
     }
 }

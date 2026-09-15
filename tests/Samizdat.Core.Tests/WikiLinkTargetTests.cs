@@ -36,4 +36,8 @@ public class WikiLinkTargetTests
     [Fact]
     public void Literal_fallback_slug_still_works()
         => Assert.Equal(["bez-nazvaniya"], WikiLinkTarget.Candidates("bez-nazvaniya"));
+
+    [Fact]
+    public void Title_that_really_gives_the_fallback_word_still_resolves()
+        => Assert.Equal(["Без названия", "bez-nazvaniya"], WikiLinkTarget.Candidates("Без названия"));
 }
