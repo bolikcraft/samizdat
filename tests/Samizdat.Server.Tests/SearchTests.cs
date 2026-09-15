@@ -277,6 +277,60 @@ public class ArticleSearchTests(DatabaseFixture database) : IDisposable
 
         Assert.Empty(await search.FindSimilar("гипервизер", isOwner: false));
     }
+
+    // Обход ts_headline (экранируем перед вызовом, снимаем экранирование после — см. Find)
+    // держится на верном порядке пяти replace() в обе стороны. Сторожевые тесты на случай,
+    // если будущая чистка переставит их местами и подмену никто не заметит: xUnit сравнивает
+    // строки культурно, поэтому Ordinal обязателен — иначе разница в этих символах невесома.
+
+    [Fact]
+    public async Task Snippet_keeps_raw_special_characters_byte_for_byte()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        AddArticle(factory, "znaki", "Знаки", "сервер & < > \" ' рядом", ArticleVisibility.Private);
+
+        var hit = Assert.Single(await Find(factory, "сервер", isOwner: true));
+
+        Assert.Contains("& < > \" ' рядом", hit.Snippet, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Handwritten_amp_entity_does_not_turn_into_an_ampersand()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        AddArticle(factory, "amp", "Амперсанд", "сервер написан как &amp; в тексте", ArticleVisibility.Private);
+
+        var hit = Assert.Single(await Find(factory, "сервер", isOwner: true));
+
+        Assert.Contains("&amp;", hit.Snippet, StringComparison.Ordinal);
+        Assert.DoesNotContain("&amp;amp;", hit.Snippet, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Handwritten_tag_like_entity_stays_as_is()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        AddArticle(factory, "tag", "Тег", "сервер &lt;тег&gt; рядом", ArticleVisibility.Private);
+
+        var hit = Assert.Single(await Find(factory, "сервер", isOwner: true));
+
+        Assert.Contains("&lt;тег&gt;", hit.Snippet, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Emoji_next_to_the_found_word_survives()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        AddArticle(factory, "emoji", "Эмодзи", "сервер 🚀 гудит рядом", ArticleVisibility.Private);
+
+        var hit = Assert.Single(await Find(factory, "сервер", isOwner: true));
+
+        Assert.Contains("🚀", hit.Snippet, StringComparison.Ordinal);
+    }
 }
 
 [Collection("db")]
