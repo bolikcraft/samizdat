@@ -6,11 +6,7 @@ namespace Samizdat.Core.Rendering;
 
 public sealed class ArticleRenderer
 {
-    readonly MarkdownPipeline pipeline = new MarkdownPipelineBuilder()
-        .UseAdvancedExtensions()
-        .UseColorCode()
-        .Use<WikiLinkExtension>()
-        .Build();
+    readonly MarkdownPipeline pipeline = SharedPipeline.Builder().UseColorCode().Build();
 
     /// slug нужен, чтобы собрать путь к вложениям статьи; attachmentBase его подменяет
     /// (гостевая страница отдаёт вложения через свой маршрут).
