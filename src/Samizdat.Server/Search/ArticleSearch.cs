@@ -32,20 +32,32 @@ public sealed class ArticleSearch(SamizdatDbContext db)
         // Поэтому перед вызовом текст экранируем, а после — экранирование снимаем в обратном
         // порядке: наружу уходит тот же необработанный текст, что и раньше, только без выпавших кусков.
         const string sql = """
-            WITH q AS (SELECT websearch_to_tsquery('russian', @query) AS query)
+            WITH q AS (SELECT websearch_to_tsquery('russian', @query) AS query),
+                 -- Цитата строится по описанию и тексту вместе, иначе находка только по описанию
+                 -- показывала бы случайный кусок текста без искомого слова. Без описания разделитель
+                 -- не добавляем — иначе он лёг бы мусором перед цитатой из текста.
+                 source AS (
+                     SELECT a."Slug",
+                            CASE WHEN a."Description" IS NULL OR a."Description" = '' THEN a."SearchText"
+                                 ELSE a."Description" || E'\n\n' || a."SearchText"
+                            END AS text
+                     FROM articles a
+                 )
             SELECT a."Slug", a."Title", a."Folder",
                    (a."Visibility" = @shared OR @owner) AS can_open,
                    CASE WHEN a."Visibility" = @shared OR @owner THEN
                        replace(replace(replace(replace(replace(
                            ts_headline('russian',
-                               replace(replace(replace(replace(replace(a."SearchText",
+                               replace(replace(replace(replace(replace(source.text,
                                    '&', '&amp;'), '<', '&lt;'), '>', '&gt;'), '"', '&quot;'), '''', '&#39;'),
                                q.query, @options),
                            '&#39;', ''''), '&quot;', '"'), '&gt;', '>'), '&lt;', '<'), '&amp;', '&')
                        END AS snippet,
                    ts_rank_cd(CASE WHEN a."Visibility" = @shared OR @owner
                                    THEN a."SearchVector" ELSE a."MetaVector" END, q.query) AS rank
-            FROM articles a, q
+            FROM articles a
+            JOIN source ON source."Slug" = a."Slug"
+            CROSS JOIN q
             WHERE ((a."Visibility" = @shared OR @owner) AND a."SearchVector" @@ q.query)
                OR a."MetaVector" @@ q.query
             ORDER BY rank DESC, a."Title"

@@ -44,14 +44,14 @@ public class ArticleSearchTests(DatabaseFixture database) : IDisposable
         });
 
     void AddArticle(WebApplicationFactory<Program> factory, string slug, string title, string text,
-                    ArticleVisibility visibility)
+                    ArticleVisibility visibility, string? description = null)
     {
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
         db.Articles.Add(new ArticleRow
         {
             Slug = slug, Title = title, ContentHash = "h", IndexedHash = "h", SearchText = text,
-            Visibility = visibility, UpdatedAt = DateTimeOffset.UtcNow,
+            Description = description, Visibility = visibility, UpdatedAt = DateTimeOffset.UtcNow,
         });
         db.SaveChanges();
     }
@@ -86,6 +86,47 @@ public class ArticleSearchTests(DatabaseFixture database) : IDisposable
         // Ordinal обязателен: в культурном сравнении управляющие символы невесомы, и проверка
         // зеленеет на цитате без подсветки.
         Assert.Contains($"{SearchSnippet.Start}сервер{SearchSnippet.Stop}", hit.Snippet, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Word_only_in_the_description_gets_a_highlighted_snippet()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        AddArticle(factory, "dom", "Дом", "тут стоит тихий дом", ArticleVisibility.Private,
+                   description: "рассказ про старый сервер в подвале");
+
+        var hit = Assert.Single(await Find(factory, "сервер", isOwner: true));
+
+        Assert.Contains($"{SearchSnippet.Start}сервер{SearchSnippet.Stop}", hit.Snippet, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Word_in_both_description_and_text_still_shows_a_snippet()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        AddArticle(factory, "dom", "Дом", "тут стоит тихий сервер в доме", ArticleVisibility.Private,
+                   description: "рассказ про домашний сервер");
+
+        var hit = Assert.Single(await Find(factory, "сервер", isOwner: true));
+
+        Assert.Contains($"{SearchSnippet.Start}сервер{SearchSnippet.Stop}", hit.Snippet, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Empty_description_leaves_no_leading_garbage_in_the_snippet()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        AddArticle(factory, "dom", "Дом",
+                   "Сервер стоит в углу комнаты и совсем негромко гудит уже которую ночь подряд.",
+                   ArticleVisibility.Private, description: "");
+
+        var hit = Assert.Single(await Find(factory, "сервер", isOwner: true));
+
+        // Пустое описание не должно оставить перед цитатой ни пробела, ни своего разделителя.
+        Assert.StartsWith($"{SearchSnippet.Start}Сервер{SearchSnippet.Stop}", hit.Snippet, StringComparison.Ordinal);
     }
 
     [Fact]
