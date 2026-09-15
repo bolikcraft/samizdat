@@ -459,14 +459,14 @@ public static class SettingsEndpoints
     static string? Message(string? ok, string? err) => err switch
     {
         "wrong_password" => "Неверный текущий пароль.",
-        "short_password" => "Новый пароль должен быть не короче 8 символов.",
+        "short_password" => $"Новый пароль должен быть не короче {MinPasswordLength} символов.",
         "password_mismatch" => "Новый пароль и повтор не совпадают.",
         "background_missing" => "Файл не выбран.",
         "background_type" => "Это не картинка. Подойдёт jpeg, png или webp.",
         "background_too_big" => "Картинка больше 8 МБ.",
         "background_unknown" => "Такого фона нет в наборе темы.",
         "bad_person" => "Логин не должен быть пустым.",
-        "person_short_password" => "Пароль должен быть не короче 8 символов.",
+        "person_short_password" => $"Пароль должен быть не короче {MinPasswordLength} символов.",
         "login_taken" => "Такой логин уже занят.",
         "last_owner" => "Это последний владелец, его нельзя удалить.",
         "self_delete" => "Себя удалить нельзя.",

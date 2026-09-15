@@ -61,14 +61,16 @@ public class ServerCommandsTests(DatabaseFixture database) : IDisposable
         database.ResetDatabase();
         var factory = StartServer();
         await ServerCommands.TryRun(["owner", "set", "aleks", "первый"], factory.Services);
-        var firstHash = FindUser(factory, "aleks")!.PasswordHash;
+        var first = FindUser(factory, "aleks")!;
 
         await ServerCommands.TryRun(["owner", "set", "aleks", "второй"], factory.Services);
 
         var user = FindUser(factory, "aleks");
         Assert.NotNull(user);
-        Assert.NotEqual(firstHash, user.PasswordHash);
+        Assert.NotEqual(first.PasswordHash, user.PasswordHash);
         Assert.Equal(UserRole.Owner, user.Role);
+        // Пароль сменили с консоли — выданные cookie должны погаснуть, как и при смене из настроек.
+        Assert.NotEqual(first.SessionStamp, user.SessionStamp);
     }
 
     public void Dispose() => Directory.Delete(dataRoot, recursive: true);

@@ -36,6 +36,7 @@ public static class ServerCommands
             else
             {
                 user.PasswordHash = PasswordHasher.Hash(password);
+                user.SessionStamp = UserRow.NewSessionStamp();
             }
 
             await db.SaveChangesAsync();
