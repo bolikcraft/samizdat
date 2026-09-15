@@ -135,25 +135,34 @@ public static class ApiEndpoints
             return Results.Ok(new { slug, hash = row.ContentHash });
         });
 
-        api.MapDelete("/articles/{slug}", async (string slug, ArticleFiles files, SamizdatDbContext db) =>
+        api.MapDelete("/articles/{slug}", async (string slug, ArticleFiles files, SamizdatDbContext db,
+                                                 ILogger<Program> logger) =>
         {
             if (!ArticleFiles.IsValidSlug(slug)) return Results.BadRequest("Плохой slug");
 
             await using var transaction = await db.Database.BeginTransactionAsync();
             await LockSlug(db, slug);
 
-            // Сперва база, потом диск: если SaveChangesAsync откажет, файл останется на месте и статья
-            // не потеряется. Строка без файла — это 404 и предупреждение в лог на видном месте, а файл
-            // без строки — просто мусор, который следующий push перезапишет.
+            // Строка и файл — одна транзакция: откажет удаление с диска, откатится и удаление
+            // строки. Итог такого отказа — «строка без файла» (лог ниже плюс предупреждение
+            // IndexBackfill при следующем старте), а не тихий мусор, как было бы у «файла без
+            // строки». Удаление с диска остаётся под той же блокировкой: конкурентный PUT ждёт
+            // её снятия, а не застаёт каталог на полпути.
             var row = await db.Articles.FindAsync(slug);
             if (row is not null)
             {
                 db.Articles.Remove(row);
                 await db.SaveChangesAsync();
             }
-            // Удаление с диска остаётся под той же блокировкой: конкурентный PUT ждёт её снятия,
-            // а не застаёт каталог на полпути.
-            files.Remove(slug);
+            try
+            {
+                files.Remove(slug);
+            }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+            {
+                logger.LogError(error, "Статья {Slug}: не удалось удалить файлы с диска", slug);
+                throw;
+            }
             await transaction.CommitAsync();
             return Results.Ok();
         });

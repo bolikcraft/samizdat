@@ -169,7 +169,7 @@ public static class SettingsEndpoints
         }).RequireValidToken().OwnerOnly();
 
         group.MapPost("/background", [RequestSizeLimit(MaxBackgroundRequestBytes)]
-            async (HttpContext context, SiteSettings settings, BackgroundFile background) =>
+            async (HttpContext context, SiteSettings settings, BackgroundFile background, ILogger<Program> logger) =>
         {
             IFormCollection form;
             try
@@ -199,9 +199,21 @@ public static class SettingsEndpoints
 
             // Настройка меняется первой: имя файла известно по расширению заранее, до записи на
             // диск. Откажет она — до Save дело не дойдёт, и прежний фон останется на месте.
+            // Откажет сам Save (диск полон, обрыв чтения) — настройку возвращаем к прочитанному
+            // прежде значению: без этого она указывала бы на файл, которого нет, и фон пропал бы
+            // со страницы, хотя старый файл цел.
+            var previous = settings.Get("theme.background", "");
             settings.Set("theme.background", BackgroundFile.NameFor(extension));
             stream.Position = 0;
-            background.Save(stream, extension);
+            try
+            {
+                background.Save(stream, extension);
+            }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+            {
+                RevertBackgroundSetting(settings, logger, previous);
+                throw;
+            }
             return Ok("background");
         }).RefuseAnOversizedBody().RequireValidToken().OwnerOnly();
 
@@ -251,13 +263,24 @@ public static class SettingsEndpoints
         }).RequireValidToken().OwnerOnly();
 
         // Удаление загруженной картинки. Если она стояла фоном, фон заодно снимается: файла больше нет.
-        group.MapPost("/background/remove", (SiteSettings settings, BackgroundFile background) =>
+        group.MapPost("/background/remove", (SiteSettings settings, BackgroundFile background, ILogger<Program> logger) =>
         {
             // Настройка меняется первой: откажет она — до удаления файла дело не дойдёт, и фон
             // останется прежним. Когда фоном стоит не своя картинка (набор темы, цвет), настройку
-            // не трогаем вовсе — файл всё равно убираем, он просто больше не выбран.
-            if (settings.Background.Kind == BackgroundKind.Upload) settings.Set("theme.background", "");
-            background.Remove();
+            // не трогаем вовсе — файл всё равно убираем, он просто больше не выбран. Откажет само
+            // удаление — настройку возвращаем к прочитанному прежде значению, симметрично загрузке.
+            var previous = settings.Get("theme.background", "");
+            var clearsTheSetting = settings.Background.Kind == BackgroundKind.Upload;
+            if (clearsTheSetting) settings.Set("theme.background", "");
+            try
+            {
+                background.Remove();
+            }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+            {
+                if (clearsTheSetting) RevertBackgroundSetting(settings, logger, previous);
+                throw;
+            }
             return Ok("background_removed");
         }).RequireValidToken().OwnerOnly();
 
@@ -408,6 +431,22 @@ public static class SettingsEndpoints
             invocation.HttpContext.Request.ContentLength > MaxBackgroundRequestBytes
                 ? Err("background_too_big")
                 : await next(invocation));
+
+    /// Настройку возвращаем на прежнее значение, если работа с файлом отказала уже после того,
+    /// как настройка её обогнала. Сам откат тоже может отказать (база легла) — тогда только лог:
+    /// подменять собой исходную причину отказа в ответе не стоит.
+    static void RevertBackgroundSetting(SiteSettings settings, ILogger<Program> logger, string previous)
+    {
+        try
+        {
+            settings.Set("theme.background", previous);
+        }
+        catch (DbUpdateException error)
+        {
+            logger.LogError(error, "Фон: не удалось откатить настройку после отказа записи файла на диске, " +
+                                    "она может указывать на несуществующий файл");
+        }
+    }
 
     // Path сужает куку до настроек, HttpOnly закрывает её от скриптов. Delete обязан повторить
     // эти же поля, иначе браузер удалит не ту куку, и токен останется висеть до конца сеанса.

@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Headers;
+using System.Runtime.Versioning;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -385,6 +386,76 @@ public class BackgroundTests : IDisposable
 
             Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
         });
+
+        Assert.Equal(Jpeg(), await client.GetByteArrayAsync("/background"));
+        using var scope = factory.Services.CreateScope();
+        Assert.Equal("background.jpg",
+            scope.ServiceProvider.GetRequiredService<SiteSettings>().BackgroundFileName);
+    }
+
+    // Читать и открывать каталог можно, писать в него — нет: File.Create внутри Save и
+    // Directory.Delete внутри Remove отказывают так же честно, как при отвалившемся диске.
+    // Права доступа Unix: тесты воспроизводимы только на Linux/macOS, как и стенд в CI.
+    [SupportedOSPlatform("linux")]
+    static void DenyWrites(string folder)
+        => File.SetUnixFileMode(folder, UnixFileMode.UserRead | UnixFileMode.UserExecute);
+
+    [SupportedOSPlatform("linux")]
+    static void AllowWrites(string folder) => File.SetUnixFileMode(folder,
+        UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+
+    [Fact]
+    [SupportedOSPlatform("linux")]
+    public async Task A_disk_write_that_fails_leaves_the_old_setting_in_place()
+    {
+        var factory = StartFactory();
+        var client = await OwnerClient(factory);
+        var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
+        await client.PostAsync("/settings/background", Upload(name, value, Jpeg(), "old.jpg"));
+
+        var folder = Path.Combine(dataRoot, "background");
+        DenyWrites(folder);
+        try
+        {
+            (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
+            var response = await client.PostAsync("/settings/background", Upload(name, value, Png(), "new.png"));
+
+            Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
+        }
+        finally
+        {
+            AllowWrites(folder);
+        }
+
+        Assert.Equal(Jpeg(), await client.GetByteArrayAsync("/background"));
+        using var scope = factory.Services.CreateScope();
+        Assert.Equal("background.jpg",
+            scope.ServiceProvider.GetRequiredService<SiteSettings>().BackgroundFileName);
+    }
+
+    [Fact]
+    [SupportedOSPlatform("linux")]
+    public async Task A_disk_removal_that_fails_leaves_the_old_setting_in_place()
+    {
+        var factory = StartFactory();
+        var client = await OwnerClient(factory);
+        var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
+        await client.PostAsync("/settings/background", Upload(name, value, Jpeg(), "wall.jpg"));
+
+        var folder = Path.Combine(dataRoot, "background");
+        DenyWrites(folder);
+        try
+        {
+            (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
+            var response = await client.PostAsync("/settings/background/remove", new FormUrlEncodedContent(
+                new Dictionary<string, string> { [name] = value }));
+
+            Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
+        }
+        finally
+        {
+            AllowWrites(folder);
+        }
 
         Assert.Equal(Jpeg(), await client.GetByteArrayAsync("/background"));
         using var scope = factory.Services.CreateScope();

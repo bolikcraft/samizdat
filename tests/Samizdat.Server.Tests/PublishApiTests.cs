@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Samizdat.Server.Data;
 
@@ -190,20 +191,41 @@ public class PublishApiTests(DatabaseFixture database) : IDisposable
         Assert.Equal($"V{winner}", row.Title);
     }
 
-    // Блокировка обязана быть на слаг, а не одна на всех: иначе выкладка чужой статьи ждала бы
-    // своей очереди без всякой причины.
-    [Fact]
-    public async Task Concurrent_puts_of_different_slugs_both_succeed()
+    // Число повторяет SlugLockNamespace в ApiEndpoints — своё пространство ключей
+    // pg_advisory_xact_lock, отдельное от QueueLock регистрации.
+    const int SlugLockNamespace = 587_240_119;
+
+    // Блокировка обязана быть на слаг, а не одна на всех: занимаем слаг A вручную, отдельным
+    // соединением и незакоммиченной транзакцией — будто там уже идёт PUT/DELETE — и смотрим,
+    // что слаг B это не задерживает, а слаг A ждёт и проходит только после освобождения.
+    // Простой прогон двух PUT (как раньше) зеленеет и без блокировки на слаг вовсе: он меряет
+    // только итоговый успех, не очередь.
+    [Fact(Timeout = 10_000)]
+    public async Task A_slug_locked_elsewhere_does_not_hold_up_a_different_slug()
     {
-        var (_, client) = StartWithToken();
+        var (factory, client) = StartWithToken();
         var slugA = UniqueSlug();
         var slugB = UniqueSlug();
 
-        var answers = await Task.WhenAll(
-            client.PutAsync($"/api/articles/{slugA}", Article("a")),
-            client.PutAsync($"/api/articles/{slugB}", Article("b")));
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+        await using var externalLock = await db.Database.BeginTransactionAsync();
+        await db.Database.ExecuteSqlAsync(
+            $"SELECT pg_advisory_xact_lock({SlugLockNamespace}, hashtext({slugA}))");
 
-        Assert.All(answers, answer => Assert.Equal(HttpStatusCode.OK, answer.StatusCode));
+        // Слаг B занят другим ключом — проходит, пока чужая блокировка ещё держится.
+        var bResponse = await client.PutAsync($"/api/articles/{slugB}", Article("b"));
+        Assert.Equal(HttpStatusCode.OK, bResponse.StatusCode);
+
+        // Слаг A ждёт: запрос запущен, но не может завершиться, пока блокировка снаружи жива.
+        var aTask = client.PutAsync($"/api/articles/{slugA}", Article("a"));
+        await Task.Delay(TimeSpan.FromMilliseconds(500));
+        Assert.False(aTask.IsCompleted, "PUT слага A прошёл, хотя его слаг ещё занят другим соединением");
+
+        await externalLock.RollbackAsync();
+        var aResponse = await aTask;
+
+        Assert.Equal(HttpStatusCode.OK, aResponse.StatusCode);
         Assert.Equal("a", await File.ReadAllTextAsync(Path.Combine(dataRoot, "articles", slugA, "index.md")));
         Assert.Equal("b", await File.ReadAllTextAsync(Path.Combine(dataRoot, "articles", slugB, "index.md")));
     }
