@@ -11,6 +11,18 @@ namespace Samizdat.Server.Endpoints;
 
 public static class ApiEndpoints
 {
+    // Пространство ключей для блокировки на слаг (2-арг форма pg_advisory_xact_lock) — отдельное
+    // от других блокировок вроде QueueLock регистрации, чтобы хэш слага не мог задеть чужую.
+    const int SlugLockNamespace = 587_240_119;
+
+    /// Слаг статьи заперт до конца транзакции: параллельный PUT/DELETE того же слага иначе
+    /// делит один каталог на диске (BeginReplace двигает его в .old-/.tmp-) и один из двух
+    /// спотыкается о то, что другой уже подвинул. Блокировка транзакционная — снимается сама
+    /// на Commit/Rollback и видна всем процессам (reindex, вторая копия сервера), а не только
+    /// этому запросу.
+    static Task LockSlug(SamizdatDbContext db, string slug)
+        => db.Database.ExecuteSqlAsync($"SELECT pg_advisory_xact_lock({SlugLockNamespace}, hashtext({slug}))");
+
     public static void MapApi(this WebApplication app)
     {
         // Bearer-токен, не cookie: antiforgery здесь неприменим в принципе, отключаем на всю группу
@@ -61,6 +73,9 @@ public static class ApiEndpoints
                 return Results.BadRequest($"{slug}/index.md: {error.Message}");
             }
 
+            await using var transaction = await db.Database.BeginTransactionAsync();
+            await LockSlug(db, slug);
+
             // Запись на диск можно отменить: SaveChangesAsync ниже способен отказать уже после того,
             // как файлы легли на место, и тогда диск и база разойдутся.
             var write = files.BeginReplace(slug, markdown, attachments);
@@ -105,21 +120,27 @@ public static class ApiEndpoints
                 { SqlState: PostgresErrorCodes.ProgramLimitExceeded })
             {
                 RollbackFileWrite();
+                await transaction.RollbackAsync();
                 return Results.BadRequest($"{slug}: описание слишком длинное для поискового индекса");
             }
             catch
             {
                 RollbackFileWrite();
+                await transaction.RollbackAsync();
                 throw;
             }
 
             write.Commit();
+            await transaction.CommitAsync();
             return Results.Ok(new { slug, hash = row.ContentHash });
         });
 
         api.MapDelete("/articles/{slug}", async (string slug, ArticleFiles files, SamizdatDbContext db) =>
         {
             if (!ArticleFiles.IsValidSlug(slug)) return Results.BadRequest("Плохой slug");
+
+            await using var transaction = await db.Database.BeginTransactionAsync();
+            await LockSlug(db, slug);
 
             // Сперва база, потом диск: если SaveChangesAsync откажет, файл останется на месте и статья
             // не потеряется. Строка без файла — это 404 и предупреждение в лог на видном месте, а файл
@@ -130,7 +151,10 @@ public static class ApiEndpoints
                 db.Articles.Remove(row);
                 await db.SaveChangesAsync();
             }
+            // Удаление с диска остаётся под той же блокировкой: конкурентный PUT ждёт её снятия,
+            // а не застаёт каталог на полпути.
             files.Remove(slug);
+            await transaction.CommitAsync();
             return Results.Ok();
         });
 

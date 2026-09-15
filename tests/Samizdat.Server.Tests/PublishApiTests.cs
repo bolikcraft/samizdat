@@ -159,6 +159,84 @@ public class PublishApiTests(DatabaseFixture database) : IDisposable
         Assert.Empty(db.Articles.Where(article => article.Slug == "st"));
     }
 
+    // Без блокировки на слаг второй PUT переносит существующий каталог в .old- в тот момент,
+    // когда первый ждёт того же движения: Directory.Move у одного из них не находит то, что
+    // ожидал. Блокировка обязана развести их по очереди, а не уронить одного из двух.
+    [Fact]
+    public async Task Two_concurrent_puts_of_the_same_slug_leave_one_consistent_version()
+    {
+        var (factory, client) = StartWithToken();
+        var slug = UniqueSlug();
+        await client.PutAsync($"/api/articles/{slug}", Article("---\ntitle: V0\n---\nv0"));
+
+        // Восемь разом, не два: гонка на Directory.Move ловится не при каждой паре, а с запасом
+        // конкурентов — почти всегда.
+        const int concurrentWriters = 8;
+        var answers = await Task.WhenAll(Enumerable.Range(1, concurrentWriters).Select(i =>
+            client.PutAsync($"/api/articles/{slug}", Article($"---\ntitle: V{i}\n---\nv{i}"))));
+
+        Assert.All(answers, answer => Assert.Equal(HttpStatusCode.OK, answer.StatusCode));
+
+        var articlesRoot = Path.Combine(dataRoot, "articles");
+        Assert.DoesNotContain(Directory.EnumerateDirectories(articlesRoot),
+            dir => Path.GetFileName(dir)!.StartsWith('.'));
+
+        var content = await File.ReadAllTextAsync(Path.Combine(articlesRoot, slug, "index.md"));
+        var winner = Enumerable.Range(1, concurrentWriters).Single(i => content.EndsWith($"v{i}"));
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+        var row = db.Articles.Single(article => article.Slug == slug);
+        Assert.Equal($"V{winner}", row.Title);
+    }
+
+    // Блокировка обязана быть на слаг, а не одна на всех: иначе выкладка чужой статьи ждала бы
+    // своей очереди без всякой причины.
+    [Fact]
+    public async Task Concurrent_puts_of_different_slugs_both_succeed()
+    {
+        var (_, client) = StartWithToken();
+        var slugA = UniqueSlug();
+        var slugB = UniqueSlug();
+
+        var answers = await Task.WhenAll(
+            client.PutAsync($"/api/articles/{slugA}", Article("a")),
+            client.PutAsync($"/api/articles/{slugB}", Article("b")));
+
+        Assert.All(answers, answer => Assert.Equal(HttpStatusCode.OK, answer.StatusCode));
+        Assert.Equal("a", await File.ReadAllTextAsync(Path.Combine(dataRoot, "articles", slugA, "index.md")));
+        Assert.Equal("b", await File.ReadAllTextAsync(Path.Combine(dataRoot, "articles", slugB, "index.md")));
+    }
+
+    [Fact]
+    public async Task Delete_during_a_put_of_the_same_slug_leaves_no_mess()
+    {
+        var (factory, client) = StartWithToken();
+        var slug = UniqueSlug();
+        await client.PutAsync($"/api/articles/{slug}", Article("v0"));
+
+        // Несколько PUT разом с одним DELETE: одиночная пара ловит гонку на Directory.Move не
+        // всегда, запас конкурентов — почти всегда.
+        const int concurrentWriters = 6;
+        var writes = Enumerable.Range(1, concurrentWriters)
+            .Select(i => client.PutAsync($"/api/articles/{slug}", Article($"v{i}")))
+            .Append(client.DeleteAsync($"/api/articles/{slug}"));
+        var answers = await Task.WhenAll(writes);
+
+        Assert.All(answers, answer => Assert.Equal(HttpStatusCode.OK, answer.StatusCode));
+
+        var articlesRoot = Path.Combine(dataRoot, "articles");
+        Assert.DoesNotContain(Directory.EnumerateDirectories(articlesRoot),
+            dir => Path.GetFileName(dir)!.StartsWith('.'));
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+        var rowExists = db.Articles.Any(article => article.Slug == slug);
+        var folderExists = Directory.Exists(Path.Combine(articlesRoot, slug));
+        // Что бы ни победило по порядку — база и диск обязаны сойтись на одном исходе.
+        Assert.Equal(rowExists, folderExists);
+    }
+
     [Fact]
     public async Task Get_markdown_returns_source()
     {
