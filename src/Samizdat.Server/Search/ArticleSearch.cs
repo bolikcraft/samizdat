@@ -84,7 +84,7 @@ public sealed class ArticleSearch(SamizdatDbContext db)
         return Run(sql, ("query", text), ("owner", isOwner), ("shared", (int)ArticleVisibility.Shared),
                    ("options", SearchSnippet.Options), ("limit", Limit),
                    ("mark0", SearchSnippet.Start.ToString()), ("mark1", SearchSnippet.Stop.ToString()),
-                   ("delimiter", SearchSnippet.FragmentDelimiter), ("ellipsis", SearchSnippet.Ellipsis));
+                   ("delimiter", SearchSnippet.FragmentBreak.ToString()), ("ellipsis", SearchSnippet.Ellipsis));
     }
 
     /// Запасной путь: полнотекст не нашёл ничего, ищем похожие куски слов. Индексов у триграмм нет

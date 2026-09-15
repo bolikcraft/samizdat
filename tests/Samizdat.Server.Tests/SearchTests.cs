@@ -26,6 +26,11 @@ public class SearchSnippetTests
 
         Assert.Equal("<mark>&lt;b&gt;</mark>", html);
     }
+
+    [Fact]
+    public void Fragment_break_becomes_a_visible_ellipsis()
+        => Assert.Equal("первый кусок … второй кусок",
+                        SearchSnippet.ToHtml($"первый кусок{SearchSnippet.FragmentBreak}второй кусок"));
 }
 
 [Collection("db")]
@@ -387,6 +392,34 @@ public class ArticleSearchTests(DatabaseFixture database) : IDisposable
 
         Assert.StartsWith(SearchSnippet.Ellipsis, hit.Snippet, StringComparison.Ordinal);
         Assert.EndsWith(SearchSnippet.Ellipsis, hit.Snippet, StringComparison.Ordinal);
+    }
+
+    // Разбиение на два фрагмента (два далёких совпадения) плюс авторское «…» рядом со вторым
+    // совпадением — конструкция проверена напрямую на ts_headline. Со старым текстовым
+    // разделителем " … " разбор границы между фрагментами и авторского многоточия опирался
+    // на один и тот же текст; с управляющим символом эта путаница исключена в принципе, а
+    // края (там, где реально обрезано) размечаются верно и не путаются с многоточием автора.
+    [Fact]
+    public async Task Two_distant_matches_join_correctly_next_to_the_authors_own_ellipsis()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        var before = string.Join(" ", Enumerable.Range(1, 40).Select(i => $"перед{i}"));
+        var between = string.Join(" ", Enumerable.Range(1, 30).Select(i => $"между{i}"));
+        var after = string.Join(" ", Enumerable.Range(1, 40).Select(i => $"после{i}"));
+        AddArticle(factory, "dom", "Дом", $"{before} сервер {between} межа … дом {after}",
+                   ArticleVisibility.Private);
+
+        var hit = Assert.Single(await Find(factory, "сервер дом", isOwner: true));
+        var html = SearchSnippet.ToHtml(hit.Snippet!);
+
+        Assert.Contains("<mark>сервер</mark>", html, StringComparison.Ordinal);
+        Assert.Contains("<mark>дом</mark>", html, StringComparison.Ordinal);
+        // Авторское «…» рядом со вторым найденным словом дошло до читателя как было.
+        Assert.Contains("межа … <mark>дом</mark>", html, StringComparison.Ordinal);
+        // Оба края текста реально обрезаны (перед первым словом и после второго) — оба отмечены.
+        Assert.StartsWith(SearchSnippet.Ellipsis, html, StringComparison.Ordinal);
+        Assert.EndsWith(SearchSnippet.Ellipsis, html, StringComparison.Ordinal);
     }
 
     [Fact]
