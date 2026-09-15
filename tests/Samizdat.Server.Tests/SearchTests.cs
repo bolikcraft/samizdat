@@ -197,6 +197,71 @@ public class ArticleSearchTests(DatabaseFixture database) : IDisposable
     }
 
     [Fact]
+    public async Task Huge_query_does_not_break_the_search()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        AddArticle(factory, "dom", "Дом", "тут стоит сервер", ArticleVisibility.Private);
+
+        // Запрос в мегабайт база не берёт: tsquery такого размера — отказ 54000.
+        Assert.Empty(await Find(factory, new string('я', 1_300_000), isOwner: true));
+    }
+
+    [Fact]
+    public async Task Zero_byte_in_the_query_does_not_break_the_search()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        AddArticle(factory, "dom", "Дом", "тут стоит сервер", ArticleVisibility.Private);
+
+        var hits = await Find(factory, "сервер\0", isOwner: true);
+
+        Assert.Equal("dom", Assert.Single(hits).Slug);
+    }
+
+    [Fact]
+    public async Task Word_in_the_first_letters_of_a_long_query_still_finds_the_article()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        AddArticle(factory, "dom", "Дом", "тут стоит сервер", ArticleVisibility.Private);
+
+        // Хвост за пределом обрезки уходит целиком: иначе он добавил бы к запросу слово,
+        // которого в статье нет, и находки не стало бы.
+        var query = $"сервер{new string(' ', ArticleSearch.MaxQuery)}абракадабра";
+
+        var hits = await Find(factory, query, isOwner: true);
+
+        Assert.Equal("dom", Assert.Single(hits).Slug);
+    }
+
+    [Fact]
+    public async Task Trigrams_catch_a_swapped_pair_of_letters()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        AddArticle(factory, "kubernetes", "Kubernetes", "оркестратор", ArticleVisibility.Private);
+
+        using var scope = factory.Services.CreateScope();
+        var search = scope.ServiceProvider.GetRequiredService<ArticleSearch>();
+
+        Assert.Equal("kubernetes", Assert.Single(await search.FindSimilar("kuberentes", isOwner: true)).Slug);
+    }
+
+    [Fact]
+    public async Task Trigrams_do_not_catch_a_word_of_another_article()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        AddArticle(factory, "proxmox", "Proxmox", "гипервизор дома", ArticleVisibility.Private);
+
+        using var scope = factory.Services.CreateScope();
+        var search = scope.ServiceProvider.GetRequiredService<ArticleSearch>();
+
+        Assert.Empty(await search.FindSimilar("черепаха", isOwner: true));
+    }
+
+    [Fact]
     public async Task Trigrams_keep_the_text_of_a_private_article_closed()
     {
         database.ResetDatabase();

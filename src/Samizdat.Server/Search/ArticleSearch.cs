@@ -12,13 +12,21 @@ public sealed record SearchHit(string Slug, string Title, string Folder, bool Ca
 public sealed class ArticleSearch(SamizdatDbContext db)
 {
     public const int Limit = 50;
+
+    /// Длиннее поисковая строка человеку не нужна, а база на огромном запросе отвечает отказом.
+    public const int MaxQuery = 200;
+
     const int SimilarLimit = 10;
 
-    /// Порог похожести триграмм. Ниже — в находки лезет случайный шум.
-    const double SimilarFloor = 0.5;
+    /// Порог похожести триграмм. Ловит замену и вставку буквы; перестановка соседних букв в коротком
+    /// слове не ловится и на этом пороге. Ниже — в находки лезет случайный шум.
+    const double SimilarFloor = 0.4;
 
     public Task<IReadOnlyList<SearchHit>> Find(string query, bool isOwner)
     {
+        var text = Clean(query);
+        if (text.Length == 0) return Empty;
+
         const string sql = """
             WITH q AS (SELECT websearch_to_tsquery('russian', @query) AS query)
             SELECT a."Slug", a."Title", a."Folder",
@@ -34,7 +42,7 @@ public sealed class ArticleSearch(SamizdatDbContext db)
             LIMIT @limit
             """;
 
-        return Run(sql, ("query", query), ("owner", isOwner), ("shared", (int)ArticleVisibility.Shared),
+        return Run(sql, ("query", text), ("owner", isOwner), ("shared", (int)ArticleVisibility.Shared),
                    ("options", SearchSnippet.Options), ("limit", Limit));
     }
 
@@ -42,6 +50,9 @@ public sealed class ArticleSearch(SamizdatDbContext db)
     /// намеренно — путь редкий, а лишний индекс дорожает на каждой выкладке.
     public Task<IReadOnlyList<SearchHit>> FindSimilar(string query, bool isOwner)
     {
+        var text = Clean(query);
+        if (text.Length == 0) return Empty;
+
         // Текст закрытой статьи читателю не сравниваем вовсе: похожесть по нему — та же утечка.
         const string sql = """
             WITH s AS (
@@ -57,8 +68,22 @@ public sealed class ArticleSearch(SamizdatDbContext db)
             LIMIT @limit
             """;
 
-        return Run(sql, ("query", query), ("owner", isOwner), ("shared", (int)ArticleVisibility.Shared),
+        return Run(sql, ("query", text), ("owner", isOwner), ("shared", (int)ArticleVisibility.Shared),
                    ("floor", SimilarFloor), ("limit", SimilarLimit));
+    }
+
+    static Task<IReadOnlyList<SearchHit>> Empty => Task.FromResult<IReadOnlyList<SearchHit>>([]);
+
+    /// Строку запроса чистим до похода в базу: нулевой байт база не принимает вовсе, а на слишком
+    /// длинном запросе отвечает отказом, потратив на него секунды.
+    static string Clean(string query)
+    {
+        var text = new string(query.Where(symbol => !char.IsControl(symbol)).ToArray()).Trim();
+        if (text.Length <= MaxQuery) return text;
+
+        // Половина суррогатной пары на конце — уже не текст: драйвер не переводит её в UTF-8.
+        var end = char.IsHighSurrogate(text[MaxQuery - 1]) ? MaxQuery - 1 : MaxQuery;
+        return text[..end];
     }
 
     async Task<IReadOnlyList<SearchHit>> Run(string sql, params (string Name, object Value)[] parameters)

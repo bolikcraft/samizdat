@@ -145,6 +145,29 @@ public class IndexTests(DatabaseFixture database) : IDisposable
     }
 
     [Fact]
+    public async Task Control_character_from_the_text_does_not_reach_the_index()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        var client = TestPublisher.ClientWithToken(factory);
+
+        // Такими символами размечается подсветка цитаты: из текста заметки они подделали бы её.
+        var body = $"тут {SearchSnippet.Start}сервер{SearchSnippet.Stop} стоит";
+
+        (await TestPublisher.Push(client, "statya", $"---\ntitle: Статья\n---\n\n{body}"))
+            .EnsureSuccessStatusCode();
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+
+        var text = db.Articles.Single().SearchText;
+
+        Assert.DoesNotContain(SearchSnippet.Start.ToString(), text, StringComparison.Ordinal);
+        Assert.DoesNotContain(SearchSnippet.Stop.ToString(), text, StringComparison.Ordinal);
+        Assert.Contains("тут сервер стоит", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Republishing_drops_a_link_that_is_gone()
     {
         database.ResetDatabase();
