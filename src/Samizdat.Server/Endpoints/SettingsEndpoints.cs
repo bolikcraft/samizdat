@@ -70,7 +70,10 @@ public static class SettingsEndpoints
             }
 
             List<Dictionary<string, object?>> people = isOwner
-                ? db.Users.OrderBy(row => row.Login).ToList().Select(row => new Dictionary<string, object?>
+                // Ждущие сюда не попадают: они живут в очереди раздела «Регистрация», пока
+                // владелец не решит. Кнопки этого списка им не подходят.
+                ? db.Users.Where(row => row.ApprovedAt != null).OrderBy(row => row.Login).ToList()
+                    .Select(row => new Dictionary<string, object?>
                 {
                     ["id"] = row.Id,
                     ["login"] = row.Login,

@@ -178,6 +178,52 @@
   {{ if message_section == "signup" }}{{ message_block }}{{ end }}
 
   <div class="settings-block">
+    <h3>Открытая регистрация</h3>
+    <p class="hint">Пока выключена, завести учётку можно только по приглашению. Когда включена,
+      на странице входа появляется кнопка «Зарегистрироваться», а записавшиеся встают в очередь:
+      пускаете их вы.</p>
+    <form method="post" action="/settings/signup/open" class="settings-form">
+      {{ antiforgery }}
+      <label class="signup-switch">
+        <input type="checkbox" name="open"{{ if signup.open }} checked{{ end }}>
+        Разрешить записываться самостоятельно
+      </label>
+      <button type="submit">Сохранить</button>
+    </form>
+  </div>
+
+  <div class="settings-block">
+    <h3>Очередь заявок</h3>
+    {{ if signup.pending.size > 0 }}
+    <div class="table-scroll">
+    <table class="pending settings-table">
+      <thead><tr><th>Логин</th><th>Подана</th><th></th></tr></thead>
+      <tbody>
+      {{ for person in signup.pending }}
+      <tr>
+        <td>{{ person.login | html.escape }}</td>
+        <td>{{ person.created_at | html.escape }}</td>
+        <td class="row-actions">
+          <form method="post" action="/settings/signup/{{ person.id }}/approve" class="inline-form approve-form">
+            {{ antiforgery }}
+            <button type="submit">Пустить</button>
+          </form>
+          <form method="post" action="/settings/signup/{{ person.id }}/reject" class="inline-form">
+            {{ antiforgery }}
+            <button type="submit">Отказать</button>
+          </form>
+        </td>
+      </tr>
+      {{ end }}
+      </tbody>
+    </table>
+    </div>
+    {{ else }}
+    <p class="empty">Заявок нет.</p>
+    {{ end }}
+  </div>
+
+  <div class="settings-block">
     <h3>Приглашения</h3>
     <p class="hint">Ссылка срабатывает один раз: кто перешёл первым, тот и завёл учётку
       читателя. Дальше она не работает и остаётся в списке следом.</p>

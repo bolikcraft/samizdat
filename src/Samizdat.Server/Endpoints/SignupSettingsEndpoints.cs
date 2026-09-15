@@ -17,6 +17,40 @@ public static class SignupSettingsEndpoints
     {
         var group = app.MapGroup("/settings").RequireAuthorization();
 
+        // Галка без значения в форме не приходит вовсе: браузер шлёт поле только у отмеченной.
+        group.MapPost("/signup/open", async (HttpContext context, SiteSettings settings) =>
+        {
+            var form = await context.Request.ReadFormAsync();
+            settings.Set("auth.open_registration", form["open"].ToString() == "on" ? "true" : "false");
+            return Ok("signup_open");
+        }).RequireValidToken().OwnerOnly();
+
+        group.MapPost("/signup/{id:int}/approve", (int id, SamizdatDbContext db) =>
+        {
+            var person = db.Users.Find(id);
+            if (person is null) return Results.NotFound();
+            // Только ждущего: живого человека эти кнопки не трогают, иначе «отказать» стало бы
+            // вторым способом удалить кого угодно в обход раздела «Пользователи».
+            if (person.ApprovedAt is not null) return Err("not_pending");
+
+            person.ApprovedAt = DateTimeOffset.UtcNow;
+            db.SaveChanges();
+            return Ok("signup_approved");
+        }).RequireValidToken().OwnerOnly();
+
+        // Отказ сносит строку, а не помечает её: ждущая заявка держит логин занятым уникальным
+        // индексом, и помеченная держала бы его вечно.
+        group.MapPost("/signup/{id:int}/reject", (int id, SamizdatDbContext db) =>
+        {
+            var person = db.Users.Find(id);
+            if (person is null) return Results.NotFound();
+            if (person.ApprovedAt is not null) return Err("not_pending");
+
+            db.Users.Remove(person);
+            db.SaveChanges();
+            return Ok("signup_rejected");
+        }).RequireValidToken().OwnerOnly();
+
         group.MapPost("/invites", async (HttpContext context, SamizdatDbContext db) =>
         {
             var form = await context.Request.ReadFormAsync();
@@ -60,6 +94,14 @@ public static class SignupSettingsEndpoints
         return new Dictionary<string, object?>
         {
             ["open"] = settings.OpenRegistration,
+            ["pending"] = db.Users.Where(row => row.ApprovedAt == null)
+                .OrderBy(row => row.CreatedAt).ToList()
+                .Select(row => new Dictionary<string, object?>
+                {
+                    ["id"] = row.Id,
+                    ["login"] = row.Login,
+                    ["created_at"] = row.CreatedAt.ToString("yyyy-MM-dd HH:mm"),
+                }).ToList(),
             // Живые сверху: погашенные остаются следом, но не мешают найти рабочую ссылку.
             ["invites"] = db.Invites.ToList()
                 .OrderByDescending(row => row.IsAlive(now)).ThenByDescending(row => row.CreatedAt)

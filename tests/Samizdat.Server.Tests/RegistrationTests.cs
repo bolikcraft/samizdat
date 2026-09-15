@@ -448,6 +448,115 @@ public class RegistrationTests : IDisposable
         Assert.Equal("/", answer.Headers.Location?.ToString());
     }
 
+    [Fact]
+    public async Task Owner_switches_the_open_registration_on_and_off()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        AddPerson(factory, "hozyain", "parol-hozyaina", UserRole.Owner);
+        var owner = await Login(factory, "hozyain", "parol-hozyaina");
+
+        var on = await Post(owner, "/settings/signup/open", new() { ["open"] = "on" });
+        Assert.Equal("/settings?ok=signup_open#signup", on.Headers.Location?.ToString());
+        Assert.Equal(HttpStatusCode.OK, (await factory.CreateClient().GetAsync("/register")).StatusCode);
+
+        await Post(owner, "/settings/signup/open", new());
+        Assert.Equal(HttpStatusCode.NotFound,
+            (await factory.CreateClient().GetAsync("/register")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Owner_lets_a_waiting_person_in()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        AddPerson(factory, "hozyain", "parol-hozyaina", UserRole.Owner);
+        AddPending(factory, "gost", "parol-gostya");
+        var id = Users(factory).Single(row => row.Login == "gost").Id;
+        var owner = await Login(factory, "hozyain", "parol-hozyaina");
+
+        var answer = await Post(owner, $"/settings/signup/{id}/approve", new());
+
+        Assert.Equal("/settings?ok=signup_approved#signup", answer.Headers.Location?.ToString());
+        Assert.Equal(HttpStatusCode.Redirect, (await TryLogin(factory, "gost", "parol-gostya")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Owner_rejects_a_waiting_person_and_the_row_is_gone()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        AddPerson(factory, "hozyain", "parol-hozyaina", UserRole.Owner);
+        AddPending(factory, "gost", "parol-gostya");
+        var id = Users(factory).Single(row => row.Login == "gost").Id;
+        var owner = await Login(factory, "hozyain", "parol-hozyaina");
+
+        var answer = await Post(owner, $"/settings/signup/{id}/reject", new());
+
+        Assert.Equal("/settings?ok=signup_rejected#signup", answer.Headers.Location?.ToString());
+        Assert.DoesNotContain(Users(factory), row => row.Login == "gost");
+    }
+
+    // Этими кнопками нельзя тронуть живого человека: иначе «отказать» стало бы вторым способом
+    // удалить кого угодно, минуя защиту раздела «Пользователи».
+    [Fact]
+    public async Task The_queue_buttons_do_not_touch_a_person_who_is_already_in()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        AddPerson(factory, "hozyain", "parol-hozyaina", UserRole.Owner);
+        AddPerson(factory, "ivan", "parol-ivana", UserRole.Reader);
+        var id = Users(factory).Single(row => row.Login == "ivan").Id;
+        var owner = await Login(factory, "hozyain", "parol-hozyaina");
+
+        var rejected = await Post(owner, $"/settings/signup/{id}/reject", new());
+
+        Assert.Equal("/settings?err=not_pending#signup", rejected.Headers.Location?.ToString());
+        Assert.Contains(Users(factory), row => row.Login == "ivan");
+    }
+
+    [Fact]
+    public async Task A_reader_cannot_touch_the_queue()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        AddPerson(factory, "ivan", "parol-ivana", UserRole.Reader);
+        AddPending(factory, "gost", "parol-gostya");
+        var id = Users(factory).Single(row => row.Login == "gost").Id;
+        var reader = await Login(factory, "ivan", "parol-ivana");
+
+        Assert.Equal(HttpStatusCode.Forbidden,
+            (await Post(reader, "/settings/signup/open", new() { ["open"] = "on" })).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden,
+            (await Post(reader, $"/settings/signup/{id}/approve", new())).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden,
+            (await Post(reader, $"/settings/signup/{id}/reject", new())).StatusCode);
+        Assert.Contains(Users(factory), row => row.Login == "gost");
+    }
+
+    [Fact]
+    public async Task The_queue_is_shown_to_the_owner_and_hidden_from_a_reader()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        AddPerson(factory, "hozyain", "parol-hozyaina", UserRole.Owner);
+        AddPerson(factory, "ivan", "parol-ivana", UserRole.Reader);
+        AddPending(factory, "gost", "parol-gostya");
+        var pendingId = Users(factory).Single(row => row.Login == "gost").Id;
+
+        var owner = await Login(factory, "hozyain", "parol-hozyaina");
+        var ownerHtml = await owner.GetStringAsync("/settings/");
+        var reader = await Login(factory, "ivan", "parol-ivana");
+        var readerHtml = await reader.GetStringAsync("/settings/");
+
+        Assert.Contains($"/settings/signup/{pendingId}/approve", ownerHtml);
+        Assert.Contains("/settings/signup/open", ownerHtml);
+        Assert.DoesNotContain("/settings/signup", readerHtml);
+        // Ждущий не человек сайта: в списке раздела «Пользователи» ему места нет, а кнопку
+        // удаления рисуют только строкам того списка.
+        Assert.DoesNotContain($"/settings/people/{pendingId}/delete", ownerHtml);
+    }
+
     WebApplicationFactory<Program> CreateFactory() =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
