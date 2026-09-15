@@ -67,6 +67,20 @@ public class DownloadTests : IDisposable
     }
 
     [Fact]
+    public async Task A_cyrillic_slug_survives_in_the_file_name()
+    {
+        using var factory = CreateFactory();
+        AddArticle(factory, "статья", ArticleVisibility.Private);
+        AddPerson(factory, "hozyain", "parol", UserRole.Owner);
+
+        var client = await Login(factory, "hozyain", "parol");
+        var answer = await client.GetAsync("/download/статья");
+
+        Assert.Equal(HttpStatusCode.OK, answer.StatusCode);
+        Assert.Contains("filename*=UTF-8''", answer.Content.Headers.ContentDisposition?.ToString());
+    }
+
+    [Fact]
     public async Task Owner_gets_the_file_byte_for_byte()
     {
         using var factory = CreateFactory();
@@ -199,6 +213,21 @@ public class DownloadTests : IDisposable
         var client = await Login(factory, "ivan", "parol");
 
         Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/download/otkrytaya")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Owner_downloads_despite_a_broken_header()
+    {
+        using var factory = CreateFactory();
+        var text = "---\ntitle: [не закрыт\n---\n\nТекст.\n";
+        AddArticle(factory, "tayna", ArticleVisibility.Private, text);
+        AddPerson(factory, "hozyain", "parol", UserRole.Owner);
+
+        var client = await Login(factory, "hozyain", "parol");
+        var answer = await client.GetAsync("/download/tayna");
+
+        Assert.Equal(HttpStatusCode.OK, answer.StatusCode);
+        Assert.Equal(text, await answer.Content.ReadAsStringAsync());
     }
 
     [Fact]

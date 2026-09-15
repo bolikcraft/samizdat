@@ -123,68 +123,33 @@ public class ArticleFilesTests : IDisposable
     [Fact]
     public void Attachments_list_everything_but_the_source()
     {
-        var root = Directory.CreateTempSubdirectory("samizdat-files").FullName;
-        try
-        {
-            var files = new ArticleFiles(root);
-            var folder = Path.Combine(root, "articles", "tayna");
-            Directory.CreateDirectory(folder);
-            File.WriteAllText(Path.Combine(folder, "index.md"), "текст");
-            File.WriteAllBytes(Path.Combine(folder, "ezh.png"), [1, 2, 3]);
-            File.WriteAllBytes(Path.Combine(folder, "abc.png"), [4]);
+        files.Replace("tayna", "текст"u8.ToArray(), [("ezh.png", [1, 2, 3]), ("abc.png", [4])]);
 
-            var names = files.Attachments("tayna").Select(one => one.Name).ToList();
+        var names = files.Attachments("tayna").Select(one => one.Name).ToList();
 
-            // По алфавиту: имена в архиве должны лежать одинаково от прогона к прогону.
-            Assert.Equal(["abc.png", "ezh.png"], names);
-        }
-        finally
-        {
-            Directory.Delete(root, recursive: true);
-        }
+        // По алфавиту: имена в архиве должны лежать одинаково от прогона к прогону.
+        Assert.Equal(["abc.png", "ezh.png"], names);
     }
 
     [Fact]
     public void A_symlink_out_of_the_folder_is_not_an_attachment()
     {
-        var root = Directory.CreateTempSubdirectory("samizdat-files").FullName;
-        try
-        {
-            var files = new ArticleFiles(root);
-            var folder = Path.Combine(root, "articles", "tayna");
-            Directory.CreateDirectory(folder);
-            File.WriteAllText(Path.Combine(folder, "index.md"), "текст");
+        files.Replace("tayna", "текст"u8.ToArray(), []);
 
-            var outside = Path.Combine(root, "chuzhoy.txt");
-            File.WriteAllText(outside, "не наше");
-            File.CreateSymbolicLink(Path.Combine(folder, "ssylka.txt"), outside);
+        var outside = Path.Combine(dataRoot, "chuzhoy.txt");
+        File.WriteAllText(outside, "не наше");
+        File.CreateSymbolicLink(Path.Combine(files.Folder("tayna"), "ssylka.txt"), outside);
 
-            Assert.Empty(files.Attachments("tayna"));
-        }
-        finally
-        {
-            Directory.Delete(root, recursive: true);
-        }
+        Assert.Empty(files.Attachments("tayna"));
     }
 
     [Fact]
     public void Markdown_bytes_come_back_untouched()
     {
-        var root = Directory.CreateTempSubdirectory("samizdat-files").FullName;
-        try
-        {
-            var files = new ArticleFiles(root);
-            var folder = Path.Combine(root, "articles", "tayna");
-            Directory.CreateDirectory(folder);
-            byte[] written = [0xEF, 0xBB, 0xBF, (byte)'a', (byte)'\r', (byte)'\n'];
-            File.WriteAllBytes(Path.Combine(folder, "index.md"), written);
+        byte[] written = [0xEF, 0xBB, 0xBF, (byte)'a', (byte)'\r', (byte)'\n'];
+        files.Replace("tayna", written, []);
 
-            Assert.Equal(written, files.ReadMarkdownBytes("tayna"));
-        }
-        finally
-        {
-            Directory.Delete(root, recursive: true);
-        }
+        Assert.Equal(written, files.ReadMarkdownBytes("tayna"));
     }
 
     public void Dispose() => Directory.Delete(dataRoot, recursive: true);
