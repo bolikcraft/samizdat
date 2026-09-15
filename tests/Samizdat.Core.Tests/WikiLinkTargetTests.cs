@@ -41,3 +41,34 @@ public class WikiLinkTargetTests
     public void Title_that_really_gives_the_fallback_word_still_resolves()
         => Assert.Equal(["Без названия", "bez-nazvaniya"], WikiLinkTarget.Candidates("Без названия"));
 }
+
+public class WikiLinksTests
+{
+    [Fact]
+    public void Targets_are_collected_in_order()
+    {
+        var targets = WikiLinks.Targets("см. [[proxmox]] и [[Заметка про диски|диски]]");
+
+        Assert.Equal(["proxmox", "Заметка про диски"], targets);
+    }
+
+    [Fact]
+    public void Picture_embed_is_not_a_link()
+        => Assert.Empty(WikiLinks.Targets("![[shema.png]]"));
+
+    [Fact]
+    public void The_same_target_twice_comes_twice()
+        => Assert.Equal(["proxmox", "proxmox"], WikiLinks.Targets("[[proxmox]] и ещё [[proxmox]]"));
+
+    [Fact]
+    public void Link_inside_a_table_is_found()
+        => Assert.Equal(["proxmox"], WikiLinks.Targets("| a | b |\n|---|---|\n| [[proxmox]] | x |"));
+
+    [Fact]
+    public void Link_inside_a_callout_is_found()
+        => Assert.Equal(["proxmox"], WikiLinks.Targets("> [!note] Заголовок\n> см. [[proxmox]]\n"));
+
+    [Fact]
+    public void Text_without_links_gives_nothing()
+        => Assert.Empty(WikiLinks.Targets("обычный текст без ссылок"));
+}
