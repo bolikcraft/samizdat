@@ -168,6 +168,26 @@ public class IndexTests(DatabaseFixture database) : IDisposable
     }
 
     [Fact]
+    public async Task Control_character_from_the_title_does_not_reach_the_index()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        var client = TestPublisher.ClientWithToken(factory);
+
+        // Заголовок и описание тоже идут в поисковые векторы и оттуда на страницу находок.
+        var matter = $"title: Тайный{SearchSnippet.Start}сервер\ndescription: про{SearchSnippet.Stop}дом";
+
+        (await TestPublisher.Push(client, "statya", $"---\n{matter}\n---\n\nтекст")).EnsureSuccessStatusCode();
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+        var row = db.Articles.Single();
+
+        Assert.Equal("Тайныйсервер", row.Title);
+        Assert.Equal("продом", row.Description);
+    }
+
+    [Fact]
     public async Task Republishing_drops_a_link_that_is_gone()
     {
         database.ResetDatabase();

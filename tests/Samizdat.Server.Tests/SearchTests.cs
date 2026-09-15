@@ -81,7 +81,9 @@ public class ArticleSearchTests(DatabaseFixture database) : IDisposable
 
         var hit = Assert.Single(await Find(factory, "сервер", isOwner: true));
 
-        Assert.Contains($"{SearchSnippet.Start}сервер{SearchSnippet.Stop}", hit.Snippet);
+        // Ordinal обязателен: в культурном сравнении управляющие символы невесомы, и проверка
+        // зеленеет на цитате без подсветки.
+        Assert.Contains($"{SearchSnippet.Start}сервер{SearchSnippet.Stop}", hit.Snippet, StringComparison.Ordinal);
     }
 
     [Fact]

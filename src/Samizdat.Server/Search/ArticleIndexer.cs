@@ -17,6 +17,9 @@ public sealed class ArticleIndexer(SamizdatDbContext db)
     /// body — текст статьи без фронтматтера.
     public void Index(ArticleRow row, string body)
     {
+        // Заголовок и описание чистим здесь же: они идут в поисковые векторы и на страницу находок.
+        row.Title = WithoutControls(row.Title);
+        row.Description = row.Description is null ? null : WithoutControls(row.Description);
         row.SearchText = Trim(WithoutControls(PlainText.Extract(body)));
         row.IndexedHash = row.ContentHash;
 
@@ -44,7 +47,7 @@ public sealed class ArticleIndexer(SamizdatDbContext db)
     }
 
     /// Управляющими символами размечается подсветка цитаты, в тексте статьи им не место. Перевод
-    /// строки и табуляция законны и остаются.
+    /// строки и табуляция законны и остаются. Одно место на все поля, что уходят в поиск.
     static string WithoutControls(string text)
         => text.Any(Forbidden) ? new string(text.Where(symbol => !Forbidden(symbol)).ToArray()) : text;
 
