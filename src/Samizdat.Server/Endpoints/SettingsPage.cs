@@ -3,29 +3,29 @@ using Samizdat.Server.Data;
 
 namespace Samizdat.Server.Endpoints;
 
-/// Общее у разделов страницы настроек: итог действия, раздел, которому он принадлежит, и текст
-/// сообщения. Разделы живут в разных файлах, а механизм у них один.
+/// Общее у разделов страницы настроек: итог действия и раздел, которому он принадлежит, текст
+/// сообщения, проверка роли и поиск текущего человека. Разделы живут в разных файлах, а
+/// механизм у них один.
 public static class SettingsPage
 {
-    /// Одна мера на все места, где заводят пароль: свой, чужой, нового человека и свой при
-    /// регистрации.
-    public const int MinPasswordLength = 8;
+    /// Одна мера на все места, где заводят пароль: свой, чужой и пароль нового человека.
+    internal const int MinPasswordLength = 8;
 
     /// Маршрут только для владельца. Роль стоит на маршрутах, а не на группе: читателю нужен
     /// вход в настройки ради своего пароля.
-    public static RouteHandlerBuilder OwnerOnly(this RouteHandlerBuilder builder)
+    internal static RouteHandlerBuilder OwnerOnly(this RouteHandlerBuilder builder)
         => builder.RequireAuthorization(policy => policy.RequireRole(nameof(UserRole.Owner)));
 
     /// Возврат на страницу настроек с итогом действия: код итога в адресе, раздел — в якоре.
     // Якорем страница выбирает раздел: без него открылся бы первый, а не тот, где нажали кнопку.
-    public static IResult Ok(string code) => Results.Redirect($"/settings?ok={code}#{SectionOf(code)}");
-    public static IResult Err(string code) => Results.Redirect($"/settings?err={code}#{SectionOf(code)}");
+    internal static IResult Ok(string code) => Results.Redirect($"/settings?ok={code}#{SectionOf(code)}");
+    internal static IResult Err(string code) => Results.Redirect($"/settings?err={code}#{SectionOf(code)}");
 
-    public static IResult LoggedOut() => Results.Redirect("/login");
+    internal static IResult LoggedOut() => Results.Redirect("/login");
 
     /// null — человека в базе уже нет: его удалили, пока запрос шёл. Следующий запрос он же
     /// и последний: проверка cookie погасит сессию.
-    public static UserRow? CurrentUser(SamizdatDbContext db, ClaimsPrincipal user)
+    internal static UserRow? CurrentUser(SamizdatDbContext db, ClaimsPrincipal user)
         => db.Users.FirstOrDefault(row => row.Login == user.Identity!.Name);
 
     /// Раздел, которому принадлежит итог действия.
@@ -33,7 +33,7 @@ public static class SettingsPage
     // раздела: одно общее над разделами оставалось висеть над чужой формой. Якорь возврата и
     // место сообщения берутся отсюда оба — иначе сообщение попадало бы в скрытый раздел.
     // Незнакомый код уходит в первый раздел: его же показывает страница без якоря.
-    public static string SectionOf(string code) => code switch
+    internal static string SectionOf(string code) => code switch
     {
         "password" or "wrong_password" or "short_password" or "password_mismatch" => "security",
         "token_created" or "token_note" or "token_revoked" => "tokens",
@@ -44,7 +44,7 @@ public static class SettingsPage
         _ => "appearance",
     };
 
-    public static string? Message(string? ok, string? err) => err switch
+    internal static string? Message(string? ok, string? err) => err switch
     {
         "wrong_password" => "Неверный текущий пароль.",
         "short_password" => $"Новый пароль должен быть не короче {MinPasswordLength} символов.",
