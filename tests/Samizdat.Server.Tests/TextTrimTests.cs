@@ -24,4 +24,12 @@ public class TextTrimTests
     [Fact]
     public void Empty_string_stays_empty()
         => Assert.Equal("", TextTrim.Cut("", 0));
+
+    [Fact]
+    public void Zero_limit_on_a_non_empty_string_gives_an_empty_string()
+        => Assert.Equal("", TextTrim.Cut("текст", 0));
+
+    [Fact]
+    public void Negative_limit_gives_an_empty_string()
+        => Assert.Equal("", TextTrim.Cut("текст", -1));
 }

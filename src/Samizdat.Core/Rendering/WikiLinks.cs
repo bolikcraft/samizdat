@@ -5,6 +5,8 @@ namespace Samizdat.Core.Rendering;
 /// Цели вики-ссылок статьи — из них собирается таблица обратных ссылок.
 public static class WikiLinks
 {
+    // Рабочий код (ArticleIndexer) зовёт только перегрузку от MarkdownDocument — эта живёт ради
+    // тестов, как независимый от него эталон разбора.
     public static IReadOnlyList<string> Targets(string markdown)
         => Targets(Markdig.Markdown.Parse(markdown, IndexPipeline.Instance));
 

@@ -14,6 +14,8 @@ public static class PlainText
 
     static bool Forbidden(char symbol) => symbol < ' ' && symbol is not ('\n' or '\r' or '\t');
 
+    // Рабочий код (ArticleIndexer) зовёт только перегрузку от MarkdownDocument — эта живёт ради
+    // тестов, как независимый от него эталон разбора.
     public static string Extract(string markdown)
         => Extract(Markdig.Markdown.Parse(markdown, IndexPipeline.Instance));
 
