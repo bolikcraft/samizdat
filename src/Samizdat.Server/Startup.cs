@@ -87,6 +87,7 @@ public static class Startup
         app.MapAuth();
         app.MapPages().RequireAuthorization();
         app.MapShare();
+        app.MapDownload();
         app.MapApi();
         app.MapSettings();
     }

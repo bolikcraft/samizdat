@@ -1,5 +1,10 @@
 using System.IO.Compression;
+using System.Net;
 using System.Text;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.DependencyInjection;
+using Samizdat.Server.Auth;
+using Samizdat.Server.Data;
 using Samizdat.Server.Storage;
 
 namespace Samizdat.Server.Tests;
@@ -28,5 +33,225 @@ public class ArticlePackageTests
         {
             Directory.Delete(root, recursive: true);
         }
+    }
+}
+
+[Collection("db")]
+public class DownloadTests : IDisposable
+{
+    readonly DatabaseFixture database;
+    readonly string dataRoot = Directory.CreateTempSubdirectory("samizdat-data").FullName;
+
+    public DownloadTests(DatabaseFixture database)
+    {
+        this.database = database;
+        database.ResetDatabase();
+    }
+
+    public void Dispose() => Directory.Delete(dataRoot, recursive: true);
+
+    [Fact]
+    public async Task Owner_downloads_a_private_article_with_the_switches_off()
+    {
+        using var factory = CreateFactory();
+        AddArticle(factory, "tayna", ArticleVisibility.Private);
+        AddPerson(factory, "hozyain", "parol", UserRole.Owner);
+
+        var client = await Login(factory, "hozyain", "parol");
+        var answer = await client.GetAsync("/download/tayna");
+
+        Assert.Equal(HttpStatusCode.OK, answer.StatusCode);
+        Assert.Equal("text/markdown", answer.Content.Headers.ContentType?.MediaType);
+        Assert.Contains("tayna.md", answer.Content.Headers.ContentDisposition?.ToString());
+    }
+
+    [Fact]
+    public async Task Owner_gets_the_file_byte_for_byte()
+    {
+        using var factory = CreateFactory();
+        AddArticle(factory, "tayna", ArticleVisibility.Private,
+                   "---\ntitle: Тайна\ntags: [заметки]\n---\n\nТекст.\n");
+        AddPerson(factory, "hozyain", "parol", UserRole.Owner);
+
+        var client = await Login(factory, "hozyain", "parol");
+        var text = await client.GetStringAsync("/download/tayna");
+
+        Assert.Equal("---\ntitle: Тайна\ntags: [заметки]\n---\n\nТекст.\n", text);
+    }
+
+    [Fact]
+    public async Task Reader_gets_nothing_while_the_switch_is_off()
+    {
+        using var factory = CreateFactory();
+        AddArticle(factory, "otkrytaya", ArticleVisibility.Shared);
+        AddPerson(factory, "ivan", "parol", UserRole.Reader);
+
+        var client = await Login(factory, "ivan", "parol");
+
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/download/otkrytaya")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Reader_gets_the_article_without_the_foreign_fields()
+    {
+        using var factory = CreateFactory();
+        AddArticle(factory, "otkrytaya", ArticleVisibility.Shared,
+                   "---\ntitle: Тайна\ntags: [заметки]\npublish: true\n---\n\nТекст.\n");
+        AddPerson(factory, "ivan", "parol", UserRole.Reader);
+        SetSetting(factory, "articles.download.readers", "on");
+
+        var client = await Login(factory, "ivan", "parol");
+        var text = await client.GetStringAsync("/download/otkrytaya");
+
+        Assert.Contains("title: Тайна", text);
+        Assert.DoesNotContain("tags", text);
+        Assert.DoesNotContain("publish", text);
+        Assert.Contains("Текст.", text);
+    }
+
+    [Fact]
+    public async Task Reader_does_not_download_a_private_article()
+    {
+        using var factory = CreateFactory();
+        AddArticle(factory, "tayna", ArticleVisibility.Private);
+        AddPerson(factory, "ivan", "parol", UserRole.Reader);
+        SetSetting(factory, "articles.download.readers", "on");
+
+        var client = await Login(factory, "ivan", "parol");
+
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/download/tayna")).StatusCode);
+    }
+
+    [Fact]
+    public async Task A_guest_without_a_cookie_is_sent_to_the_login_page()
+    {
+        using var factory = CreateFactory();
+        AddArticle(factory, "otkrytaya", ArticleVisibility.Shared);
+        SetSetting(factory, "articles.download.readers", "on");
+
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        var answer = await client.GetAsync("/download/otkrytaya");
+
+        Assert.Equal(HttpStatusCode.Redirect, answer.StatusCode);
+        // CookieAuthenticationHandler строит абсолютный Location (схема+хост), поэтому сравниваем путь.
+        Assert.StartsWith("/login", answer.Headers.Location?.PathAndQuery);
+    }
+
+    [Fact]
+    public async Task An_unknown_article_is_not_found()
+    {
+        using var factory = CreateFactory();
+        AddPerson(factory, "hozyain", "parol", UserRole.Owner);
+
+        var client = await Login(factory, "hozyain", "parol");
+
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/download/net-takoy")).StatusCode);
+    }
+
+    [Fact]
+    public async Task An_article_with_attachments_comes_as_a_zip()
+    {
+        using var factory = CreateFactory();
+        AddArticle(factory, "tayna", ArticleVisibility.Private);
+        await File.WriteAllBytesAsync(Path.Combine(dataRoot, "articles", "tayna", "ezh.png"), [1, 2, 3]);
+        AddPerson(factory, "hozyain", "parol", UserRole.Owner);
+
+        var client = await Login(factory, "hozyain", "parol");
+        var answer = await client.GetAsync("/download/tayna");
+
+        Assert.Equal("application/zip", answer.Content.Headers.ContentType?.MediaType);
+        Assert.Contains("tayna.zip", answer.Content.Headers.ContentDisposition?.ToString());
+
+        using var zip = new ZipArchive(await answer.Content.ReadAsStreamAsync(), ZipArchiveMode.Read);
+        Assert.Equal(["tayna/index.md", "tayna/ezh.png"], zip.Entries.Select(entry => entry.FullName));
+    }
+
+    [Fact]
+    public async Task The_source_inside_the_archive_is_trimmed_for_the_reader()
+    {
+        using var factory = CreateFactory();
+        AddArticle(factory, "otkrytaya", ArticleVisibility.Shared,
+                   "---\ntitle: Тайна\ntags: [заметки]\n---\n\nТекст.\n");
+        await File.WriteAllBytesAsync(Path.Combine(dataRoot, "articles", "otkrytaya", "ezh.png"), [1, 2, 3]);
+        AddPerson(factory, "ivan", "parol", UserRole.Reader);
+        SetSetting(factory, "articles.download.readers", "on");
+
+        var client = await Login(factory, "ivan", "parol");
+        var answer = await client.GetAsync("/download/otkrytaya");
+
+        using var zip = new ZipArchive(await answer.Content.ReadAsStreamAsync(), ZipArchiveMode.Read);
+        using var source = new StreamReader(zip.GetEntry("otkrytaya/index.md")!.Open());
+        var text = await source.ReadToEndAsync();
+
+        Assert.Contains("title: Тайна", text);
+        Assert.DoesNotContain("tags", text);
+    }
+
+    [Fact]
+    public async Task A_broken_header_is_not_handed_to_the_reader()
+    {
+        using var factory = CreateFactory();
+        AddArticle(factory, "otkrytaya", ArticleVisibility.Shared, "---\ntitle: [не закрыт\n---\n\nТекст.\n");
+        AddPerson(factory, "ivan", "parol", UserRole.Reader);
+        SetSetting(factory, "articles.download.readers", "on");
+
+        var client = await Login(factory, "ivan", "parol");
+
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/download/otkrytaya")).StatusCode);
+    }
+
+    WebApplicationFactory<Program> CreateFactory() =>
+        new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("Samizdat:DataRoot", dataRoot);
+            builder.UseSetting("ConnectionStrings:Postgres", database.ConnectionString);
+            // Слежение за файлом настроек тут не нужно: тесты поднимают десятки хостов,
+            // и наблюдатели inotify упираются в системный лимит.
+            builder.UseSetting("hostBuilder:reloadConfigOnChange", "false");
+        });
+
+    void AddArticle(WebApplicationFactory<Program> factory, string slug, ArticleVisibility visibility,
+                    string text = "---\ntitle: Тайна\n---\n\nТекст.\n")
+    {
+        var folder = Path.Combine(dataRoot, "articles", slug);
+        Directory.CreateDirectory(folder);
+        File.WriteAllText(Path.Combine(folder, "index.md"), text);
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+        db.Articles.Add(new ArticleRow
+        {
+            Slug = slug, Title = "Тайна", ContentHash = $"hash-{slug}", Visibility = visibility,
+            UpdatedAt = DateTimeOffset.UtcNow,
+        });
+        db.SaveChanges();
+    }
+
+    static void AddPerson(WebApplicationFactory<Program> factory, string login, string password, UserRole role)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+        db.Users.Add(new UserRow
+        {
+            Login = login, PasswordHash = PasswordHasher.Hash(password), Role = role,
+            CreatedAt = DateTimeOffset.UtcNow,
+        });
+        db.SaveChanges();
+    }
+
+    static void SetSetting(WebApplicationFactory<Program> factory, string key, string value)
+    {
+        using var scope = factory.Services.CreateScope();
+        scope.ServiceProvider.GetRequiredService<SiteSettings>().Set(key, value);
+    }
+
+    // Без автоперехода: иначе клиент сам сходит по редиректу и тест не увидит его кода.
+    static async Task<HttpClient> Login(WebApplicationFactory<Program> factory, string login, string password)
+    {
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        var answer = await client.PostAsync("/login", new FormUrlEncodedContent(
+            new Dictionary<string, string> { ["login"] = login, ["password"] = password }));
+        Assert.Equal(HttpStatusCode.Redirect, answer.StatusCode);
+        return client;
     }
 }
