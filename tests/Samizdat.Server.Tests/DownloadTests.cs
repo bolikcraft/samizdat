@@ -1,6 +1,7 @@
 using System.IO.Compression;
 using System.Net;
 using System.Text;
+using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Samizdat.Server.Auth;
@@ -434,5 +435,82 @@ public class DownloadTests : IDisposable
         var html = await client.GetStringAsync($"/s/{token}");
 
         Assert.DoesNotContain("/download/s/", html);
+    }
+
+    [Fact]
+    public async Task Owner_switches_downloading_on_from_the_settings_page()
+    {
+        using var factory = CreateFactory();
+        AddPerson(factory, "hozyain", "parol", UserRole.Owner);
+
+        var client = await Login(factory, "hozyain", "parol");
+        var answer = await Post(client, "/settings/articles",
+                                new() { ["readers"] = "on", ["guests"] = "on" });
+
+        Assert.Equal(HttpStatusCode.Redirect, answer.StatusCode);
+        Assert.Equal("/settings?ok=articles#articles", answer.Headers.Location?.ToString());
+
+        using var scope = factory.Services.CreateScope();
+        Assert.Equal(new DownloadPolicy(true, true),
+                     scope.ServiceProvider.GetRequiredService<SiteSettings>().Download);
+    }
+
+    [Fact]
+    public async Task An_unchecked_box_switches_downloading_off()
+    {
+        using var factory = CreateFactory();
+        AddPerson(factory, "hozyain", "parol", UserRole.Owner);
+        SetSetting(factory, "articles.download.readers", "on");
+        SetSetting(factory, "articles.download.guests", "on");
+
+        var client = await Login(factory, "hozyain", "parol");
+        // Снятый флажок форма не присылает вовсе — приходит пустая форма.
+        await Post(client, "/settings/articles", new());
+
+        using var scope = factory.Services.CreateScope();
+        Assert.Equal(new DownloadPolicy(false, false),
+                     scope.ServiceProvider.GetRequiredService<SiteSettings>().Download);
+    }
+
+    [Fact]
+    public async Task Reader_does_not_switch_downloading()
+    {
+        using var factory = CreateFactory();
+        AddPerson(factory, "ivan", "parol", UserRole.Reader);
+
+        var client = await Login(factory, "ivan", "parol");
+        var answer = await Post(client, "/settings/articles", new() { ["readers"] = "on" });
+
+        Assert.Equal(HttpStatusCode.Forbidden, answer.StatusCode);
+    }
+
+    [Fact]
+    public async Task The_settings_page_shows_the_state_of_the_switches()
+    {
+        using var factory = CreateFactory();
+        AddPerson(factory, "hozyain", "parol", UserRole.Owner);
+        SetSetting(factory, "articles.download.readers", "on");
+
+        var client = await Login(factory, "hozyain", "parol");
+        var html = await client.GetStringAsync("/settings");
+
+        Assert.Contains("id=\"articles\"", html);
+        Assert.Contains("name=\"readers\" value=\"on\" checked", html);
+        Assert.Contains("name=\"guests\" value=\"on\">", html);
+    }
+
+    // Форма достаёт свой antiforgery-токен со страницы — сервер требует его на каждом небезопасном POST.
+    static async Task<HttpResponseMessage> Post(HttpClient client, string path, Dictionary<string, string> fields)
+    {
+        var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
+        fields[name] = value;
+        return await client.PostAsync(path, new FormUrlEncodedContent(fields));
+    }
+
+    static (string Name, string Value) AntiforgeryToken(string html)
+    {
+        var match = Regex.Match(html, "<input type=\"hidden\" name=\"([^\"]+)\" value=\"([^\"]+)\">");
+        if (!match.Success) throw new InvalidOperationException("Antiforgery-поле не найдено на странице");
+        return (match.Groups[1].Value, match.Groups[2].Value);
     }
 }

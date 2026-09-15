@@ -112,6 +112,23 @@
 </section>
 {{~ end ~}}
 
+{{~ if user && user.is_owner ~}}
+<section class="settings-pane" id="articles">
+  <h2>Статьи</h2>
+  {{ if message_section == "articles" }}{{ message_block }}{{ end }}
+  <p class="hint">Кнопка «Скачать» под статьёй отдаёт её исходник в markdown. У пользователя и
+    гостя в шапке файла остаются только заголовок, описание и дата. Вы скачиваете статью всегда.</p>
+  <form method="post" action="/settings/articles" class="settings-form">
+    {{ antiforgery }}
+    <label class="check"><input type="checkbox" name="readers" value="on"{{ if download.readers }} checked{{ end }}>
+      Пользователи могут скачивать открытые им статьи</label>
+    <label class="check"><input type="checkbox" name="guests" value="on"{{ if download.guests }} checked{{ end }}>
+      Гости могут скачивать статью по ссылке «Поделиться»</label>
+    <button type="submit">Сохранить</button>
+  </form>
+</section>
+{{~ end ~}}
+
 <section class="settings-pane" id="security">
   <h2>Пароль</h2>
   {{ if message_section == "security" }}{{ message_block }}{{ end }}
