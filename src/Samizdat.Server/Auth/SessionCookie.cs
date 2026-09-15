@@ -35,8 +35,8 @@ public static class SessionCookie
         if (login is not null && stamp is not null)
         {
             var db = context.HttpContext.RequestServices.GetRequiredService<SamizdatDbContext>();
-            // ApprovedAt едет тем же запросом, что и метка: отозвать одобрение можно, и сессия
-            // должна погаснуть так же быстро, как от смены пароля.
+            // ApprovedAt едет тем же запросом, что и метка: лишнего обращения к базе это не стоит,
+            // а ждущий не пройдёт даже с подделанной cookie.
             var current = await db.Users.AsNoTracking()
                 .Where(row => row.Login == login)
                 .Select(row => new { row.SessionStamp, row.ApprovedAt })

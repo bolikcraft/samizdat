@@ -387,6 +387,22 @@ public class RegistrationTests : IDisposable
         Assert.Equal(HttpStatusCode.Found, (await client.GetAsync("/")).StatusCode);
     }
 
+    // CSRF на /i/{token} была найденной дырой: /register из той же формы не должен стать
+    // второй такой же.
+    [Fact]
+    public async Task A_post_to_register_without_a_token_is_refused()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        OpenRegistration(factory);
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+
+        var answer = await client.PostAsync("/register", Fields("ivan", "parol-ivana"));
+
+        Assert.Equal(HttpStatusCode.BadRequest, answer.StatusCode);
+        Assert.Empty(Users(factory));
+    }
+
     [Fact]
     public async Task A_busy_login_is_refused_on_the_open_form()
     {
@@ -783,7 +799,7 @@ public class RegistrationTests : IDisposable
         return invite.Token;
     }
 
-    /// Поля без antiforgery-поля — проверить, что POST без токена отказывает.
+    // Поля без antiforgery-поля — нужны и закрытой регистрации, и проверке отказа без токена.
     static FormUrlEncodedContent Fields(string login, string password)
         => new(new Dictionary<string, string>
         {

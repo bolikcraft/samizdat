@@ -348,6 +348,10 @@ public static class SettingsEndpoints
             var person = db.Users.Find(id);
             if (person is null) return Results.NotFound();
 
+            // Ждущего эта кнопка не трогает: его разбирают в разделе «Регистрация», в обход
+            // очереди тут его снести нельзя.
+            if (person.ApprovedAt is null) return Err("not_pending");
+
             // Последнего владельца удалять нельзя: сайт остался бы без входа в настройки,
             // и поднять его можно было бы только командой в консоли.
             if (person.Role == UserRole.Owner && db.Users.Count(row => row.Role == UserRole.Owner) == 1)
