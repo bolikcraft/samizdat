@@ -39,14 +39,14 @@ public static class SignupSettingsEndpoints
         }).RequireValidToken().OwnerOnly();
 
         // Отзыв мягкий: строка остаётся, чтобы приглашённый увидел 410 «ссылка не работает».
-        group.MapPost("/invites/{id:int}/revoke", async (int id, SamizdatDbContext db) =>
+        group.MapPost("/invites/{id:int}/revoke", (int id, SamizdatDbContext db) =>
         {
             var invite = db.Invites.FirstOrDefault(
                 row => row.Id == id && row.RevokedAt == null && row.UsedAt == null);
             if (invite is null) return Results.NotFound();
 
             invite.RevokedAt = DateTimeOffset.UtcNow;
-            await db.SaveChangesAsync();
+            db.SaveChanges();
             return Ok("invite_revoked");
         }).RequireValidToken().OwnerOnly();
     }

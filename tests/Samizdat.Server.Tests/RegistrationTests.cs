@@ -307,6 +307,53 @@ public class RegistrationTests : IDisposable
         Assert.Empty(Invites(factory));
     }
 
+    [Fact]
+    public async Task A_second_revoke_of_an_invite_answers_404()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        AddPerson(factory, "hozyain", "parol-hozyaina", UserRole.Owner);
+        var token = AddInvite(factory, note: null, revokedAt: DateTimeOffset.UtcNow);
+        var id = Invites(factory).Single().Id;
+        var owner = await Login(factory, "hozyain", "parol-hozyaina");
+
+        var answer = await Post(owner, $"/settings/invites/{id}/revoke", new());
+
+        Assert.Equal(HttpStatusCode.NotFound, answer.StatusCode);
+    }
+
+    [Fact]
+    public async Task A_reader_cannot_revoke_an_invite()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        AddPerson(factory, "ivan", "parol-ivana", UserRole.Reader);
+        var token = AddInvite(factory, note: null);
+        var id = Invites(factory).Single().Id;
+        var reader = await Login(factory, "ivan", "parol-ivana");
+
+        var answer = await Post(reader, $"/settings/invites/{id}/revoke", new());
+
+        Assert.Equal(HttpStatusCode.Forbidden, answer.StatusCode);
+        Assert.True(Invites(factory).Single().IsAlive(DateTimeOffset.UtcNow));
+    }
+
+    [Fact]
+    public async Task A_used_invite_cannot_be_revoked()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        AddPerson(factory, "hozyain", "parol-hozyaina", UserRole.Owner);
+        var token = AddInvite(factory, note: null, usedAt: DateTimeOffset.UtcNow);
+        var id = Invites(factory).Single().Id;
+        var owner = await Login(factory, "hozyain", "parol-hozyaina");
+
+        var answer = await Post(owner, $"/settings/invites/{id}/revoke", new());
+
+        Assert.Equal(HttpStatusCode.NotFound, answer.StatusCode);
+        Assert.Null(Invites(factory).Single().RevokedAt);
+    }
+
     WebApplicationFactory<Program> CreateFactory() =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
@@ -413,7 +460,8 @@ public class RegistrationTests : IDisposable
                                      + TenLetters + TenLetters + TenLetters + TenLetters + TenLetters + "i";
 
     static string AddInvite(WebApplicationFactory<Program> factory, string? note,
-                            DateTimeOffset? expiresAt = null, DateTimeOffset? revokedAt = null)
+                            DateTimeOffset? expiresAt = null, DateTimeOffset? revokedAt = null,
+                            DateTimeOffset? usedAt = null)
     {
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
@@ -424,6 +472,7 @@ public class RegistrationTests : IDisposable
             CreatedAt = DateTimeOffset.UtcNow,
             ExpiresAt = expiresAt,
             RevokedAt = revokedAt,
+            UsedAt = usedAt,
         };
         db.Invites.Add(invite);
         db.SaveChanges();

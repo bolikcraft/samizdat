@@ -201,7 +201,7 @@
       <thead><tr><th>Ссылка</th><th>Кому</th><th>Состояние</th><th></th></tr></thead>
       <tbody>
       {{ for invite in signup.invites }}
-      <tr{{ if !invite.alive }} class="dead-link"{{ end }}>
+      <tr{{ if !invite.alive && !invite.used_at }} class="dead-link"{{ end }}>
         <td>
           <div class="link-cell">
             <input class="link-url" type="text" readonly value="{{ invite.url | html.escape }}">
