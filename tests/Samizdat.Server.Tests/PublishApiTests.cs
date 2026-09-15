@@ -1,10 +1,7 @@
 using System.Net;
-using System.Net.Http.Headers;
 using System.Net.Http.Json;
-using System.Text;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
-using Samizdat.Server.Auth;
 using Samizdat.Server.Data;
 
 namespace Samizdat.Server.Tests;
@@ -31,34 +28,7 @@ public class PublishApiTests(DatabaseFixture database) : IDisposable
             builder.UseSetting("hostBuilder:reloadConfigOnChange", "false");
         });
 
-        var login = $"owner-{Guid.NewGuid():N}";
-        const string password = "x";
-        string token;
-        using (var scope = factory.Services.CreateScope())
-        {
-            var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
-            var owner = new UserRow
-            {
-                Login = login,
-                PasswordHash = PasswordHasher.Hash(password),
-                Role = UserRole.Owner,
-                CreatedAt = DateTimeOffset.UtcNow,
-            };
-            db.Users.Add(owner);
-            db.SaveChanges();
-
-            token = ApiToken.Create();
-            db.ApiTokens.Add(new ApiTokenRow
-            {
-                UserId = owner.Id,
-                TokenHash = ApiToken.HashOf(token),
-                CreatedAt = DateTimeOffset.UtcNow,
-            });
-            db.SaveChanges();
-        }
-
-        var client = factory.CreateClient();
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        var (client, login, password) = TestPublisher.ClientWithOwner(factory);
         return (factory, client, login, password);
     }
 
@@ -71,16 +41,8 @@ public class PublishApiTests(DatabaseFixture database) : IDisposable
         return client;
     }
 
-    static MultipartFormDataContent Article(string markdown, params (string Name, byte[] Bytes)[] files)
-    {
-        var content = new MultipartFormDataContent
-        {
-            { new ByteArrayContent(Encoding.UTF8.GetBytes(markdown)), "index.md", "index.md" },
-        };
-        foreach (var (name, bytes) in files)
-            content.Add(new ByteArrayContent(bytes), "attachments", name);
-        return content;
-    }
+    static MultipartFormDataContent Article(string markdown, params (string Name, byte[] Bytes)[] files) =>
+        TestPublisher.Form(markdown, files);
 
     [Fact]
     public async Task Put_writes_file_and_row()

@@ -10,16 +10,24 @@ namespace Samizdat.Server.Tests;
 /// Выкладка статьи через /api так, как это делает CLI: на ней же строится индекс.
 public static class TestPublisher
 {
-    public static HttpClient ClientWithToken(WebApplicationFactory<Program> factory)
+    public static HttpClient ClientWithToken(WebApplicationFactory<Program> factory) =>
+        ClientWithOwner(factory).Client;
+
+    /// Логин и пароль нужны тем тестам, что открывают ещё и страницы сайта: их пускает cookie-сессия.
+    public static (HttpClient Client, string Login, string Password) ClientWithOwner(
+        WebApplicationFactory<Program> factory)
     {
+        var login = $"owner-{Guid.NewGuid():N}";
+        const string password = "x";
+
         string token;
         using (var scope = factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
             var owner = new UserRow
             {
-                Login = $"owner-{Guid.NewGuid():N}",
-                PasswordHash = PasswordHasher.Hash("x"),
+                Login = login,
+                PasswordHash = PasswordHasher.Hash(password),
                 Role = UserRole.Owner,
                 CreatedAt = DateTimeOffset.UtcNow,
             };
@@ -36,17 +44,26 @@ public static class TestPublisher
 
         var client = factory.CreateClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        return client;
+        return (client, login, password);
+    }
+
+    /// Форма выкладки. Поле folder тут не задано: тесты, которым важна папка, добавляют его сами.
+    public static MultipartFormDataContent Form(string markdown, params (string Name, byte[] Bytes)[] attachments)
+    {
+        var form = new MultipartFormDataContent
+        {
+            { new ByteArrayContent(Encoding.UTF8.GetBytes(markdown)), "index.md", "index.md" },
+        };
+        foreach (var (name, bytes) in attachments)
+            form.Add(new ByteArrayContent(bytes), "attachments", name);
+        return form;
     }
 
     public static async Task<HttpResponseMessage> Push(HttpClient client, string slug, string markdown,
                                                        string folder = "")
     {
-        using var form = new MultipartFormDataContent
-        {
-            { new StringContent(folder), "folder" },
-            { new ByteArrayContent(Encoding.UTF8.GetBytes(markdown)), "index.md", "index.md" },
-        };
+        using var form = Form(markdown);
+        form.Add(new StringContent(folder), "folder");
 
         return await client.PutAsync($"/api/articles/{slug}", form);
     }

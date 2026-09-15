@@ -198,6 +198,36 @@ public class IndexTests(DatabaseFixture database) : IDisposable
     }
 
     [Fact]
+    public async Task Link_to_itself_in_another_case_is_not_stored()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        var client = TestPublisher.ClientWithToken(factory);
+
+        (await TestPublisher.Push(client, "proxmox", "---\ntitle: Proxmox\n---\n\nсам на себя [[Proxmox]]"))
+            .EnsureSuccessStatusCode();
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+
+        Assert.Empty(db.ArticleLinks.ToList());
+    }
+
+    [Fact]
+    public async Task Emoji_on_the_trim_border_does_not_break_publishing()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        var client = TestPublisher.ClientWithToken(factory);
+
+        // Эмодзи ровно на границе обрезки: разрезанная пополам суррогатная пара валила выкладку.
+        var head = new string('a', ArticleIndexer.MaxSearchText - 1);
+        var answer = await TestPublisher.Push(client, "emodzi", $"---\ntitle: Эмодзи\n---\n\n{head}😀хвост");
+
+        Assert.True(answer.IsSuccessStatusCode);
+    }
+
+    [Fact]
     public async Task Huge_article_is_published_with_a_trimmed_index()
     {
         database.ResetDatabase();

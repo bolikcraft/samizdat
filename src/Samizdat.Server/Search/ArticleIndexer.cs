@@ -14,15 +14,16 @@ public sealed class ArticleIndexer(SamizdatDbContext db)
     /// body — текст статьи без фронтматтера.
     public void Index(ArticleRow row, string body)
     {
-        var text = PlainText.Extract(body);
-        row.SearchText = text.Length > MaxSearchText ? text[..MaxSearchText] : text;
+        row.SearchText = Trim(PlainText.Extract(body));
         row.IndexedHash = row.ContentHash;
 
         // Пишем обе формы цели: рендер ищет сперва буквальный slug, потом транслитерацию имени
         // заметки. Лишняя строка ни с чем не соединится, а без неё бэклинк разошёлся бы со ссылкой.
+        // Ссылку на саму себя отбрасываем целиком: статью находит любой из её кандидатов.
         var wanted = WikiLinks.Targets(body)
-            .SelectMany(WikiLinkTarget.Candidates)
-            .Where(target => target != row.Slug)
+            .Select(WikiLinkTarget.Candidates)
+            .Where(candidates => !candidates.Contains(row.Slug, StringComparer.Ordinal))
+            .SelectMany(candidates => candidates)
             .ToHashSet(StringComparer.Ordinal);
 
         var existing = db.ArticleLinks.Where(link => link.FromSlug == row.Slug).ToList();
@@ -34,5 +35,15 @@ public sealed class ArticleIndexer(SamizdatDbContext db)
 
         foreach (var target in wanted.Where(target => existing.All(link => link.ToSlug != target)))
             db.ArticleLinks.Add(new ArticleLinkRow { FromSlug = row.Slug, ToSlug = target });
+    }
+
+    static string Trim(string text)
+    {
+        if (text.Length <= MaxSearchText) return text;
+
+        // Половина суррогатной пары на конце — уже не текст: драйвер не переводит её в UTF-8
+        // и валит выкладку.
+        var end = char.IsHighSurrogate(text[MaxSearchText - 1]) ? MaxSearchText - 1 : MaxSearchText;
+        return text[..end];
     }
 }
