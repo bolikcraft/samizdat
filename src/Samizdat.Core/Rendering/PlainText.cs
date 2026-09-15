@@ -1,5 +1,6 @@
 using Markdig.Renderers;
 using Markdig.Renderers.Html;
+using Markdig.Syntax;
 
 namespace Samizdat.Core.Rendering;
 
@@ -14,11 +15,16 @@ public static class PlainText
     static bool Forbidden(char symbol) => symbol < ' ' && symbol is not ('\n' or '\r' or '\t');
 
     public static string Extract(string markdown)
+        => Extract(Markdig.Markdown.Parse(markdown, IndexPipeline.Instance));
+
+    // Документ мутируется на месте: CalloutTransformer.Apply меняет дерево (QuoteBlock →
+    // CalloutBlock), так что зовите эту перегрузку после всего, что ждёт документ нетронутым
+    // (например WikiLinks.Targets).
+    public static string Extract(MarkdownDocument document)
     {
         // Без CalloutTransformer цитата "[!warning]" осталась бы AlertBlock — его встроенный
         // рендерер пишет сырой html (svg-иконку) в обход EnableHtmlForBlock; "[!note] Заголовок"
         // без трансформации ушёл бы в индекс маркером как есть, буквально со скобками.
-        var document = Markdig.Markdown.Parse(markdown, IndexPipeline.Instance);
         CalloutTransformer.Apply(document);
 
         using var writer = new StringWriter();

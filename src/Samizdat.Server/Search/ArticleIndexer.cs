@@ -20,13 +20,19 @@ public sealed class ArticleIndexer(SamizdatDbContext db)
         // Заголовок и описание чистим здесь же: они идут в поисковые векторы и на страницу находок.
         row.Title = PlainText.WithoutControls(row.Title);
         row.Description = row.Description is null ? null : PlainText.WithoutControls(row.Description);
-        row.SearchText = Trim(PlainText.WithoutControls(PlainText.Extract(body)));
+
+        // Разбираем один раз на двоих: статья бывает на сотни килобайт, второй проход Markdig
+        // по ней — лишняя работа. Порядок важен: WikiLinks.Targets смотрит на нетронутое дерево,
+        // PlainText.Extract следом сам применит CalloutTransformer к тому же объекту.
+        var document = Markdig.Markdown.Parse(body, IndexPipeline.Instance);
+        var links = WikiLinks.Targets(document);
+        row.SearchText = Trim(PlainText.WithoutControls(PlainText.Extract(document)));
         row.IndexedHash = row.ContentHash;
 
         // Пишем обе формы цели: рендер ищет сперва буквальный slug, потом транслитерацию имени
         // заметки. Лишняя строка ни с чем не соединится, а без неё бэклинк разошёлся бы со ссылкой.
         // Ссылку на саму себя отбрасываем целиком: статью находит любой из её кандидатов.
-        var wanted = WikiLinks.Targets(body)
+        var wanted = links
             .Select(WikiLinkTarget.Candidates)
             .Where(candidates => !candidates.Contains(row.Slug, StringComparer.Ordinal))
             .SelectMany(candidates => candidates)

@@ -6,7 +6,12 @@ namespace Samizdat.Core.Rendering;
 public static class WikiLinks
 {
     public static IReadOnlyList<string> Targets(string markdown)
-        => Markdig.Markdown.Parse(markdown, IndexPipeline.Instance)
+        => Targets(Markdig.Markdown.Parse(markdown, IndexPipeline.Instance));
+
+    // Документ передавайте до CalloutTransformer.Apply — ссылки собираются так же, как при
+    // разборе строки с нуля (тот тоже не трансформирует коллауты).
+    public static IReadOnlyList<string> Targets(MarkdownDocument document)
+        => document
             .Descendants<WikiLink>()
             .Where(link => !link.IsPictureEmbed)
             .Select(link => link.Target)

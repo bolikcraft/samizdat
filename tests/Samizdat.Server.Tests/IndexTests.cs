@@ -246,6 +246,30 @@ public class IndexTests(DatabaseFixture database) : IDisposable
     }
 
     [Fact]
+    public async Task Link_inside_a_callout_fills_both_the_text_and_the_links()
+    {
+        // ArticleIndexer разбирает markdown один раз и зовёт WikiLinks.Targets перед
+        // PlainText.Extract на том же document — этот тест ловит регрессию порядка.
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        var client = TestPublisher.ClientWithToken(factory);
+
+        var body = "> [!note] Заголовок\n> см. [[Вторая заметка]] и текст\n";
+
+        (await TestPublisher.Push(client, "pervaya", $"---\ntitle: Первая\n---\n\n{body}"))
+            .EnsureSuccessStatusCode();
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+        var row = db.Articles.Single();
+
+        Assert.Contains("Заголовок", row.SearchText);
+        Assert.Contains("текст", row.SearchText);
+        Assert.Equal(["Вторая заметка", "vtoraya-zametka"],
+                     db.ArticleLinks.Select(link => link.ToSlug).ToList().Order());
+    }
+
+    [Fact]
     public async Task Control_character_from_the_text_does_not_reach_the_index()
     {
         database.ResetDatabase();
