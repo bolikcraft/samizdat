@@ -26,7 +26,7 @@ public sealed class ArticleIndexer(SamizdatDbContext db)
         // PlainText.Extract следом сам применит CalloutTransformer к тому же объекту.
         var document = Markdig.Markdown.Parse(body, IndexPipeline.Instance);
         var links = WikiLinks.Targets(document);
-        row.SearchText = Trim(PlainText.WithoutControls(PlainText.Extract(document)));
+        row.SearchText = TextTrim.Cut(PlainText.WithoutControls(PlainText.Extract(document)), MaxSearchText);
         row.IndexedHash = row.ContentHash;
 
         // Пишем обе формы цели: рендер ищет сперва буквальный slug, потом транслитерацию имени
@@ -50,15 +50,5 @@ public sealed class ArticleIndexer(SamizdatDbContext db)
 
         foreach (var target in wanted.Where(target => existing.All(link => link.ToSlug != target)))
             db.ArticleLinks.Add(new ArticleLinkRow { FromSlug = row.Slug, ToSlug = target });
-    }
-
-    static string Trim(string text)
-    {
-        if (text.Length <= MaxSearchText) return text;
-
-        // Половина суррогатной пары на конце — уже не текст: драйвер не переводит её в UTF-8
-        // и валит выкладку.
-        var end = char.IsHighSurrogate(text[MaxSearchText - 1]) ? MaxSearchText - 1 : MaxSearchText;
-        return text[..end];
     }
 }

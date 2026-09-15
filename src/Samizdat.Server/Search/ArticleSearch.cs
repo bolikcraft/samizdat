@@ -89,11 +89,7 @@ public sealed class ArticleSearch(SamizdatDbContext db)
     static string Clean(string query)
     {
         var text = new string(query.Where(symbol => !char.IsControl(symbol)).ToArray()).Trim();
-        if (text.Length <= MaxQuery) return text;
-
-        // Половина суррогатной пары на конце — уже не текст: драйвер не переводит её в UTF-8.
-        var end = char.IsHighSurrogate(text[MaxQuery - 1]) ? MaxQuery - 1 : MaxQuery;
-        return text[..end];
+        return TextTrim.Cut(text, MaxQuery);
     }
 
     async Task<IReadOnlyList<SearchHit>> Run(string sql, params (string Name, object Value)[] parameters)
