@@ -49,6 +49,116 @@ public class RegistrationTests : IDisposable
         Assert.Contains("Заявка ещё не одобрена", await answer.Content.ReadAsStringAsync());
     }
 
+    [Fact]
+    public async Task An_invite_makes_a_reader_who_is_let_in_at_once()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        var token = AddInvite(factory, note: "для Ивана");
+
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        var answer = await client.PostAsync($"/i/{token}", Fields("ivan", "parol-ivana"));
+
+        Assert.Equal(HttpStatusCode.Redirect, answer.StatusCode);
+        Assert.Equal("/", answer.Headers.Location?.ToString());
+
+        var person = Users(factory).Single(row => row.Login == "ivan");
+        Assert.Equal(UserRole.Reader, person.Role);
+        Assert.NotNull(person.ApprovedAt);
+
+        var invite = Invites(factory).Single();
+        Assert.NotNull(invite.UsedAt);
+        Assert.Equal("ivan", invite.UsedByLogin);
+    }
+
+    [Fact]
+    public async Task The_same_invite_does_not_work_twice()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        var token = AddInvite(factory, note: null);
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        await client.PostAsync($"/i/{token}", Fields("ivan", "parol-ivana"));
+
+        var again = await client.PostAsync($"/i/{token}", Fields("petr", "parol-petra"));
+
+        Assert.Equal(HttpStatusCode.Gone, again.StatusCode);
+        Assert.Single(Users(factory));
+    }
+
+    [Fact]
+    public async Task An_expired_or_revoked_invite_shows_a_dead_page()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        var expired = AddInvite(factory, note: null, expiresAt: DateTimeOffset.UtcNow.AddDays(-1));
+        var revoked = AddInvite(factory, note: null, revokedAt: DateTimeOffset.UtcNow);
+        var client = factory.CreateClient();
+
+        Assert.Equal(HttpStatusCode.Gone, (await client.GetAsync($"/i/{expired}")).StatusCode);
+        Assert.Equal(HttpStatusCode.Gone, (await client.GetAsync($"/i/{revoked}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/i/takogo-net")).StatusCode);
+    }
+
+    // Два человека открыли одну ссылку разом. Гашение с условием внутри UPDATE обязано пустить
+    // только одного: без него оба проходили проверку IsAlive и заводили по учётке.
+    [Fact]
+    public async Task Two_people_racing_for_one_invite_give_one_reader()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        var token = AddInvite(factory, note: null);
+        var first = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        var second = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+
+        var answers = await Task.WhenAll(
+            first.PostAsync($"/i/{token}", Fields("ivan", "parol-ivana")),
+            second.PostAsync($"/i/{token}", Fields("petr", "parol-petra")));
+
+        Assert.Single(Users(factory));
+        Assert.Equal(1, answers.Count(answer => answer.StatusCode == HttpStatusCode.Redirect));
+    }
+
+    [Fact]
+    public async Task A_busy_login_keeps_the_invite_alive()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        AddPerson(factory, "ivan", "parol-ivana", UserRole.Reader);
+        var token = AddInvite(factory, note: null);
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+
+        var answer = await client.PostAsync($"/i/{token}", Fields("ivan", "drugoy-parol"));
+
+        Assert.Equal(HttpStatusCode.OK, answer.StatusCode);
+        Assert.Contains("логин уже занят", await answer.Content.ReadAsStringAsync());
+        Assert.Null(Invites(factory).Single().UsedAt);
+    }
+
+    [Theory]
+    [InlineData("ivan", "korotko", "korotko", "не короче")]
+    [InlineData("ivan", "parol-ivana", "drugoy-parol", "не совпадают")]
+    [InlineData("", "parol-ivana", "parol-ivana", "не должен быть пустым")]
+    public async Task A_bad_form_shows_the_reason_and_keeps_the_invite(string login, string password,
+                                                                      string repeat, string expected)
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        var token = AddInvite(factory, note: null);
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+
+        var answer = await client.PostAsync($"/i/{token}", new FormUrlEncodedContent(
+            new Dictionary<string, string>
+            {
+                ["login"] = login, ["password"] = password, ["repeat"] = repeat,
+            }));
+
+        Assert.Equal(HttpStatusCode.OK, answer.StatusCode);
+        Assert.Contains(expected, await answer.Content.ReadAsStringAsync());
+        Assert.Empty(Users(factory));
+        Assert.Null(Invites(factory).Single().UsedAt);
+    }
+
     WebApplicationFactory<Program> CreateFactory() =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
@@ -135,5 +245,29 @@ public class RegistrationTests : IDisposable
         var match = Regex.Match(html, "<input type=\"hidden\" name=\"([^\"]+)\" value=\"([^\"]+)\">");
         if (!match.Success) throw new InvalidOperationException("Antiforgery-поле не найдено на странице");
         return (match.Groups[1].Value, match.Groups[2].Value);
+    }
+
+    static FormUrlEncodedContent Fields(string login, string password) => new(
+        new Dictionary<string, string>
+        {
+            ["login"] = login, ["password"] = password, ["repeat"] = password,
+        });
+
+    static string AddInvite(WebApplicationFactory<Program> factory, string? note,
+                            DateTimeOffset? expiresAt = null, DateTimeOffset? revokedAt = null)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+        var invite = new InviteRow
+        {
+            Token = ShareToken.Create(),
+            Note = note,
+            CreatedAt = DateTimeOffset.UtcNow,
+            ExpiresAt = expiresAt,
+            RevokedAt = revokedAt,
+        };
+        db.Invites.Add(invite);
+        db.SaveChanges();
+        return invite.Token;
     }
 }

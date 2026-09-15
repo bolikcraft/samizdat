@@ -85,6 +85,7 @@ public static class Startup
         app.UseAuthorization();
         app.UseAntiforgery();
         app.MapAuth();
+        app.MapRegistration();
         app.MapPages().RequireAuthorization();
         app.MapShare();
         app.MapApi();
