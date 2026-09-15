@@ -449,6 +449,19 @@ public class RegistrationTests : IDisposable
     }
 
     [Fact]
+    public async Task The_login_page_offers_to_register_only_when_it_is_open()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+
+        Assert.DoesNotContain("/register", await factory.CreateClient().GetStringAsync("/login"));
+
+        OpenRegistration(factory);
+
+        Assert.Contains("/register", await factory.CreateClient().GetStringAsync("/login"));
+    }
+
+    [Fact]
     public async Task Owner_switches_the_open_registration_on_and_off()
     {
         database.ResetDatabase();

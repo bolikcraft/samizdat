@@ -5,3 +5,6 @@
   <label>Пароль <input type="password" name="password" autocomplete="current-password"></label>
   <button type="submit">Войти</button>
 </form>
+{{ if registration_open }}
+<p class="login-register"><a href="/register">Зарегистрироваться</a></p>
+{{ end }}

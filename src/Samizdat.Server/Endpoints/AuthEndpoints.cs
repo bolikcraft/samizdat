@@ -49,6 +49,7 @@ public static class AuthEndpoints
             {
                 ["page_title"] = "Вход",
                 ["error"] = error,
+                ["registration_open"] = settings.OpenRegistration,
                 ["site"] = PageEndpoints.SiteModel(settings),
             }),
             "text/html; charset=utf-8");

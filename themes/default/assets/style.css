@@ -407,6 +407,7 @@ button.is-busy::after {
 }
 .error { color: var(--danger); }
 .login .invite-note { margin: 0; color: var(--muted); font-size: 0.9rem; }
+.login-register { margin: 0 auto; max-width: 20rem; font-size: 0.9rem; }
 
 .settings-message {
   margin: 0.6rem 0 1.25rem;
