@@ -476,17 +476,18 @@ button.is-busy::after {
 /* Смысловые куски раздела: между ними линия, перед первым её нет. */
 .settings-block + .settings-block { margin-top: 1.75rem; padding-top: 1.5rem; border-top: 1px solid var(--line); }
 
-.settings-form { display: grid; gap: 0.75rem; max-width: 24rem; }
+/* Ширину держат сами поля, а не форма: общий потолок в 24rem ломал подпись флажка на две строки. */
+.settings-form { display: grid; gap: 0.75rem; max-width: 40rem; }
 .settings-form label { display: grid; gap: 0.3rem; font-family: system-ui, sans-serif; font-size: 0.9rem; color: var(--muted); }
 .settings-form input, .settings-form select {
-  width: 100%; padding: 0.5rem; font: inherit; color: var(--fg);
+  width: 100%; max-width: 24rem; padding: 0.5rem; font: inherit; color: var(--fg);
   background: var(--bg); border: 1px solid var(--line); border-radius: 4px;
 }
 .settings-form input:focus-visible, .settings-form select:focus-visible {
   border-color: var(--accent); outline: 2px solid var(--accent); outline-offset: 1px;
 }
 .settings-form fieldset.color-scheme {
-  border: 1px solid var(--line); border-radius: 8px; padding: 0.4rem 0.6rem 0.6rem;
+  border: 1px solid var(--line); border-radius: 8px; padding: 0.4rem 0.6rem 0.6rem; max-width: 24rem;
 }
 .settings-form fieldset.color-scheme legend { font-family: system-ui, sans-serif; font-size: 0.85rem; color: var(--muted); padding: 0 0.3rem; }
 .settings-form button { justify-self: start; }
@@ -505,8 +506,9 @@ button.is-busy::after {
 
 /* Флажок-переключатель: та же поправка, что у радиокнопок схемы — иначе общее правило
    для .settings-form input растягивает его в подписанный прямоугольник. */
-.settings-form label.check { display: flex; flex-direction: row; align-items: center; gap: 0.5rem; cursor: pointer; }
-.settings-form label.check input { width: auto; padding: 0; margin: 0; border: none; background: none; accent-color: var(--accent); }
+/* В узком окне подпись всё же переносится, и галка встаёт к первой строке, а не к середине. */
+.settings-form label.check { display: flex; flex-direction: row; align-items: start; gap: 0.5rem; cursor: pointer; }
+.settings-form label.check input { width: auto; padding: 0; margin: 0.15rem 0 0; border: none; background: none; accent-color: var(--accent); }
 
 /* Форма загрузки и текущий фон стоят рядом, пока хватает ширины. */
 .inline-form { margin: 0; }
