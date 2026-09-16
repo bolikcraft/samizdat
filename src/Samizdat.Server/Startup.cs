@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Configuration.Json;
 using Microsoft.Extensions.Configuration.Xml;
 using Samizdat.Core.Localization;
@@ -58,9 +59,8 @@ public static class Startup
         builder.Services.AddSingleton<ArticleRenderer>();
         builder.Services.AddSingleton<PageCache>();
 
-        builder.Services.AddDbContext<SamizdatDbContext>(options =>
-            options.UseNpgsql(builder.Configuration.GetConnectionString("Postgres")
-                              ?? "Host=localhost;Database=samizdat;Username=samizdat"));
+        var connectionString = PostgresConnectionString(builder.Configuration);
+        builder.Services.AddDbContext<SamizdatDbContext>(options => options.UseNpgsql(connectionString));
 
         builder.Services.AddScoped<ArticleIndexer>();
         builder.Services.AddScoped<ArticleSearch>();
@@ -126,6 +126,14 @@ public static class Startup
         app.MapSettings();
         app.MapSignupSettings();
     }
+
+    // Запасного значения нет намеренно: опечатка в имени переменной среды молча уводила сервер на localhost.
+    public static string PostgresConnectionString(IConfiguration configuration) =>
+        configuration.GetConnectionString("Postgres") is { Length: > 0 } value
+            ? value
+            : throw new InvalidOperationException(
+                "Не задана строка подключения к Postgres: ключ ConnectionStrings:Postgres " +
+                "(переменная среды ConnectionStrings__Postgres).");
 
     // Настройки лежат в appsettings.xml, а не в json. Источники json убираем и ставим xml на их
     // место в цепочке: в конце он оказался бы сильнее секретов, переменных среды и аргументов.
