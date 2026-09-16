@@ -7,11 +7,13 @@ public class LanguageSourceTests : IDisposable
     readonly string folder = Directory.CreateTempSubdirectory("samizdat-lang").FullName;
 
     [Fact]
-    public void Embedded_source_carries_english_and_russian()
+    public void Embedded_source_carries_the_packs_of_the_repository()
     {
         var source = new EmbeddedLanguageSource();
 
-        Assert.Equal(["en", "ru"], source.Codes().Order());
+        Assert.Contains("en", source.Codes());
+        Assert.Contains("ru", source.Codes());
+        Assert.Contains("zh-Hans", source.Codes());
         Assert.NotNull(source.Read("en"));
         Assert.Null(source.Read("нет-такого"));
     }
