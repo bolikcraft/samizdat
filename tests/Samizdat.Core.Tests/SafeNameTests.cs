@@ -40,6 +40,12 @@ public class SafeNameTests
     [InlineData(".")]
     [InlineData("..")]
     [InlineData("")]
+    // Windows и zip отбрасывают хвостовые пробелы и точки: это тот же index.md.
+    [InlineData("index.md ")]
+    [InlineData("index.md.")]
+    [InlineData("index.md...")]
+    [InlineData("index.md  ")]
+    [InlineData("INDEX.MD .")]
     public void Bad_attachment_name_is_refused(string name) => Assert.False(SafeName.IsAttachment(name));
 
     [Theory]

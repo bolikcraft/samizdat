@@ -18,8 +18,10 @@ public static class SafeName
            && !name.Any(symbol => symbol is '/' or '\\' || char.IsControl(symbol));
 
     /// Исходник статьи лежит в одной папке с вложениями. Регистр не важен: на macOS и Windows
-    /// INDEX.MD и index.md — один файл.
-    public static bool IsSource(string name) => name.Equals("index.md", StringComparison.OrdinalIgnoreCase);
+    /// INDEX.MD и index.md — один файл. Windows и zip при распаковке отбрасывают хвостовые
+    /// пробелы и точки, поэтому "index.md " и "index.md." — тоже он.
+    public static bool IsSource(string name)
+        => name.TrimEnd(' ', '.').Equals("index.md", StringComparison.OrdinalIgnoreCase);
 
     public static bool IsAttachment(string name) => IsSegment(name) && !IsSource(name);
 

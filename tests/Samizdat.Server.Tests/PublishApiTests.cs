@@ -137,7 +137,7 @@ public class PublishApiTests(DatabaseFixture database) : IDisposable
     [InlineData("INDEX.MD")]
     [InlineData("a\\b.png")]
     [InlineData("..\\..\\evil.exe")]
-    [InlineData("bad.png")]
+    [InlineData("bad\u0001.png")]
     public async Task Put_with_a_bad_attachment_name_is_refused_and_the_article_stays(string name)
     {
         var (_, client) = StartWithToken();
