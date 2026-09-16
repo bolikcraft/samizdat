@@ -108,7 +108,7 @@ public sealed partial class VaultScanner(string vaultPath)
     /// Ищем только те файлы, на которые есть ссылка в тексте.
     IReadOnlyList<(string Name, byte[] Bytes)> FindAttachments(string text, string noteFile)
     {
-        var found = new Dictionary<string, byte[]>();
+        var found = new Dictionary<string, (string Path, byte[] Bytes)>();
         var noteFolder = Path.GetDirectoryName(noteFile)!;
 
         foreach (Match match in ImageReference().Matches(text))
@@ -119,29 +119,44 @@ public sealed partial class VaultScanner(string vaultPath)
 
             if (reference.StartsWith("http", StringComparison.OrdinalIgnoreCase)) continue;
 
-            // На сервере вложения лежат плоско по имени, поэтому второй файл с тем же именем не нужен.
+            // Рендер и сервер ищут вложение по имени из ссылки с учётом регистра, поэтому выгружаем под ним,
+            // даже если файл на диске назван в другом регистре.
             var name = Path.GetFileName(reference);
             // Сервер отвергнет всю статью из-за такого имени, а index.md затёр бы её текст.
-            if (!SafeName.IsAttachment(name) || found.ContainsKey(name)) continue;
+            if (!SafeName.IsAttachment(name)) continue;
+            if (ResolveAttachment(reference, name, noteFolder) is not { } file) continue;
 
-            if (ResolveAttachment(reference, name, noteFolder) is { } file)
-                found[name] = File.ReadAllBytes(file);
+            // На сервере вложения лежат плоско по имени, поэтому второй файл с тем же именем не выгружаем.
+            if (found.TryGetValue(name, out var taken))
+            {
+                if (taken.Path != file)
+                    warnings.Add($"{noteFile}: два разных файла с именем {name}, выгружен {taken.Path}");
+                continue;
+            }
+
+            found[name] = (file, File.ReadAllBytes(file));
         }
 
-        return found.Select(item => (item.Key, item.Value)).ToList();
+        return found.Select(item => (item.Key, item.Value.Bytes)).ToList();
     }
 
     /// Порядок как в Obsidian: путь от папки заметки, путь от корня вольта, потом файл с тем же именем.
+    /// Путь с ведущим "/" идёт только от корня вольта.
     string? ResolveAttachment(string reference, string name, string noteFolder)
     {
+        var starts = reference.StartsWith('/') ? new[] { vaultPath } : [noteFolder, vaultPath];
         var relative = reference.TrimStart('/');
-        foreach (var start in new[] { noteFolder, vaultPath })
+        foreach (var start in starts)
         {
             var candidate = Path.GetFullPath(Path.Combine(start, relative));
             if (IsVaultFile(candidate)) return candidate;
         }
 
-        return FilesByName()[name]
+        // Как в Obsidian: сначала точное имя, без него — имя в другом регистре.
+        var sameName = FilesByName()[name].ToList();
+        var exact = sameName.Where(candidate => Path.GetFileName(candidate) == name).ToList();
+
+        return (exact.Count > 0 ? exact : sameName)
             .OrderBy(candidate => Distance(noteFolder, candidate))
             .ThenBy(candidate => candidate, StringComparer.Ordinal)
             .FirstOrDefault();
@@ -156,11 +171,12 @@ public sealed partial class VaultScanner(string vaultPath)
                && !IsHidden(path);
     }
 
-    // Маска "*" нужна только для обхода; имя из ссылки сравнивается с ключом точно.
+    // Маска "*" нужна только для обхода; имя из ссылки сравнивается с ключом без маски.
     ILookup<string, string> FilesByName()
         => filesByName ??= Directory.EnumerateFiles(vaultPath, "*", SearchOption.AllDirectories)
                                     .Where(file => !IsHidden(file))
-                                    .ToLookup(file => Path.GetFileName(file), StringComparer.Ordinal);
+                                    .Select(Path.GetFullPath)
+                                    .ToLookup(file => Path.GetFileName(file), StringComparer.OrdinalIgnoreCase);
 
     /// Шаги по дереву папок: вверх до общего предка и вниз до папки файла.
     static int Distance(string fromFolder, string file)

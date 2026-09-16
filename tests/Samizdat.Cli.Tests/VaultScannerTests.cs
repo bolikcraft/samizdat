@@ -327,6 +327,67 @@ public class VaultScannerTests : IDisposable
     }
 
     [Fact]
+    public void Leading_slash_takes_only_the_vault_root()
+    {
+        Note("notes/n.md", "---\ntitle: N\npublish: true\n---\n![](/x/img/cover.png)");
+        Attachment("notes/x/img/cover.png", [2]);
+        Attachment("x/img/cover.png", [1]);
+
+        Assert.Equal(new byte[] { 1 }, new VaultScanner(vault).Scan().Single().Attachments.Single().Bytes);
+    }
+
+    [Fact]
+    public void Name_link_ignores_case_when_there_is_no_exact_match()
+    {
+        Note("n.md", "---\ntitle: N\npublish: true\n---\n![[cap.png]]");
+        Attachment("sub/Cap.png", [1]);
+
+        var attachment = new VaultScanner(vault).Scan().Single().Attachments.Single();
+
+        // Рендер и сервер ищут вложение по имени из ссылки с учётом регистра.
+        Assert.Equal("cap.png", attachment.Name);
+        Assert.Equal(new byte[] { 1 }, attachment.Bytes);
+    }
+
+    [Fact]
+    public void Exact_name_wins_over_a_nearer_name_in_other_case()
+    {
+        Note("n.md", "---\ntitle: N\npublish: true\n---\n![[cap.png]]");
+        Attachment("sub/Cap.png", [1]);
+        Attachment("a/b/cap.png", [2]);
+
+        Assert.Equal(new byte[] { 2 }, new VaultScanner(vault).Scan().Single().Attachments.Single().Bytes);
+    }
+
+    [Fact]
+    public void Two_files_with_one_name_in_a_note_give_a_warning()
+    {
+        Note("n.md", "---\ntitle: N\npublish: true\n---\n![](a/pic.png) ![](b/pic.png)");
+        Attachment("a/pic.png", [1]);
+        Attachment("b/pic.png", [2]);
+
+        var scanner = new VaultScanner(vault);
+
+        Assert.Equal(new byte[] { 1 }, scanner.Scan().Single().Attachments.Single().Bytes);
+        var warning = Assert.Single(scanner.Warnings);
+        Assert.Contains(Path.Combine(vault, "n.md"), warning);
+        Assert.Contains("pic.png", warning);
+        Assert.Contains(Path.Combine(vault, "a", "pic.png"), warning);
+    }
+
+    [Fact]
+    public void Same_file_linked_twice_gives_no_warning()
+    {
+        Note("n.md", "---\ntitle: N\npublish: true\n---\n![[pic.png]] ![](a/pic.png)");
+        Attachment("a/pic.png", [1]);
+
+        var scanner = new VaultScanner(vault);
+
+        Assert.Single(scanner.Scan().Single().Attachments);
+        Assert.Empty(scanner.Warnings);
+    }
+
+    [Fact]
     public void Wildcards_in_the_name_are_plain_characters()
     {
         Note("n.md", "---\ntitle: N\npublish: true\n---\n![[*.png]] ![](?.pdf)");
