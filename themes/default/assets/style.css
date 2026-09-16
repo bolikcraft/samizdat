@@ -100,7 +100,7 @@ body {
   background-attachment: fixed;
 }
 
-.top, .bottom {
+.top {
   width: calc(100% - 2rem);
   margin: 0 auto;
   padding: 1rem 0.5rem;
@@ -110,9 +110,6 @@ body {
 /* Шапка держится над панелью: иначе выпадающее меню владельца уходит ей за край. */
 .top { position: relative; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
 .top a { color: var(--fg); font-family: system-ui, sans-serif; font-weight: bold; text-decoration: none; }
-/* Подвал лежит прямо на снимке, как и шапка, поэтому читается тем же приёмом — цветом --fg
-   и обводкой, а не подложкой: своего фона у него по замыслу нет. */
-.bottom { font-size: 0.9rem; color: var(--fg); font-family: system-ui, sans-serif; font-weight: bold; }
 
 /* Меню владельца: <details> без js, раскрывается вправо под именем. */
 .user-menu { position: relative; font-family: system-ui, sans-serif; font-size: 0.9rem; }
@@ -175,7 +172,8 @@ body {
    Ниже 720px они складываются в одну колонку со сворачиваемым деревом сверху. */
 .shell {
   width: calc(100% - 2rem);
-  margin: 0 auto 1.5rem;
+  /* Снизу тот же зазор, что по бокам: подвала нет, панель доходит до края окна. */
+  margin: 0 auto 1rem;
   display: grid;
   grid-template-columns: 16rem minmax(0, 1fr);
   gap: 0.25rem;
@@ -296,8 +294,8 @@ body {
 @media (max-width: 720px) {
   /* На iOS background-attachment: fixed рисует картинку неправильно. */
   body { background-attachment: scroll; }
-  .top, .bottom { width: calc(100% - 1rem); padding: 0.75rem 0.25rem; }
-  .shell, .shell-plain { display: block; width: calc(100% - 1rem); }
+  .top { width: calc(100% - 1rem); padding: 0.75rem 0.25rem; }
+  .shell, .shell-plain { display: block; width: calc(100% - 1rem); margin-bottom: 0.5rem; }
   /* Отдельным правилом: браузер без :has() выбросил бы весь список селекторов вместе с ним. */
   .shell-plain:has(.login) { width: calc(100% - 1rem); }
   .shell main { padding: 0.75rem; border-radius: 10px; }
@@ -456,8 +454,7 @@ button.is-busy::after {
   body:has(.settings-nav) .settings-panes { flex: 1; min-height: 0; overflow-y: auto; }
 
   /* Гостевая статья: панель тянется до низа окна, но своей прокрутки не имеет. Длинный текст
-     растит страницу, и шапка с подвалом уезжают вместе с ней — так подвал не отнимает у панели
-     полосу в каждом экране. Высоту даёт flex: 1 при body min-height: 100vh. */
+     растит страницу, и шапка уезжает вместе с ней. Высоту даёт flex: 1 при body min-height: 100vh. */
   body:has(.shell-full) { display: flex; flex-direction: column; }
   body:has(.shell-full) .shell-full { display: flex; flex-direction: column; flex: 1; }
   body:has(.shell-full) .shell-full main { flex: 1; }
