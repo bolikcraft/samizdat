@@ -86,4 +86,37 @@ public class SluggerTests
     public void Long_non_latin_title_is_cut_on_a_letter_boundary()
         => Assert.Equal(string.Concat(Enumerable.Repeat("日本語", 22)),
                         Slugger.FromTitle(string.Concat(Enumerable.Repeat("日本語", 40))));
+
+    // Знак вне BMP — это пара суррогатов. Половинка пары ломала Normalize.
+    [Theory]
+    [InlineData("Мой \U0001F389 праздник", "moy-prazdnik")]
+    [InlineData("\U0001F389", "bez-nazvaniya")]
+    [InlineData("日本語 \U0001F389", "日本語")]
+    [InlineData("\U00020000字", "\U00020000字")]
+    [InlineData("\U0001D400", "\U0001D400")]
+    public void Symbols_outside_bmp_do_not_break_the_slug(string title, string expected)
+    {
+        var slug = Slugger.FromTitle(title);
+
+        Assert.Equal(expected, slug);
+        Assert.Null(SafeName.SlugProblem(slug));
+    }
+
+    [Fact]
+    public void Capital_letter_with_a_dot_becomes_lower_case()
+        => Assert.Equal("istanbul", Slugger.FromTitle("İstanbul"));
+
+    [Theory]
+    [InlineData("می\u200Cخواهم", "می\u200Cخواهم")]
+    [InlineData("\u200Cمی\u200D", "می")]
+    [InlineData("日 \u200D本", "日-本")]
+    public void Joiner_stays_only_between_native_letters(string title, string expected)
+        => Assert.Equal(expected, Slugger.FromTitle(title));
+
+    [Theory]
+    [InlineData("\u0301", "bez-nazvaniya")]
+    [InlineData("\u0301日本", "日本")]
+    [InlineData("日 \u0301本", "日-本")]
+    public void Mark_without_a_base_letter_is_dropped(string title, string expected)
+        => Assert.Equal(expected, Slugger.FromTitle(title));
 }

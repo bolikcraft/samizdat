@@ -48,6 +48,10 @@ public class WikiLinkTargetTests
     [Fact]
     public void Target_with_diacritics_gives_a_latin_slug()
         => Assert.Equal(["Über", "uber"], WikiLinkTarget.Candidates("Über"));
+
+    [Fact]
+    public void Target_with_an_emoji_gives_a_slug()
+        => Assert.Equal(["x \U0001F389", "x"], WikiLinkTarget.Candidates("x \U0001F389"));
 }
 
 public class WikiLinksTests

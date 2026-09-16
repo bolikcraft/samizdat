@@ -40,46 +40,68 @@ public static class Slugger
         return slug.Length == 0 ? null : slug;
     }
 
+    // Перебор по Rune: половинка суррогатной пары ломает Normalize.
     static string Latin(string text)
     {
         var result = new StringBuilder(text.Length);
-        foreach (var symbol in text)
+        foreach (var symbol in text.EnumerateRunes())
         {
             // Таблицу смотрим до разложения: «й» в NFD — это «и» и знак.
-            if (Letters.TryGetValue(symbol, out var latin))
+            if (symbol.IsBmp && Letters.TryGetValue((char)symbol.Value, out var latin))
                 result.Append(latin);
-            else if (char.IsAsciiLetterOrDigit(symbol))
-                result.Append(symbol);
+            else if (symbol.IsAscii && Rune.IsLetterOrDigit(symbol))
+                result.Append(symbol.ToString());
             else
                 AppendWithoutMarks(result, symbol);
         }
         return result.ToString();
     }
 
-    static void AppendWithoutMarks(StringBuilder result, char symbol)
+    static void AppendWithoutMarks(StringBuilder result, Rune symbol)
     {
-        foreach (var part in symbol.ToString().Normalize(NormalizationForm.FormD))
+        // «İ» остаётся заглавной после ToLowerInvariant и становится «I» с точкой после разложения.
+        var parts = symbol.ToString().Normalize(NormalizationForm.FormD).ToLowerInvariant();
+        foreach (var part in parts.EnumerateRunes())
         {
-            if (CharUnicodeInfo.GetUnicodeCategory(part) == UnicodeCategory.NonSpacingMark) continue;
+            if (Rune.GetUnicodeCategory(part) == UnicodeCategory.NonSpacingMark) continue;
 
-            if (Letters.TryGetValue(part, out var latin)) result.Append(latin);
-            else result.Append(char.IsAsciiLetterOrDigit(part) ? part : '-');
+            if (part.IsBmp && Letters.TryGetValue((char)part.Value, out var latin)) result.Append(latin);
+            else result.Append(part.IsAscii && Rune.IsLetterOrDigit(part) ? part.ToString() : "-");
         }
     }
 
     static string Native(string text)
     {
+        var symbols = text.EnumerateRunes().ToArray();
         var result = new StringBuilder(text.Length);
-        foreach (var symbol in text)
-            result.Append(IsNative(symbol) ? symbol : '-');
+        // Знак без буквы перед ним и соединитель вне слова дали бы slug из невидимых символов.
+        var afterLetter = false;
+        for (var i = 0; i < symbols.Length; i++)
+        {
+            var symbol = symbols[i];
+            if (Rune.IsLetterOrDigit(symbol))
+                afterLetter = true;
+            else if (afterLetter && IsMark(symbol))
+                afterLetter = true;
+            // ZWNJ и ZWJ в персидском и в индийских письмах — часть написания слова.
+            else if (afterLetter && IsJoiner(symbol) && i + 1 < symbols.Length && Rune.IsLetterOrDigit(symbols[i + 1]))
+                afterLetter = false;
+            else
+            {
+                result.Append('-');
+                afterLetter = false;
+                continue;
+            }
+            result.Append(symbol.ToString());
+        }
         return result.ToString();
     }
 
     // Гласные знаки хинди и тайского — отдельные символы. Без них слово распалось бы на куски.
-    static bool IsNative(char symbol)
-        => char.IsLetterOrDigit(symbol)
-           || CharUnicodeInfo.GetUnicodeCategory(symbol) is UnicodeCategory.NonSpacingMark
-                                                          or UnicodeCategory.SpacingCombiningMark;
+    static bool IsMark(Rune symbol)
+        => Rune.GetUnicodeCategory(symbol) is UnicodeCategory.NonSpacingMark or UnicodeCategory.SpacingCombiningMark;
+
+    static bool IsJoiner(Rune symbol) => symbol.Value is 0x200C or 0x200D;
 
     static string Join(string text) => string.Join('-', text.Split('-', StringSplitOptions.RemoveEmptyEntries));
 
@@ -97,6 +119,6 @@ public static class Slugger
             bytes += size;
             end += step;
         }
-        return slug[..end].TrimEnd('-');
+        return slug[..end].TrimEnd('-', '\u200C', '\u200D');
     }
 }

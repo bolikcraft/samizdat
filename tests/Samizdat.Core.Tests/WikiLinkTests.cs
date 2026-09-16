@@ -73,6 +73,14 @@ public class WikiLinkTests
 
         Assert.Contains("<a href=\"/proxmox\">", html);
     }
+
+    [Fact]
+    public void Link_with_an_emoji_renders()
+    {
+        var html = renderer.Render("см. [[x \U0001F389]]", "s", new FakeLookup("x"));
+
+        Assert.Contains("<a href=\"/x\">", html);
+    }
 }
 
 public sealed class FakeLookup(params string[] slugs) : IArticleLookup
