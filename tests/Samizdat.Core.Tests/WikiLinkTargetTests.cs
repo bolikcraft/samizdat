@@ -40,6 +40,14 @@ public class WikiLinkTargetTests
     [Fact]
     public void Title_that_really_gives_the_fallback_word_still_resolves()
         => Assert.Equal(["Без названия", "bez-nazvaniya"], WikiLinkTarget.Candidates("Без названия"));
+
+    [Fact]
+    public void Non_latin_target_is_its_own_slug()
+        => Assert.Equal(["日本語"], WikiLinkTarget.Candidates("日本語"));
+
+    [Fact]
+    public void Target_with_diacritics_gives_a_latin_slug()
+        => Assert.Equal(["Über", "uber"], WikiLinkTarget.Candidates("Über"));
 }
 
 public class WikiLinksTests
