@@ -114,9 +114,12 @@ public static class ShareEndpoints
 
             var article = db.Articles.Find(slug);
             if (article is null) return Results.NotFound();
+            var role = ArticleAccess.RoleOf(user);
             // Именно StatusCode, а не Results.Forbid(): Forbid отдаёт cookie-схеме редирект
             // на страницу «доступа нет», а нам нужен честный код ответа.
-            if (!ArticleAccess.CanShare(article.Visibility, ArticleAccess.RoleOf(user)))
+            if (!ArticleAccess.CanShare(article.Visibility, role))
+                return Results.StatusCode(StatusCodes.Status403Forbidden);
+            if (SettingsPage.CurrentUser(db, user) is not { } me)
                 return Results.StatusCode(StatusCodes.Status403Forbidden);
 
             var now = DateTimeOffset.UtcNow;
@@ -128,6 +131,9 @@ public static class ShareEndpoints
                 .FirstOrDefault(link => link.IsAlive(now));
             if (live is not null)
             {
+                if (!ArticleAccess.CanManageShare(role, live.CreatedByUserId, me.Id))
+                    return Results.StatusCode(StatusCodes.Status403Forbidden);
+
                 live.ExpiresAt = expires;
                 if (note.Length > 0) live.Note = note;
                 db.SaveChanges();
@@ -141,6 +147,7 @@ public static class ShareEndpoints
                 Note = note.Length == 0 ? null : note,
                 CreatedAt = now,
                 ExpiresAt = expires,
+                CreatedByUserId = me.Id,
             });
             db.SaveChanges();
 
@@ -156,7 +163,10 @@ public static class ShareEndpoints
 
             var article = db.Articles.Find(slug);
             if (article is null) return Results.NotFound();
-            if (!ArticleAccess.CanShare(article.Visibility, ArticleAccess.RoleOf(user)))
+            var role = ArticleAccess.RoleOf(user);
+            if (!ArticleAccess.CanShare(article.Visibility, role))
+                return Results.StatusCode(StatusCodes.Status403Forbidden);
+            if (SettingsPage.CurrentUser(db, user) is not { } me)
                 return Results.StatusCode(StatusCodes.Status403Forbidden);
 
             var now = DateTimeOffset.UtcNow;
@@ -164,6 +174,9 @@ public static class ShareEndpoints
                 .FirstOrDefault(link => link.IsAlive(now));
             if (live is not null)
             {
+                if (!ArticleAccess.CanManageShare(role, live.CreatedByUserId, me.Id))
+                    return Results.StatusCode(StatusCodes.Status403Forbidden);
+
                 live.RevokedAt = now;
                 db.SaveChanges();
             }

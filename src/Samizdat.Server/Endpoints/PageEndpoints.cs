@@ -164,7 +164,7 @@ public static class PageEndpoints
 
             html = html.Replace(AntiforgeryHtml.Placeholder, AntiforgeryHtml.Field(antiforgery, context));
             html = html.Replace(SharePanel.Placeholder,
-                SharePanel.Render(pages, db, slug, antiforgery, context,
+                SharePanel.Render(pages, db, slug, antiforgery, context, user,
                                   ArticleAccess.CanShare(row.Visibility, ArticleAccess.RoleOf(user))));
             // Последней: логин вводит сам человек, плейсхолдеры внутри него заменять нельзя.
             html = html.Replace(LoginPlaceholder, WebUtility.HtmlEncode(user.Identity?.Name ?? ""));

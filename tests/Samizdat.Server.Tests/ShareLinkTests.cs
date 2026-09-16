@@ -54,6 +54,15 @@ public class ShareLinkTests : IDisposable
         return client;
     }
 
+    // Id нужен, чтобы сверить автора ссылки. Новый пользователь получает самый большой Id.
+    async Task<(HttpClient Client, int Id)> LoginWithId(WebApplicationFactory<Program> factory, UserRole role)
+    {
+        var client = await LoginClient(factory, role);
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+        return (client, db.Users.OrderByDescending(row => row.Id).First().Id);
+    }
+
     // Bearer-клиент на тот же factory: нужен, чтобы прогнать PUT /api/articles рядом с cookie-чтением страницы.
     HttpClient StartApiClient(WebApplicationFactory<Program> factory)
     {
@@ -926,4 +935,129 @@ public class ShareLinkTests : IDisposable
         Assert.Equal("otkrytaya", SingleLink(factory).Slug);
     }
 
+    [Fact]
+    public async Task Link_remembers_who_made_it()
+    {
+        using var factory = StartFactory();
+        WriteArticle("otkrytaya", "Текст статьи.");
+        RegisterArticle(factory, "otkrytaya", "Открытая", ArticleVisibility.Shared);
+        var (reader, readerId) = await LoginWithId(factory, UserRole.Reader);
+
+        await PostShare(reader, "otkrytaya", "7");
+
+        Assert.Equal(readerId, SingleLink(factory).CreatedByUserId);
+    }
+
+    [Fact]
+    public async Task Reader_cannot_revoke_or_prolong_the_owner_link()
+    {
+        using var factory = StartFactory();
+        WriteArticle("otkrytaya", "Текст статьи.");
+        RegisterArticle(factory, "otkrytaya", "Открытая", ArticleVisibility.Shared);
+        var owner = await LoginClient(factory);
+        var reader = await LoginClient(factory, UserRole.Reader);
+        await PostShare(owner, "otkrytaya", "7");
+        var before = SingleLink(factory);
+
+        var prolong = await PostShare(reader, "otkrytaya", "0");
+        var revoke = await PostRevoke(reader, "otkrytaya");
+
+        var after = SingleLink(factory);
+        Assert.Equal(HttpStatusCode.Forbidden, prolong.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, revoke.StatusCode);
+        Assert.Null(after.RevokedAt);
+        Assert.Equal(before.ExpiresAt, after.ExpiresAt);
+    }
+
+    [Fact]
+    public async Task Reader_cannot_revoke_the_link_of_another_reader()
+    {
+        using var factory = StartFactory();
+        WriteArticle("otkrytaya", "Текст статьи.");
+        RegisterArticle(factory, "otkrytaya", "Открытая", ArticleVisibility.Shared);
+        var author = await LoginClient(factory, UserRole.Reader);
+        var stranger = await LoginClient(factory, UserRole.Reader);
+        await PostShare(author, "otkrytaya", "7");
+
+        var revoke = await PostRevoke(stranger, "otkrytaya");
+
+        Assert.Equal(HttpStatusCode.Forbidden, revoke.StatusCode);
+        Assert.Null(SingleLink(factory).RevokedAt);
+    }
+
+    [Fact]
+    public async Task Reader_changes_the_term_and_revokes_own_link()
+    {
+        using var factory = StartFactory();
+        WriteArticle("otkrytaya", "Текст статьи.");
+        RegisterArticle(factory, "otkrytaya", "Открытая", ArticleVisibility.Shared);
+        var reader = await LoginClient(factory, UserRole.Reader);
+        await PostShare(reader, "otkrytaya", "7");
+        var first = SingleLink(factory);
+
+        var prolong = await PostShare(reader, "otkrytaya", "30");
+        var prolonged = SingleLink(factory);
+        var revoke = await PostRevoke(reader, "otkrytaya");
+
+        Assert.Equal(HttpStatusCode.Redirect, prolong.StatusCode);
+        Assert.True(prolonged.ExpiresAt > first.ExpiresAt);
+        Assert.Equal(HttpStatusCode.Redirect, revoke.StatusCode);
+        Assert.NotNull(SingleLink(factory).RevokedAt);
+    }
+
+    [Fact]
+    public async Task Owner_revokes_the_link_of_a_reader()
+    {
+        using var factory = StartFactory();
+        WriteArticle("otkrytaya", "Текст статьи.");
+        RegisterArticle(factory, "otkrytaya", "Открытая", ArticleVisibility.Shared);
+        var reader = await LoginClient(factory, UserRole.Reader);
+        var owner = await LoginClient(factory);
+        await PostShare(reader, "otkrytaya", "7");
+
+        var revoke = await PostRevoke(owner, "otkrytaya");
+
+        Assert.Equal(HttpStatusCode.Redirect, revoke.StatusCode);
+        Assert.NotNull(SingleLink(factory).RevokedAt);
+    }
+
+    [Fact]
+    public async Task Link_without_an_author_belongs_to_the_owners()
+    {
+        using var factory = StartFactory();
+        WriteArticle("otkrytaya", "Текст статьи.");
+        RegisterArticle(factory, "otkrytaya", "Открытая", ArticleVisibility.Shared);
+        AddLink(factory, "otkrytaya");
+        var reader = await LoginClient(factory, UserRole.Reader);
+        var owner = await LoginClient(factory);
+
+        var byReader = await PostRevoke(reader, "otkrytaya");
+        var stillAlive = SingleLink(factory).RevokedAt is null;
+        var byOwner = await PostRevoke(owner, "otkrytaya");
+
+        Assert.Equal(HttpStatusCode.Forbidden, byReader.StatusCode);
+        Assert.True(stillAlive);
+        Assert.Equal(HttpStatusCode.Redirect, byOwner.StatusCode);
+        Assert.NotNull(SingleLink(factory).RevokedAt);
+    }
+
+    [Fact]
+    public async Task Reader_sees_the_owner_link_without_the_buttons()
+    {
+        using var factory = StartFactory();
+        WriteArticle("otkrytaya", "Текст статьи.");
+        RegisterArticle(factory, "otkrytaya", "Открытая", ArticleVisibility.Shared);
+        var owner = await LoginClient(factory);
+        var reader = await LoginClient(factory, UserRole.Reader);
+        await PostShare(owner, "otkrytaya", "7");
+        var token = SingleLink(factory).Token;
+
+        var ownerPage = await owner.GetStringAsync("/otkrytaya");
+        var readerPage = await reader.GetStringAsync("/otkrytaya");
+
+        Assert.Contains("/share/revoke", ownerPage);
+        Assert.Contains($"/s/{token}", readerPage);
+        Assert.DoesNotContain("/share/revoke", readerPage);
+        Assert.DoesNotContain("action=\"/share\"", readerPage);
+    }
 }

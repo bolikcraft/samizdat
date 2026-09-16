@@ -12,5 +12,9 @@ public sealed class ShareLinkRow
     public int OpenedCount { get; set; }
     public DateTimeOffset? LastOpenedAt { get; set; }
 
+    /// Кто сделал ссылку. Пусто — ссылка владельцев: выдана до того, как автора стали записывать,
+    /// или её автора удалили.
+    public int? CreatedByUserId { get; set; }
+
     public bool IsAlive(DateTimeOffset now) => RevokedAt is null && (ExpiresAt is null || ExpiresAt > now);
 }

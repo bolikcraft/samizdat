@@ -74,6 +74,10 @@ public sealed class SamizdatDbContext(DbContextOptions<SamizdatDbContext> option
             link.Property(row => row.Note).HasMaxLength(200);
             // Каскад: статью снесли через push --prune — её ссылки не должны пережить статью.
             link.HasOne<ArticleRow>().WithMany().HasForeignKey(row => row.Slug).OnDelete(DeleteBehavior.Cascade);
+            // SET NULL, не каскад: гость со ссылкой удалённого человека не теряет доступ,
+            // а сама ссылка переходит к владельцам.
+            link.HasOne<UserRow>().WithMany().HasForeignKey(row => row.CreatedByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
         model.Entity<InviteRow>(invite =>

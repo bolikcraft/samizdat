@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Samizdat.Server.Auth;
 using Samizdat.Server.Data;
 using Testcontainers.PostgreSql;
@@ -56,6 +58,26 @@ public class InitMigrationTests : IAsyncLifetime
         await db.Database.MigrateAsync();
 
         Assert.NotNull((await db.Users.SingleAsync()).ApprovedAt);
+    }
+
+    // Ссылка, выданная до записи автора, переживает обновление: живая и без автора, то есть владельческая.
+    [Fact]
+    public async Task Link_made_before_the_author_column_stays_alive_and_without_an_author()
+    {
+        await using var db = CreateContext();
+        await db.GetService<IMigrator>().MigrateAsync("UserLanguage");
+        await db.Database.ExecuteSqlRawAsync("""
+            INSERT INTO articles ("Slug", "Title", "ContentHash", "IndexedHash", "SearchText", "UpdatedAt", "Visibility")
+            VALUES ('statya', 'Статья', 'h', '', '', now(), 1);
+            INSERT INTO share_links ("Token", "Slug", "CreatedAt", "OpenedCount")
+            VALUES ('AAAAAAAAAAAAAAAAAAAAAA', 'statya', now(), 0);
+            """);
+
+        await db.Database.MigrateAsync();
+
+        var link = await db.ShareLinks.SingleAsync();
+        Assert.Null(link.CreatedByUserId);
+        Assert.True(link.IsAlive(DateTimeOffset.UtcNow));
     }
 
     SamizdatDbContext CreateContext()

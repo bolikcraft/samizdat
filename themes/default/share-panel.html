@@ -7,6 +7,7 @@
       <button type="button" class="copy-link" data-url="{{ link.url | html.escape }}" data-copied="{{ t.common.copied }}">{{ t.common.copy }}</button>
     </div>
     <p class="share-term">{{ if link.expires_at }}{{ t.share.until | string.replace "{0}" (link.expires_at | html.escape) }}{{ else }}{{ t.share.no_term }}{{ end }}, {{ t.share.opened | string.replace "{0}" link.opened_count }}</p>
+    {{ if link.can_manage }}
     <form method="post" action="/share" class="share-form">
       {{ antiforgery }}
       <input type="hidden" name="slug" value="{{ slug | html.escape }}">
@@ -26,6 +27,7 @@
       <input type="hidden" name="slug" value="{{ slug | html.escape }}">
       <button type="submit">{{ t.share.revoke }}</button>
     </form>
+    {{ end }}
   </div>
   {{ else }}
   <form method="post" action="/share" class="share-form">

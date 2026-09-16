@@ -24,6 +24,17 @@ public class ArticleAccessTests
         => Assert.Equal(allowed, ArticleAccess.CanShare(visibility, role));
 
     [Theory]
+    [InlineData(UserRole.Owner, null, 5, true)]
+    [InlineData(UserRole.Owner, 7, 5, true)]
+    [InlineData(UserRole.Reader, 5, 5, true)]
+    [InlineData(UserRole.Reader, 7, 5, false)]
+    // Ссылка без автора выдана до того, как автора стали записывать: она владельческая.
+    [InlineData(UserRole.Reader, null, 5, false)]
+    [InlineData(null, 5, 5, false)]
+    public void Only_the_author_and_the_owner_manage_a_link(UserRole? role, int? authorId, int? userId, bool allowed)
+        => Assert.Equal(allowed, ArticleAccess.CanManageShare(role, authorId, userId));
+
+    [Theory]
     [InlineData(UserRole.Owner, true)]
     [InlineData(UserRole.Reader, false)]
     [InlineData(null, false)]

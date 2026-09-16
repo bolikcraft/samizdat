@@ -19,6 +19,15 @@ public static class ArticleAccess
 
     public static bool CanShare(ArticleVisibility visibility, UserRole? role) => CanRead(visibility, role);
 
+    /// Менять срок и отзывать ссылку может её автор и любой владелец. Ссылка без автора —
+    /// владельческая: она выдана до того, как автора стали записывать, или автора удалили.
+    public static bool CanManageShare(UserRole? role, int? authorId, int? userId) => role switch
+    {
+        UserRole.Owner => true,
+        UserRole.Reader => authorId is not null && authorId == userId,
+        _ => false,
+    };
+
     public static bool CanSwitchVisibility(UserRole? role) => role == UserRole.Owner;
 
     public static bool CanDownload(ArticleVisibility visibility, UserRole? role, DownloadPolicy policy)
