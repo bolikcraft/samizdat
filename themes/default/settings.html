@@ -3,11 +3,9 @@
 {{~## Раздел выбирается якорем: видна панель из :target, а без якоря — первая (правило в стилях).
 Поэтому и кнопки форм возвращают на /settings?...#раздел.
 
-Сообщение об итоге стоит внутри своего раздела и прячется вместе с ним: одно общее над
-разделами оставалось висеть над чужой формой, ведь разделы меняются без перезагрузки. ##~}}
-{{~ capture message_block ~}}
-{{ if message }}<p class="settings-message settings-message-{{ message_kind }}">{{ message | html.escape }}</p>{{ end }}
-{{~ end ~}}
+Итог действия всплывает в углу окна поверх разделов и через несколько секунд гаснет сам.
+Он вне разделов, поэтому виден при любом якоре. ##~}}
+{{ if message }}<p class="toast toast-{{ message_kind }}" role="{{ if message_kind == "err" }}alert{{ else }}status{{ end }}">{{ message | html.escape }}</p>{{ end }}
 <div class="settings-panes">
 
 {{~## Читателю тут открыт один раздел — свой пароль: остальные и не рисуются. Первый видимый
@@ -15,7 +13,6 @@
 {{~ if user && user.is_owner ~}}
 <section class="settings-pane" id="appearance">
   <h2>{{ t.settings.appearance.title }}</h2>
-  {{ if message_section == "appearance" }}{{ message_block }}{{ end }}
 
   <div class="settings-block">
     <form method="post" action="/settings/appearance" class="settings-form">
@@ -125,7 +122,6 @@
 {{~ if user && user.is_owner ~}}
 <section class="settings-pane" id="articles">
   <h2>{{ t.settings.articles.title }}</h2>
-  {{ if message_section == "articles" }}{{ message_block }}{{ end }}
   <p class="hint">{{ t.settings.articles.hint }}</p>
   <form method="post" action="/settings/articles" class="settings-form">
     {{ antiforgery }}
@@ -140,7 +136,6 @@
 
 <section class="settings-pane" id="security">
   <h2>{{ t.settings.password.title }}</h2>
-  {{ if message_section == "security" }}{{ message_block }}{{ end }}
   <form method="post" action="/settings/password" class="settings-form">
     {{ antiforgery }}
     <label>{{ t.settings.password.current }} <input type="password" name="current" autocomplete="current-password"></label>
@@ -152,7 +147,6 @@
 
 <section class="settings-pane" id="language">
   <h2>{{ t.settings.language.title }}</h2>
-  {{ if message_section == "language" }}{{ message_block }}{{ end }}
   <p class="hint">{{ t.settings.language.hint }}</p>
   <form method="post" action="/settings/language" class="settings-form">
     {{ antiforgery }}
@@ -171,7 +165,6 @@
 {{~ if user && user.is_owner ~}}
 <section class="settings-pane" id="people">
   <h2>{{ t.settings.people.title }}</h2>
-  {{ if message_section == "people" }}{{ message_block }}{{ end }}
   <p class="hint">{{ t.settings.people.hint }}</p>
   <form method="post" action="/settings/people" class="settings-form">
     {{ antiforgery }}
@@ -218,7 +211,6 @@
 {{~ if user && user.is_owner ~}}
 <section class="settings-pane" id="signup">
   <h2>{{ t.settings.signup.title }}</h2>
-  {{ if message_section == "signup" }}{{ message_block }}{{ end }}
 
   <div class="settings-block">
     <h3>{{ t.settings.signup.open_title }}</h3>
@@ -327,7 +319,6 @@
 {{~ if user && user.is_owner ~}}
 <section class="settings-pane" id="tokens">
   <h2>{{ t.settings.tokens.title }}</h2>
-  {{ if message_section == "tokens" }}{{ message_block }}{{ end }}
   <p class="hint">{{ t.settings.tokens.hint }} <code>samizdat-server token new</code></p>
   {{ if new_token }}
   <div class="new-token">
@@ -378,7 +369,6 @@
 
 <section class="settings-pane" id="links">
   <h2>{{ t.settings.links.title }}</h2>
-  {{ if message_section == "links" }}{{ message_block }}{{ end }}
   <p class="hint">{{ t.settings.links.hint }}</p>
   {{ if links.size > 0 }}
   <div class="table-scroll">

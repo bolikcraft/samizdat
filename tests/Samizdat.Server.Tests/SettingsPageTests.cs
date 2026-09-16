@@ -190,23 +190,21 @@ public class SettingsPageTests : IDisposable
     }
 
     [Fact]
-    public async Task A_message_stands_inside_the_section_it_belongs_to()
+    public async Task A_message_pops_up_once_over_the_sections()
     {
         var factory = StartFactory();
         AddOwner(factory, "aleks", "тайна");
         var client = await LoginClient(factory, "aleks", "тайна");
 
-        // Разделы переключаются якорем, без перезагрузки. Сообщение над всеми разделами оставалось
-        // висеть над чужой формой: выбрал фон, перешёл на пароль — «фон выбран» ещё тут.
+        // Разделы переключаются якорем, без перезагрузки. Сообщение стоит вне разделов и гаснет само,
+        // поэтому не висит над чужой формой.
         var background = await client.GetStringAsync("/settings?ok=background");
-        Assert.InRange(background.IndexOf("The background is set.", StringComparison.Ordinal),
-                       background.IndexOf("id=\"appearance\"", StringComparison.Ordinal),
-                       background.IndexOf("id=\"security\"", StringComparison.Ordinal));
+        Assert.Contains("<p class=\"toast toast-ok\" role=\"status\">The background is set.</p>", background);
+        Assert.True(background.IndexOf("class=\"toast", StringComparison.Ordinal)
+                    < background.IndexOf("class=\"settings-panes\"", StringComparison.Ordinal));
 
-        var password = await client.GetStringAsync("/settings?ok=password");
-        Assert.InRange(password.IndexOf("The password is changed.", StringComparison.Ordinal),
-                       password.IndexOf("id=\"security\"", StringComparison.Ordinal),
-                       password.IndexOf("id=\"tokens\"", StringComparison.Ordinal));
+        var wrong = await client.GetStringAsync("/settings?err=wrong_password");
+        Assert.Contains("class=\"toast toast-err\" role=\"alert\"", wrong);
     }
 
     [Fact]

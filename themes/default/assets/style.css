@@ -424,16 +424,28 @@ button.is-busy::after {
 .login .invite-note { margin: 0; color: var(--muted); font-size: 0.9rem; }
 .login-register { margin: 0 auto; max-width: 20rem; font-size: 0.9rem; }
 
-.settings-message {
-  margin: 0.6rem 0 1.25rem;
-  padding: 0.6rem 0.9rem;
-  border-left: 3px solid currentColor;
-  border-radius: 6px;
-  font-family: system-ui, sans-serif;
-  font-size: 0.95rem;
+/* Итог действия в настройках. Он гаснет сам, наведение мыши держит его на экране.
+   Ошибка висит дольше: её надо успеть прочитать. */
+.toast {
+  position: fixed; top: 1rem; right: 1rem; z-index: 10;
+  max-width: min(24rem, calc(100vw - 2rem));
+  margin: 0; padding: 0.7rem 1rem;
+  border-left: 3px solid currentColor; border-radius: 6px;
+  background: var(--callout); box-shadow: var(--shadow);
+  font-family: system-ui, sans-serif; font-size: 0.95rem;
+  animation: toast 4s ease forwards;
 }
-.settings-message-ok { background: var(--callout); color: var(--tip); }
-.settings-message-err { background: var(--callout); color: var(--danger); }
+.toast:hover { animation-play-state: paused; }
+.toast-ok { color: var(--tip); }
+.toast-err { color: var(--danger); animation-duration: 9s; }
+@keyframes toast {
+  0% { opacity: 0; transform: translateY(-0.5rem); }
+  6%, 88% { opacity: 1; transform: none; }
+  100% { opacity: 0; transform: translateY(-0.5rem); visibility: hidden; }
+}
+@media (prefers-reduced-motion: reduce) {
+  @keyframes toast { 0%, 95% { opacity: 1; } 100% { opacity: 0; visibility: hidden; } }
+}
 
 /* Настройки занимают окно целиком. Раньше высота страницы шла за высотой раздела, и выбор
    «Токены» вместо «Внешний вид» дёргал всё вверх-вниз. Теперь столбцы всегда во всю высоту,

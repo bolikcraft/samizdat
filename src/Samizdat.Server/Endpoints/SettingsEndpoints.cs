@@ -96,7 +96,6 @@ public static class SettingsEndpoints
                 ["antiforgery"] = AntiforgeryHtml.Field(antiforgery, context),
                 ["message"] = Message(text, ok, err),
                 ["message_kind"] = err is not null ? "err" : ok is not null ? "ok" : null,
-                ["message_section"] = (err ?? ok) is { } code ? SectionOf(code) : null,
                 ["color_scheme"] = settings.ColorScheme,
                 ["site_title"] = settings.Title,
                 ["max_title_length"] = SiteSettings.MaxTitleLength,
