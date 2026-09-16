@@ -178,8 +178,7 @@ public static class PageEndpoints
             var path = files.AttachmentPath(slug, file);
             if (path is null) return NotFound(pages, db, settings, user, antiforgery, context, text);
 
-            var type = ContentTypes.TryGetContentType(path, out var found) ? found : "application/octet-stream";
-            return Results.File(path, type);
+            return AttachmentFile.Serve(context, path);
         });
 
         // Вне группы и без авторизации: css нужен странице входа.

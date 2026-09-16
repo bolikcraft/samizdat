@@ -434,6 +434,25 @@ public class ShareLinkTests : IDisposable
     }
 
     [Fact]
+    public async Task Guest_gets_svg_as_a_download_in_a_sandbox()
+    {
+        using var factory = StartFactory();
+        WriteArticle("statya", "![[shema.svg]]");
+        WriteAttachment("statya", "shema.svg",
+                        "<svg xmlns=\"http://www.w3.org/2000/svg\"><script>alert(1)</script></svg>"u8.ToArray());
+        RegisterArticle(factory, "statya", "Про ежей");
+        var token = AddLink(factory, "statya");
+
+        var response = await factory.CreateClient().GetAsync($"/s/{token}/shema.svg");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("image/svg+xml", response.Content.Headers.ContentType?.MediaType);
+        Assert.Equal("attachment", response.Content.Headers.ContentDisposition?.DispositionType);
+        Assert.StartsWith("sandbox", Assert.Single(response.Headers.GetValues("Content-Security-Policy")));
+        Assert.Equal("nosniff", Assert.Single(response.Headers.GetValues("X-Content-Type-Options")));
+    }
+
+    [Fact]
     public async Task Link_of_one_article_does_not_open_files_of_another()
     {
         using var factory = StartFactory();

@@ -1,5 +1,4 @@
 using System.Security.Claims;
-using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.EntityFrameworkCore;
 using Samizdat.Core;
 using Samizdat.Core.Localization;
@@ -14,8 +13,6 @@ namespace Samizdat.Server.Endpoints;
 
 public static class ShareEndpoints
 {
-    static readonly FileExtensionContentTypeProvider ContentTypes = new();
-
     public static void MapShare(this WebApplication app)
     {
         app.MapGet("/s/{token}", (string token, SamizdatDbContext db, ArticleFiles files,
@@ -100,8 +97,7 @@ public static class ShareEndpoints
             var path = files.AttachmentPath(link.Slug, file);
             if (path is null) return Results.NotFound();
 
-            var type = ContentTypes.TryGetContentType(path, out var found) ? found : "application/octet-stream";
-            return Results.File(path, type);
+            return AttachmentFile.Serve(context, path);
         }).AllowAnonymous();
 
         app.MapPost("/share", async (HttpContext context, SamizdatDbContext db, ClaimsPrincipal user) =>

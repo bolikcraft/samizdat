@@ -364,5 +364,67 @@ public class PageEndpointsTests : IDisposable
         Assert.Contains("script-src 'self'", string.Join(";", response.Headers.GetValues("Content-Security-Policy")));
     }
 
+    [Theory]
+    [InlineData("pic.png", "image/png")]
+    [InlineData("pic.jpg", "image/jpeg")]
+    public async Task Raster_picture_is_served_inline_in_a_sandbox(string name, string type)
+    {
+        WriteArticle("st", "---\ntitle: T\n---\nтекст\n");
+        File.WriteAllBytes(Path.Combine(dataRoot, "articles", "st", name), [1, 2, 3]);
+        var factory = StartFactory();
+        Register(factory, "st", "T");
+        var client = LoginClient(factory);
+
+        var response = await client.GetAsync($"/st/{name}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(type, response.Content.Headers.ContentType?.MediaType);
+        Assert.Null(response.Content.Headers.ContentDisposition);
+        Assert.StartsWith("sandbox", Assert.Single(response.Headers.GetValues("Content-Security-Policy")));
+        Assert.Equal("nosniff", Assert.Single(response.Headers.GetValues("X-Content-Type-Options")));
+    }
+
+    [Fact]
+    public async Task Svg_attachment_is_a_download_in_a_sandbox_but_keeps_its_type_for_img()
+    {
+        WriteArticle("st", "---\ntitle: T\n---\n![[shema.svg]]\n");
+        File.WriteAllText(Path.Combine(dataRoot, "articles", "st", "shema.svg"),
+                          "<svg xmlns=\"http://www.w3.org/2000/svg\"><script>alert(1)</script></svg>");
+        var factory = StartFactory();
+        Register(factory, "st", "T");
+        var client = LoginClient(factory);
+
+        var page = await client.GetStringAsync("/st");
+        var response = await client.GetAsync("/st/shema.svg");
+
+        Assert.Contains("<img src=\"/st/shema.svg\"", page);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        // Без image/svg+xml тег <img> картинку не покажет: nosniff запрещает угадывать тип.
+        Assert.Equal("image/svg+xml", response.Content.Headers.ContentType?.MediaType);
+        Assert.Equal("attachment", response.Content.Headers.ContentDisposition?.DispositionType);
+        Assert.StartsWith("sandbox", Assert.Single(response.Headers.GetValues("Content-Security-Policy")));
+    }
+
+    [Theory]
+    [InlineData("page.html")]
+    [InlineData("data.xml")]
+    [InlineData("doc.pdf")]
+    public async Task Other_attachment_is_an_octet_stream_download(string name)
+    {
+        WriteArticle("st", "---\ntitle: T\n---\nтекст\n");
+        File.WriteAllText(Path.Combine(dataRoot, "articles", "st", name), "<script>alert(1)</script>");
+        var factory = StartFactory();
+        Register(factory, "st", "T");
+        var client = LoginClient(factory);
+
+        var response = await client.GetAsync($"/st/{name}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("application/octet-stream", response.Content.Headers.ContentType?.MediaType);
+        Assert.Equal("attachment", response.Content.Headers.ContentDisposition?.DispositionType);
+        Assert.StartsWith("sandbox", Assert.Single(response.Headers.GetValues("Content-Security-Policy")));
+        Assert.Equal("nosniff", Assert.Single(response.Headers.GetValues("X-Content-Type-Options")));
+    }
+
     public void Dispose() => Directory.Delete(dataRoot, recursive: true);
 }
