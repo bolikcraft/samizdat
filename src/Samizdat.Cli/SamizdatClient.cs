@@ -17,15 +17,17 @@ public sealed class SamizdatClient(HttpClient http)
         => await http.GetFromJsonAsync<Dictionary<string, string>>("/api/state") ?? [];
 
     public async Task PutArticleAsync(string slug, byte[] markdown,
-                                      IReadOnlyCollection<(string Name, byte[] Bytes)> attachments, string folder)
+                                      IReadOnlyCollection<(string Name, byte[] Bytes)> attachments, string folder,
+                                      string name)
     {
         using var content = new MultipartFormDataContent
         {
             { new ByteArrayContent(markdown), "index.md", "index.md" },
             { new StringContent(folder, Encoding.UTF8), "folder" },
+            { new StringContent(name, Encoding.UTF8), "name" },
         };
-        foreach (var (name, bytes) in attachments)
-            content.Add(new ByteArrayContent(bytes), "attachments", name);
+        foreach (var (attachment, bytes) in attachments)
+            content.Add(new ByteArrayContent(bytes), "attachments", attachment);
 
         var response = await http.PutAsync($"/api/articles/{Uri.EscapeDataString(slug)}", content);
         if (!response.IsSuccessStatusCode)

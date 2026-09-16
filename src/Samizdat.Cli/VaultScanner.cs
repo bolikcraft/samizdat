@@ -4,14 +4,16 @@ using Samizdat.Core;
 
 namespace Samizdat.Cli;
 
+/// Name — имя файла без .md: по нему Obsidian разрешает [[ссылку]].
 public sealed record VaultNote(
     string Slug,
     string SourcePath,
     byte[] Markdown,
     IReadOnlyList<(string Name, byte[] Bytes)> Attachments,
-    string Folder)
+    string Folder,
+    string Name)
 {
-    public string Hash => ArticleHash.Compute(Markdown, Attachments, Folder);
+    public string Hash => ArticleHash.Compute(Markdown, Attachments, Folder, Name);
 }
 
 public sealed partial class VaultScanner(string vaultPath)
@@ -51,7 +53,8 @@ public sealed partial class VaultScanner(string vaultPath)
             var relative = Path.GetRelativePath(vaultPath, Path.GetDirectoryName(file)!);
             var folder = relative == "." ? "" : relative.Replace(Path.DirectorySeparatorChar, '/');
 
-            yield return new VaultNote(slug, file, Encoding.UTF8.GetBytes(text), FindAttachments(text), folder);
+            yield return new VaultNote(slug, file, Encoding.UTF8.GetBytes(text), FindAttachments(text), folder,
+                                       Path.GetFileNameWithoutExtension(file));
         }
     }
 

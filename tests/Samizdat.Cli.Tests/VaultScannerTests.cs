@@ -156,5 +156,28 @@ public class VaultScannerTests : IDisposable
         Assert.Empty(new VaultScanner(vault).Scan().Single().Attachments);
     }
 
+    [Fact]
+    public void Note_reports_its_file_name_without_extension()
+    {
+        Note("Папка/Моя заметка.md", "---\ntitle: Как настроить сервер\npublish: true\n---\nx");
+
+        var note = new VaultScanner(vault).Scan().Single();
+
+        Assert.Equal("kak-nastroit-server", note.Slug);
+        Assert.Equal("Моя заметка", note.Name);
+    }
+
+    // Иначе новое имя файла не дойдёт до сервера, и [[Новое имя]] не найдёт статью.
+    [Fact]
+    public void Renaming_the_file_changes_its_hash()
+    {
+        Note("old.md", "---\ntitle: X\nslug: x\npublish: true\n---\nтекст");
+        var before = new VaultScanner(vault).Scan().Single().Hash;
+
+        File.Move(Path.Combine(vault, "old.md"), Path.Combine(vault, "new.md"));
+
+        Assert.NotEqual(before, new VaultScanner(vault).Scan().Single().Hash);
+    }
+
     public void Dispose() => Directory.Delete(vault, recursive: true);
 }
