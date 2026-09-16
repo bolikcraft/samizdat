@@ -1,3 +1,4 @@
+using System.Net;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.StaticFiles;
@@ -18,6 +19,9 @@ namespace Samizdat.Server.Endpoints;
 public static class PageEndpoints
 {
     static readonly FileExtensionContentTypeProvider ContentTypes = new();
+
+    // Логин в кэшированной странице: ячейка общая для всех читателей и для всех владельцев.
+    const string LoginPlaceholder = "__USER_LOGIN__";
 
     public static RouteGroupBuilder MapPages(this WebApplication app)
     {
@@ -149,7 +153,7 @@ public static class PageEndpoints
                     },
                     ["nav"] = Navigation(db, currentSlug: slug, isOwner),
                     ["backlinks"] = Backlinks(db, slug, isOwner),
-                    ["user"] = UserModel(user),
+                    ["user"] = UserModel(user, login: LoginPlaceholder),
                     // Плейсхолдер, не настоящий токен: страница кэшируется по slug и общая для всех
                     // гостей, а токен привязан к cookie конкретной сессии — см. Replace ниже.
                     ["antiforgery"] = AntiforgeryHtml.Placeholder,
@@ -162,6 +166,8 @@ public static class PageEndpoints
             html = html.Replace(SharePanel.Placeholder,
                 SharePanel.Render(pages, db, slug, antiforgery, context,
                                   ArticleAccess.CanShare(row.Visibility, ArticleAccess.RoleOf(user))));
+            // Последней: логин вводит сам человек, плейсхолдеры внутри него заменять нельзя.
+            html = html.Replace(LoginPlaceholder, WebUtility.HtmlEncode(user.Identity?.Name ?? ""));
             return Results.Content(html, "text/html; charset=utf-8");
         });
 
@@ -258,9 +264,9 @@ public static class PageEndpoints
         ["background_color"] = settings.BackgroundColor,
     };
 
-    internal static Dictionary<string, object?> UserModel(ClaimsPrincipal user) => new()
+    internal static Dictionary<string, object?> UserModel(ClaimsPrincipal user, string? login = null) => new()
     {
-        ["login"] = user.Identity!.Name,
+        ["login"] = login ?? user.Identity!.Name,
         ["is_owner"] = ArticleAccess.IsOwner(user),
     };
 

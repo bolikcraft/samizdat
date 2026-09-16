@@ -239,6 +239,30 @@ public class VisibilityTests : IDisposable
         Assert.Contains("href=\"/tayna\"", ownerAgain);
     }
 
+    // Ячейка кэша общая для всех читателей и для всех владельцев. Логин в шапке обязан быть
+    // своим у каждого, хотя остальная страница пришла из кэша.
+    [Theory]
+    [InlineData(UserRole.Reader)]
+    [InlineData(UserRole.Owner)]
+    public async Task Cached_article_page_shows_the_login_of_the_person_who_opens_it(UserRole role)
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        await AddArticle(factory, "otkrytaya", ArticleVisibility.Shared);
+        var ivanLogin = $"ivan-{Guid.NewGuid():N}";
+        var petrLogin = $"petr-{Guid.NewGuid():N}";
+        var ivan = await TestLogin.As(factory, role, ivanLogin);
+        var petr = await TestLogin.As(factory, role, petrLogin);
+
+        var ivanPage = await ivan.GetStringAsync("/otkrytaya");
+        var petrPage = await petr.GetStringAsync("/otkrytaya");
+
+        Assert.Contains($"<summary>{ivanLogin}</summary>", ivanPage);
+        Assert.Contains($"<summary>{petrLogin}</summary>", petrPage);
+        Assert.DoesNotContain(ivanLogin, petrPage);
+        Assert.DoesNotContain("__USER_LOGIN__", petrPage);
+    }
+
     WebApplicationFactory<Program> CreateFactory() =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {

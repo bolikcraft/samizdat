@@ -14,10 +14,11 @@ public static class TestLogin
 
     public static Task<HttpClient> AsReader(WebApplicationFactory<Program> factory) => As(factory, UserRole.Reader);
 
-    static async Task<HttpClient> As(WebApplicationFactory<Program> factory, UserRole role)
+    public static async Task<HttpClient> As(WebApplicationFactory<Program> factory, UserRole role,
+                                            string? login = null)
     {
         const string password = "parol";
-        var login = $"{role}-{Guid.NewGuid():N}";
+        login ??= $"{role}-{Guid.NewGuid():N}";
 
         using (var scope = factory.Services.CreateScope())
         {
