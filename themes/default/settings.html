@@ -27,6 +27,13 @@
           {{ end }}
         </select>
       </label>
+      <label>{{ t.settings.appearance.language }}
+        <select name="language">
+          {{ for item in languages }}
+          <option value="{{ item.code | html.escape }}"{{ if item.selected }} selected{{ end }}>{{ item.name | html.escape }}</option>
+          {{ end }}
+        </select>
+      </label>
       <fieldset class="color-scheme">
         <legend>{{ t.settings.appearance.scheme }}</legend>
         <div class="scheme-choices">
@@ -136,6 +143,24 @@
     <label>{{ t.settings.password.new_password }} <input type="password" name="new" autocomplete="new-password"></label>
     <label>{{ t.settings.password.repeat }} <input type="password" name="new2" autocomplete="new-password"></label>
     <button type="submit">{{ t.settings.password.submit }}</button>
+  </form>
+</section>
+
+<section class="settings-pane" id="language">
+  <h2>{{ t.settings.language.title }}</h2>
+  {{ if message_section == "language" }}{{ message_block }}{{ end }}
+  <p class="hint">{{ t.settings.language.hint }}</p>
+  <form method="post" action="/settings/language" class="settings-form">
+    {{ antiforgery }}
+    <label>{{ t.settings.language.mine }}
+      <select name="language">
+        <option value=""{{ if my_language_follows_site }} selected{{ end }}>{{ t.settings.language.as_site }}</option>
+        {{ for item in languages }}
+        <option value="{{ item.code | html.escape }}"{{ if item.mine }} selected{{ end }}>{{ item.name | html.escape }}</option>
+        {{ end }}
+      </select>
+    </label>
+    <button type="submit">{{ t.settings.save }}</button>
   </form>
 </section>
 

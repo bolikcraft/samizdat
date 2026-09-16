@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Samizdat.Server.Auth;
@@ -55,9 +56,15 @@ public class LanguageTests : IDisposable
         db.SaveChanges();
     }
 
-    static async Task<HttpClient> LoginClient(WebApplicationFactory<Program> factory, string login)
+    // Без автоперехода тест видит сам адрес возврата: за ним стоит код итога, ради которого
+    // форма и отправлялась.
+    static async Task<HttpClient> LoginClient(WebApplicationFactory<Program> factory, string login,
+                                              bool followRedirects = true)
     {
-        var client = factory.CreateClient();
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = followRedirects,
+        });
         await client.PostAsync("/login", new FormUrlEncodedContent(
             new Dictionary<string, string> { ["login"] = login, ["password"] = Password }));
         return client;
@@ -69,11 +76,26 @@ public class LanguageTests : IDisposable
         return await LoginClient(factory, login);
     }
 
-    static async Task<HttpClient> LoginAsReader(WebApplicationFactory<Program> factory, string login, string language)
+    static async Task<HttpClient> LoginAsReader(WebApplicationFactory<Program> factory, string login, string language,
+                                                bool followRedirects = true)
     {
         AddUser(factory, login, UserRole.Reader);
         SetUserLanguage(factory, login, language);
-        return await LoginClient(factory, login);
+        return await LoginClient(factory, login, followRedirects);
+    }
+
+    // Форма достаёт свой antiforgery-токен со страницы — сервер требует его на каждом небезопасном POST.
+    static async Task<HttpResponseMessage> PostLanguage(HttpClient client, string path, string language)
+    {
+        var match = Regex.Match(await client.GetStringAsync("/settings"),
+                                "<input type=\"hidden\" name=\"([^\"]+)\" value=\"([^\"]+)\">");
+        if (!match.Success) throw new InvalidOperationException("Antiforgery-поле не найдено на странице");
+
+        return await client.PostAsync(path, new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            [match.Groups[1].Value] = match.Groups[2].Value,
+            ["language"] = language,
+        }));
     }
 
     async Task AddArticle(WebApplicationFactory<Program> factory, string slug)
@@ -271,5 +293,66 @@ public class LanguageTests : IDisposable
         SetUserLanguage(factory, "reader", "ru");
 
         Assert.Contains("lang=\"ru\"", await reader.GetStringAsync("/ezh"));
+    }
+
+    [Fact]
+    public async Task Owner_sets_the_site_language_from_the_settings_page()
+    {
+        var factory = StartFactory();
+        var client = await LoginAsOwner(factory);
+
+        await PostLanguage(client, "/settings/appearance", "ru");
+
+        Assert.Contains("lang=\"ru\"", await client.GetStringAsync("/"));
+    }
+
+    [Fact]
+    public async Task Reader_sees_the_language_section()
+    {
+        var factory = StartFactory();
+        var reader = await LoginAsReader(factory, "reader", "");
+
+        var page = await reader.GetStringAsync("/settings");
+
+        Assert.Contains("action=\"/settings/language\"", page);
+        Assert.DoesNotContain("action=\"/settings/appearance\"", page);
+    }
+
+    [Fact]
+    public async Task Reader_sets_a_personal_language_and_the_site_stays_as_it_was()
+    {
+        var factory = StartFactory();
+        var reader = await LoginAsReader(factory, "reader", "");
+
+        await PostLanguage(reader, "/settings/language", "ru");
+
+        Assert.Contains("lang=\"ru\"", await reader.GetStringAsync("/"));
+        Assert.Contains("lang=\"en\"", await (await LoginAsOwner(factory)).GetStringAsync("/"));
+    }
+
+    [Fact]
+    public async Task Personal_language_set_back_to_empty_follows_the_site_again()
+    {
+        var factory = StartFactory();
+        SetSiteLanguage(factory, "ru");
+        var reader = await LoginAsReader(factory, "reader", "");
+        await PostLanguage(reader, "/settings/language", "en");
+        Assert.Contains("lang=\"en\"", await reader.GetStringAsync("/"));
+
+        await PostLanguage(reader, "/settings/language", "");
+
+        Assert.Contains("lang=\"ru\"", await reader.GetStringAsync("/"));
+    }
+
+    [Fact]
+    public async Task Unknown_language_in_the_form_is_refused()
+    {
+        var factory = StartFactory();
+        var reader = await LoginAsReader(factory, "reader", "", followRedirects: false);
+
+        var answer = await PostLanguage(reader, "/settings/language", "нет-такого");
+
+        Assert.Contains("err=bad_language", answer.Headers.Location!.OriginalString);
+        Assert.Contains("#language", answer.Headers.Location!.OriginalString);
     }
 }

@@ -45,6 +45,7 @@ public static class SettingsPage
         "bad_person" or "person_short_password" or "login_taken" => "people",
         "last_owner" or "self_delete" or "other_owner" or "own_password" => "people",
         "articles" => "articles",
+        "language" or "bad_language" => "language",
         "invite_created" or "invite_revoked" or "invite_note" or "invite_term" => "signup",
         "signup_open" or "signup_approved" or "signup_rejected" or "not_pending" => "signup",
         _ => "appearance",

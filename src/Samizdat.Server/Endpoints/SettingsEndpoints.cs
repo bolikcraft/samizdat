@@ -34,7 +34,7 @@ public static class SettingsEndpoints
         group.MapGet("/", (PageRenderer pages, SamizdatDbContext db, SiteSettings settings, ClaimsPrincipal user,
                            ThemeFactory themes, IThemeSource theme, BackgroundFile background,
                            IAntiforgery antiforgery, HttpContext context, Translator text,
-                           string? ok, string? err) =>
+                           LanguageCatalog catalog, string? ok, string? err) =>
         {
             // Читателю открыт один раздел — свой пароль, поэтому чужие списки ему и не собираем.
             var isOwner = ArticleAccess.IsOwner(user);
@@ -109,6 +109,15 @@ public static class SettingsEndpoints
                     ["name"] = name,
                     ["selected"] = name == settings.ThemeName,
                 }).ToList(),
+                // Один список на два выбора: язык сайта у владельца и свой язык у каждого.
+                ["languages"] = catalog.Available().Select(language => new Dictionary<string, object?>
+                {
+                    ["code"] = language.Code,
+                    ["name"] = language.Name,
+                    ["selected"] = language.Code == settings.Language,
+                    ["mine"] = language.Code == person.Language,
+                }).ToList(),
+                ["my_language_follows_site"] = person.Language.Length == 0,
                 ["new_token"] = newToken,
                 ["tokens"] = tokens.Select(token => new Dictionary<string, object?>
                 {
@@ -145,17 +154,37 @@ public static class SettingsEndpoints
             return Ok("password");
         }).RequireValidToken();
 
-        group.MapPost("/appearance", async (HttpContext context, SiteSettings settings, ThemeFactory themes) =>
+        group.MapPost("/appearance", async (HttpContext context, SiteSettings settings, ThemeFactory themes,
+                                            LanguageCatalog catalog) =>
         {
             var form = await context.Request.ReadFormAsync();
             var theme = form["theme"].ToString();
             var colorScheme = form["color_scheme"].ToString();
+            var language = form["language"].ToString();
 
             if (themes.AvailableThemes().Contains(theme)) settings.Set("theme.name", theme);
             if (colorScheme is "light" or "dark" or "system") settings.Set("theme.color_scheme", colorScheme);
+            if (catalog.Has(language)) settings.Set("site.language", language);
 
             return Ok("appearance");
         }).RequireValidToken().OwnerOnly();
+
+        // Свой язык — раздел для всех вошедших, поэтому без OwnerOnly: читателю он тоже нужен.
+        group.MapPost("/language", async (HttpContext context, SamizdatDbContext db, LanguageCatalog catalog,
+                                          ClaimsPrincipal user) =>
+        {
+            var form = await context.Request.ReadFormAsync();
+            var wanted = form["language"].ToString();
+
+            if (CurrentUser(db, user) is not { } person) return LoggedOut();
+
+            // Пусто — «как на сайте», это разрешено. Всё прочее должно быть живым пакетом.
+            if (wanted.Length > 0 && !catalog.Has(wanted)) return Err("bad_language");
+
+            person.Language = wanted;
+            db.SaveChanges();
+            return Ok("language");
+        }).RequireValidToken();
 
         group.MapPost("/articles", async (HttpContext context, SiteSettings settings) =>
         {
