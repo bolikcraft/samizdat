@@ -61,9 +61,19 @@
     }
   });
 
+  // Сохранения в пути по имени формы: "busy" или "again", если галку сменили до ответа.
+  // pointer-events не держит клавиатуру, поэтому второй запрос не шлём, а ждём первый.
+  var saving = {};
+
+  function liveForm(name) {
+    return document.querySelector('form[data-autosave="' + name + '"]');
+  }
+
   // Обработчик делегирован: форма после сохранения подменяется свежей из ответа.
   function save(form) {
     var name = form.getAttribute("data-autosave");
+    if (saving[name]) { saving[name] = "again"; return; }
+    saving[name] = "busy";
     form.classList.add("is-saving");
 
     fetch(form.action, {
@@ -75,16 +85,28 @@
       if (!response.ok) throw new Error("HTTP " + response.status);
       return response.text();
     }).then(function (html) {
+      var live = liveForm(name);
+      var again = saving[name] === "again";
+      delete saving[name];
+      // Ответ уже устарел: на экране новое состояние, его и отправляем.
+      if (again) { save(live); return; }
+
       var fresh = new DOMParser().parseFromString(html, "text/html");
       var next = fresh.querySelector('form[data-autosave="' + name + '"]');
       if (!next) throw new Error("form " + name + " is missing");
 
+      var focused = live.contains(document.activeElement) ? document.activeElement.name : null;
       hideButtons(next);
-      form.replaceWith(next);
+      live.replaceWith(next);
+      if (focused) {
+        var control = next.querySelector('[name="' + focused + '"]');
+        if (control) control.focus();
+      }
       showToast(fresh.querySelector(".toast"));
     }).catch(function () {
       // Отказ сервера или обрыв: отправляем форму по-настоящему, браузер покажет ответ как есть.
-      form.submit();
+      delete saving[name];
+      liveForm(name).submit();
     });
   }
 
