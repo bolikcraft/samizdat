@@ -62,6 +62,7 @@
   "settings.appearance.own_image": "Своя картинка",
   "settings.appearance.scheme": "Цветовая схема",
   "settings.appearance.site_title": "Название сайта",
+  "settings.appearance.site_title_hint": "Не длиннее {0} символов.",
   "settings.appearance.system": "Как в системе",
   "settings.appearance.theme": "Тема",
   "settings.appearance.title": "Внешний вид",

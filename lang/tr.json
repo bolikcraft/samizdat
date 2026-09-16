@@ -62,6 +62,7 @@
   "settings.appearance.own_image": "Kendi görseliniz",
   "settings.appearance.scheme": "Renk şeması",
   "settings.appearance.site_title": "Site adı",
+  "settings.appearance.site_title_hint": "En fazla {0} karakter.",
   "settings.appearance.system": "Sistemle aynı",
   "settings.appearance.theme": "Tema",
   "settings.appearance.title": "Görünüm",

@@ -693,6 +693,7 @@ public class SettingsPageTests : IDisposable
         Assert.Contains("<span class=\"top-title\">Записки &lt;Алекса&gt;</span>", index);
         Assert.Contains("name=\"title\" value=\"Записки &lt;Алекса&gt;\"", settings);
         Assert.Contains("maxlength=\"60\"", settings);
+        Assert.Contains("<small id=\"site-title-hint\" class=\"field-hint\">Up to 60 characters.</small>", settings);
     }
 
     [Theory]

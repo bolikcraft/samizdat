@@ -62,6 +62,7 @@
   "settings.appearance.own_image": "Twój obraz",
   "settings.appearance.scheme": "Schemat kolorów",
   "settings.appearance.site_title": "Nazwa witryny",
+  "settings.appearance.site_title_hint": "Maksymalnie {0} znaków.",
   "settings.appearance.system": "Jak w systemie",
   "settings.appearance.theme": "Motyw",
   "settings.appearance.title": "Wygląd",

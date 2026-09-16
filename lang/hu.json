@@ -62,6 +62,7 @@
   "settings.appearance.own_image": "Saját kép",
   "settings.appearance.scheme": "Színséma",
   "settings.appearance.site_title": "A webhely neve",
+  "settings.appearance.site_title_hint": "Legfeljebb {0} karakter.",
   "settings.appearance.system": "Mint a rendszerben",
   "settings.appearance.theme": "Téma",
   "settings.appearance.title": "Megjelenés",

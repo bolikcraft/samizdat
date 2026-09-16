@@ -28,7 +28,8 @@
         </select>
       </label>
       <label>{{ t.settings.appearance.site_title }}
-        <input type="text" name="title" value="{{ site_title | html.escape }}" maxlength="{{ max_title_length }}" required>
+        <input type="text" name="title" value="{{ site_title | html.escape }}" maxlength="{{ max_title_length }}" required aria-describedby="site-title-hint">
+        <small id="site-title-hint" class="field-hint">{{ t.settings.appearance.site_title_hint | string.replace "{0}" max_title_length }}</small>
       </label>
       <label>{{ t.settings.appearance.language }}
         <select name="language">

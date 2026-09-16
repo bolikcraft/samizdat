@@ -62,6 +62,7 @@
   "settings.appearance.own_image": "Eigen afbeelding",
   "settings.appearance.scheme": "Kleurenschema",
   "settings.appearance.site_title": "Naam van de site",
+  "settings.appearance.site_title_hint": "Maximaal {0} tekens.",
   "settings.appearance.system": "Zoals het systeem",
   "settings.appearance.theme": "Thema",
   "settings.appearance.title": "Uiterlijk",

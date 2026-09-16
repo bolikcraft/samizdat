@@ -62,6 +62,7 @@
   "settings.appearance.own_image": "Свая карцінка",
   "settings.appearance.scheme": "Колеравая схема",
   "settings.appearance.site_title": "Назва сайта",
+  "settings.appearance.site_title_hint": "Не больш за {0} знакаў.",
   "settings.appearance.system": "Як у сістэме",
   "settings.appearance.theme": "Тэма",
   "settings.appearance.title": "Знешні выгляд",

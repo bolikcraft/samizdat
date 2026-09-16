@@ -62,6 +62,7 @@
   "settings.appearance.own_image": "La tua immagine",
   "settings.appearance.scheme": "Schema di colori",
   "settings.appearance.site_title": "Nome del sito",
+  "settings.appearance.site_title_hint": "Al massimo {0} caratteri.",
   "settings.appearance.system": "Come nel sistema",
   "settings.appearance.theme": "Tema",
   "settings.appearance.title": "Aspetto",

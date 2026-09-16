@@ -62,6 +62,7 @@
   "settings.appearance.own_image": "내 그림",
   "settings.appearance.scheme": "색 구성",
   "settings.appearance.site_title": "사이트 이름",
+  "settings.appearance.site_title_hint": "최대 {0}자.",
   "settings.appearance.system": "시스템과 같게",
   "settings.appearance.theme": "테마",
   "settings.appearance.title": "모양",
