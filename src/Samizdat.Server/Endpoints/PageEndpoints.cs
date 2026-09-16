@@ -152,7 +152,7 @@ public static class PageEndpoints
                         ["download_label"] = asZip ? ".zip" : ".md",
                     },
                     ["nav"] = Navigation(db, currentSlug: slug, isOwner),
-                    ["backlinks"] = Backlinks(db, row, isOwner),
+                    ["backlinks"] = Backlinks(db, row, isOwner, articles),
                     ["user"] = UserModel(user, login: LoginPlaceholder),
                     // Плейсхолдер, не настоящий токен: страница кэшируется по slug и общая для всех
                     // гостей, а токен привязан к cookie конкретной сессии — см. Replace ниже.
@@ -273,13 +273,13 @@ public static class PageEndpoints
     /// Кто ссылается на эту статью. Блок лежит внутри кэша страницы и обновляется вместе с
     /// отпечатком каталога: тот меняется при выкладке или удалении статьи, а также после reindex —
     /// у CatalogFingerprint для этого своя метка в настройках.
-    static List<Dictionary<string, object?>> Backlinks(SamizdatDbContext db, ArticleRow target, bool isOwner)
+    static List<Dictionary<string, object?>> Backlinks(SamizdatDbContext db, ArticleRow target, bool isOwner,
+                                                        DbArticleLookup articles)
     {
         // Ссылку по имени файла засчитываем, только если рендер сам привёл бы её сюда. Иначе блок
         // показал бы источник, где эта ссылка ведёт на статью со slug, равным этому имени.
         List<string> aliases = [target.Slug];
-        if (target.NoteName is { } name && name != target.Slug
-            && new DbArticleLookup(db, isOwner).Resolve(name) == target.Slug)
+        if (target.NoteName is { } name && name != target.Slug && articles.Resolve(name) == target.Slug)
             aliases.Add(name);
 
         return db.Articles

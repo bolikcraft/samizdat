@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
@@ -108,6 +109,40 @@ public class BacklinkTests(DatabaseFixture database) : IDisposable
 
         Assert.Contains("Тайна", html);
         Assert.DoesNotContain("href=\"/tayna\"", html);
+    }
+
+    [Fact]
+    public async Task Reader_wikilink_by_note_name_to_a_closed_article_does_not_resolve()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        var api = TestPublisher.ClientWithToken(factory);
+        (await TestPublisher.Push(api, "kak-nastroit-server", "---\ntitle: Как настроить сервер\n---\n\nтекст",
+                                  name: "Моя тайная заметка")).EnsureSuccessStatusCode();
+        (await TestPublisher.Push(api, "dom", "---\ntitle: Дом\n---\n\nсм. [[Моя тайная заметка]]"))
+            .EnsureSuccessStatusCode();
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+            db.Articles.Single(row => row.Slug == "dom").Visibility = ArticleVisibility.Shared;
+            db.SaveChanges();
+        }
+
+        var client = await TestLogin.AsReader(factory);
+        var html = await client.GetStringAsync("/dom");
+        // Не по всей странице: закрытая статья законно видна плейсхолдером в дереве навигации,
+        // а нас интересует именно вики-ссылка внутри текста статьи.
+        var body = html[html.IndexOf("<article>", StringComparison.Ordinal)
+                        ..html.IndexOf("</article>", StringComparison.Ordinal)];
+
+        Assert.DoesNotContain("href=\"/kak-nastroit-server\"", body);
+        Assert.DoesNotContain("Как настроить сервер", body);
+
+        // Закрытая статья остаётся закрытой и напрямую: «Упоминается в» читателю не видно вовсе.
+        var forbidden = await client.GetAsync("/kak-nastroit-server");
+        Assert.Equal(HttpStatusCode.Forbidden, forbidden.StatusCode);
+        Assert.DoesNotContain("These articles mention it", await forbidden.Content.ReadAsStringAsync());
     }
 
     [Fact]
