@@ -30,7 +30,7 @@ public class PeopleTests : IDisposable
             new() { ["login"] = "ivan", ["password"] = "parol-ivana" });
 
         Assert.Equal(HttpStatusCode.Redirect, answer.StatusCode);
-        Assert.Equal("/settings?ok=person_added#people", answer.Headers.Location?.ToString());
+        Assert.Equal("/settings?ok=person_added#users", answer.Headers.Location?.ToString());
         Assert.Equal(UserRole.Reader, Users(factory).Single(row => row.Login == "ivan").Role);
 
         Assert.Equal(HttpStatusCode.Redirect, (await TryLogin(factory, "ivan", "parol-ivana")).StatusCode);
@@ -86,7 +86,7 @@ public class PeopleTests : IDisposable
             new() { ["login"] = "ivan", ["password"] = "drugoy-parol" });
 
         Assert.Equal(HttpStatusCode.Redirect, answer.StatusCode);
-        Assert.Equal("/settings?err=login_taken#people", answer.Headers.Location?.ToString());
+        Assert.Equal("/settings?err=login_taken#users", answer.Headers.Location?.ToString());
         Assert.Single(Users(factory), row => row.Login == "ivan");
 
         // Пароль занятого логина не тронут: отказ не должен менять чужую учётку.
@@ -105,7 +105,7 @@ public class PeopleTests : IDisposable
         var answer = await Post(owner, "/settings/people",
             new() { ["login"] = "Ivan", ["password"] = "drugoy-parol" });
 
-        Assert.Equal("/settings?err=login_taken#people", answer.Headers.Location?.ToString());
+        Assert.Equal("/settings?err=login_taken#users", answer.Headers.Location?.ToString());
         Assert.Single(Users(factory), row => row.Login == "ivan");
     }
 
@@ -130,7 +130,7 @@ public class PeopleTests : IDisposable
         var answer = await Post(owner, "/settings/people",
             new() { ["login"] = "  ", ["password"] = "parol-ivana" });
 
-        Assert.Equal("/settings?err=bad_person#people", answer.Headers.Location?.ToString());
+        Assert.Equal("/settings?err=bad_person#users", answer.Headers.Location?.ToString());
         Assert.Single(Users(factory));
     }
 
@@ -145,7 +145,7 @@ public class PeopleTests : IDisposable
         var answer = await Post(owner, "/settings/people",
             new() { ["login"] = "ivan", ["password"] = "korotko" });
 
-        Assert.Equal("/settings?err=person_short_password#people", answer.Headers.Location?.ToString());
+        Assert.Equal("/settings?err=person_short_password#users", answer.Headers.Location?.ToString());
         Assert.DoesNotContain(Users(factory), row => row.Login == "ivan");
     }
 
@@ -161,7 +161,7 @@ public class PeopleTests : IDisposable
         var answer = await Post(owner, $"/settings/people/{ivan}/password",
             new() { ["password"] = "korotko" });
 
-        Assert.Equal("/settings?err=person_short_password#people", answer.Headers.Location?.ToString());
+        Assert.Equal("/settings?err=person_short_password#users", answer.Headers.Location?.ToString());
         Assert.Equal(HttpStatusCode.Redirect, (await TryLogin(factory, "ivan", "staryy-parol")).StatusCode);
     }
 
@@ -193,7 +193,7 @@ public class PeopleTests : IDisposable
             new() { ["password"] = "novyy-parol" });
 
         Assert.Equal(HttpStatusCode.Redirect, answer.StatusCode);
-        Assert.Equal("/settings?ok=person_password#people", answer.Headers.Location?.ToString());
+        Assert.Equal("/settings?ok=person_password#users", answer.Headers.Location?.ToString());
         Assert.Equal(HttpStatusCode.OK, (await TryLogin(factory, "ivan", "staryy-parol")).StatusCode);
         Assert.Equal(HttpStatusCode.Redirect, (await TryLogin(factory, "ivan", "novyy-parol")).StatusCode);
     }
@@ -211,7 +211,7 @@ public class PeopleTests : IDisposable
         var answer = await Post(owner, $"/settings/people/{ivan}/delete", []);
 
         Assert.Equal(HttpStatusCode.Redirect, answer.StatusCode);
-        Assert.Equal("/settings?ok=person_deleted#people", answer.Headers.Location?.ToString());
+        Assert.Equal("/settings?ok=person_deleted#users", answer.Headers.Location?.ToString());
 
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
@@ -231,7 +231,7 @@ public class PeopleTests : IDisposable
         var owner = await Login(factory, "hozyain", "parol");
         var answer = await Post(owner, $"/settings/people/{gost}/delete", []);
 
-        Assert.Equal("/settings?err=not_pending#signup", answer.Headers.Location?.ToString());
+        Assert.Equal("/settings?err=not_pending#users", answer.Headers.Location?.ToString());
         Assert.Contains(Users(factory), row => row.Login == "gost");
     }
 
@@ -246,7 +246,7 @@ public class PeopleTests : IDisposable
         var answer = await Post(client, $"/settings/people/{owner}/delete", []);
 
         Assert.Equal(HttpStatusCode.Redirect, answer.StatusCode);
-        Assert.Equal("/settings?err=last_owner#people", answer.Headers.Location?.ToString());
+        Assert.Equal("/settings?err=last_owner#users", answer.Headers.Location?.ToString());
         Assert.Single(Users(factory), row => row.Login == "hozyain");
     }
 
@@ -261,7 +261,7 @@ public class PeopleTests : IDisposable
         var client = await Login(factory, "hozyain", "parol-hozyaina");
         var answer = await Post(client, $"/settings/people/{owner}/delete", []);
 
-        Assert.Equal("/settings?err=self_delete#people", answer.Headers.Location?.ToString());
+        Assert.Equal("/settings?err=self_delete#users", answer.Headers.Location?.ToString());
         Assert.Equal(2, Users(factory).Count);
     }
 
@@ -276,7 +276,7 @@ public class PeopleTests : IDisposable
         var client = await Login(factory, "hozyain", "parol-hozyaina");
         var answer = await Post(client, $"/settings/people/{other}/delete", []);
 
-        Assert.Equal("/settings?err=other_owner#people", answer.Headers.Location?.ToString());
+        Assert.Equal("/settings?err=other_owner#users", answer.Headers.Location?.ToString());
         Assert.Single(Users(factory), row => row.Login == "vtoroy");
     }
 
@@ -292,7 +292,7 @@ public class PeopleTests : IDisposable
         var answer = await Post(client, $"/settings/people/{other}/password",
             new() { ["password"] = "chuzhoy-parol" });
 
-        Assert.Equal("/settings?err=other_owner#people", answer.Headers.Location?.ToString());
+        Assert.Equal("/settings?err=other_owner#users", answer.Headers.Location?.ToString());
         Assert.Equal(HttpStatusCode.Redirect, (await TryLogin(factory, "vtoroy", "parol-vtorogo")).StatusCode);
     }
 
@@ -307,7 +307,7 @@ public class PeopleTests : IDisposable
         var answer = await Post(client, $"/settings/people/{owner}/password",
             new() { ["password"] = "novyy-parol" });
 
-        Assert.Equal("/settings?err=own_password#people", answer.Headers.Location?.ToString());
+        Assert.Equal("/settings?err=own_password#users", answer.Headers.Location?.ToString());
         Assert.Equal(HttpStatusCode.Redirect, (await TryLogin(factory, "hozyain", "parol-hozyaina")).StatusCode);
     }
 
@@ -398,7 +398,7 @@ public class PeopleTests : IDisposable
         });
 
         Assert.Equal(HttpStatusCode.Redirect, answer.StatusCode);
-        Assert.Equal("/settings?ok=password#security", answer.Headers.Location?.ToString());
+        Assert.Equal("/settings?ok=password#profile", answer.Headers.Location?.ToString());
         Assert.Equal(HttpStatusCode.Redirect, (await TryLogin(factory, "ivan", "novyy-parol")).StatusCode);
     }
 

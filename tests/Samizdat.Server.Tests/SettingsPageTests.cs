@@ -185,8 +185,8 @@ public class SettingsPageTests : IDisposable
         var password = await client.PostAsync("/settings/password", new FormUrlEncodedContent(
             new Dictionary<string, string> { [name] = value, ["current"] = "неверно", ["new"] = "x", ["new2"] = "x" }));
 
-        Assert.Equal("/settings?ok=appearance#appearance", appearance.Headers.Location?.OriginalString);
-        Assert.Equal("/settings?err=wrong_password#security", password.Headers.Location?.OriginalString);
+        Assert.Equal("/settings?ok=look#look", appearance.Headers.Location?.OriginalString);
+        Assert.Equal("/settings?err=wrong_password#profile", password.Headers.Location?.OriginalString);
     }
 
     [Fact]
@@ -686,7 +686,7 @@ public class SettingsPageTests : IDisposable
         var index = await client.GetStringAsync("/");
         var settings = await client.GetStringAsync("/settings");
 
-        Assert.Equal("/settings?ok=appearance#appearance", response.Headers.Location?.OriginalString);
+        Assert.Equal("/settings?ok=general#general", response.Headers.Location?.OriginalString);
         Assert.Contains("<title>Записки &lt;Алекса&gt;</title>", index);
         Assert.Contains("<span class=\"top-title\">Записки &lt;Алекса&gt;</span>", index);
         Assert.Contains("name=\"title\" value=\"Записки &lt;Алекса&gt;\"", settings);
@@ -711,7 +711,7 @@ public class SettingsPageTests : IDisposable
         var index = await client.GetStringAsync("/");
         var settings = await client.GetStringAsync("/settings");
 
-        Assert.Equal("/settings?ok=appearance#appearance", response.Headers.Location?.OriginalString);
+        Assert.Equal("/settings?ok=general#general", response.Headers.Location?.OriginalString);
         // Без текста ссылку на главную называет сама иконка, а вкладке нужно хоть какое-то имя.
         Assert.Matches("<a class=\"top-home\" href=\"/\"><img src=\"/assets/icon.svg\" alt=\"Samizdat\"[^>]*></a>", index);
         Assert.DoesNotContain("top-title", index);
@@ -732,7 +732,7 @@ public class SettingsPageTests : IDisposable
 
         var tooLong = await client.PostAsync("/settings/appearance", new FormUrlEncodedContent(
             new Dictionary<string, string> { [name] = value, ["title"] = new string('я', SiteSettings.MaxTitleLength + 1) }));
-        Assert.Equal("/settings?err=bad_title#appearance", tooLong.Headers.Location?.OriginalString);
+        Assert.Equal("/settings?err=bad_title#general", tooLong.Headers.Location?.OriginalString);
         Assert.Contains("<title>Samizdat</title>", await client.GetStringAsync("/"));
         Assert.Contains("The site name must not be longer than 60 characters.",
                         await client.GetStringAsync("/settings?err=bad_title"));
@@ -740,7 +740,7 @@ public class SettingsPageTests : IDisposable
         var exact = new string('я', SiteSettings.MaxTitleLength);
         var fits = await client.PostAsync("/settings/appearance", new FormUrlEncodedContent(
             new Dictionary<string, string> { [name] = value, ["title"] = exact }));
-        Assert.Equal("/settings?ok=appearance#appearance", fits.Headers.Location?.OriginalString);
+        Assert.Equal("/settings?ok=general#general", fits.Headers.Location?.OriginalString);
         Assert.Contains($"<title>{exact}</title>", await client.GetStringAsync("/"));
     }
 
@@ -759,7 +759,7 @@ public class SettingsPageTests : IDisposable
         var response = await client.PostAsync("/settings/appearance", new FormUrlEncodedContent(
             new Dictionary<string, string> { [name] = value, ["title"] = title }));
 
-        Assert.Equal("/settings?ok=appearance#appearance", response.Headers.Location?.OriginalString);
+        Assert.Equal("/settings?ok=general#general", response.Headers.Location?.OriginalString);
     }
 
     [Fact]
@@ -796,25 +796,27 @@ public class SettingsPageTests : IDisposable
             new Dictionary<string, string> { ["login"] = "aleks", ["password"] = "тайна" }));
         var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
 
-        // Снятый флажок форма не присылает: есть только название.
-        var response = await client.PostAsync("/settings/appearance", new FormUrlEncodedContent(
+        await client.PostAsync("/settings/appearance", new FormUrlEncodedContent(
             new Dictionary<string, string> { [name] = value, ["title"] = "Записки" }));
+        // Снятый флажок форма не присылает: приходит только метка формы.
+        var response = await client.PostAsync("/settings/appearance", new FormUrlEncodedContent(
+            new Dictionary<string, string> { [name] = value, ["show_title_form"] = "1" }));
         var index = await client.GetStringAsync("/");
         var settings = await client.GetStringAsync("/settings");
 
-        Assert.Equal("/settings?ok=appearance#appearance", response.Headers.Location?.OriginalString);
+        Assert.Equal("/settings?ok=general#general", response.Headers.Location?.OriginalString);
         Assert.DoesNotContain("<h1>", index);
         Assert.Contains("<span class=\"top-title\">Записки</span>", index);
         Assert.Contains("name=\"show_title\" value=\"on\">", settings);
 
         await client.PostAsync("/settings/appearance", new FormUrlEncodedContent(
-            new Dictionary<string, string> { [name] = value, ["title"] = "Записки", ["show_title"] = "on" }));
+            new Dictionary<string, string> { [name] = value, ["show_title_form"] = "1", ["show_title"] = "on" }));
 
         Assert.Contains("<h1>Записки</h1>", await client.GetStringAsync("/"));
     }
 
     [Fact]
-    public async Task A_form_without_the_title_field_leaves_the_show_title_switch_alone()
+    public async Task A_form_without_the_switch_mark_leaves_the_show_title_switch_alone()
     {
         var factory = StartFactory();
         AddOwner(factory, "aleks", "тайна");
@@ -823,9 +825,33 @@ public class SettingsPageTests : IDisposable
             new Dictionary<string, string> { ["login"] = "aleks", ["password"] = "тайна" }));
         var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
 
+        // Название и схема сохраняются своими формами и флажок не трогают.
+        await client.PostAsync("/settings/appearance", new FormUrlEncodedContent(
+            new Dictionary<string, string> { [name] = value, ["title"] = "Samizdat" }));
         await client.PostAsync("/settings/appearance", new FormUrlEncodedContent(
             new Dictionary<string, string> { [name] = value, ["color_scheme"] = "dark" }));
 
         Assert.Contains("<h1>Samizdat</h1>", await client.GetStringAsync("/"));
+    }
+
+    [Theory]
+    [InlineData("title", "Samizdat", "/settings?ok=general#general")]
+    [InlineData("show_title_form", "1", "/settings?ok=general#general")]
+    [InlineData("language", "en", "/settings?ok=general#general")]
+    [InlineData("theme", "default", "/settings?ok=look#look")]
+    [InlineData("color_scheme", "dark", "/settings?ok=look#look")]
+    public async Task An_appearance_form_returns_to_the_section_of_its_fields(string field, string fieldValue, string location)
+    {
+        var factory = StartFactory();
+        AddOwner(factory, "aleks", "тайна");
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        await client.PostAsync("/login", new FormUrlEncodedContent(
+            new Dictionary<string, string> { ["login"] = "aleks", ["password"] = "тайна" }));
+        var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
+
+        var response = await client.PostAsync("/settings/appearance", new FormUrlEncodedContent(
+            new Dictionary<string, string> { [name] = value, [field] = fieldValue }));
+
+        Assert.Equal(location, response.Headers.Location?.OriginalString);
     }
 }

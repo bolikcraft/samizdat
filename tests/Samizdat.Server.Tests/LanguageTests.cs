@@ -353,6 +353,6 @@ public class LanguageTests : IDisposable
         var answer = await PostLanguage(reader, "/settings/language", "нет-такого");
 
         Assert.Contains("err=bad_language", answer.Headers.Location!.OriginalString);
-        Assert.Contains("#language", answer.Headers.Location!.OriginalString);
+        Assert.Contains("#profile", answer.Headers.Location!.OriginalString);
     }
 }

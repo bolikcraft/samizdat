@@ -36,20 +36,20 @@ public static class SettingsPage
 
     /// Раздел, которому принадлежит итог действия.
     // Отсюда берётся якорь возврата: после сохранения открыт тот же раздел.
-    // Незнакомый код уходит в первый раздел: его же показывает страница без якоря.
+    // Незнакомый код — это фон и оформление: у них много своих кодов.
     internal static string SectionOf(string code) => code switch
     {
-        "password" or "wrong_password" or "short_password" or "password_mismatch" => "security",
-        "token_created" or "token_note" or "token_revoked" => "tokens",
-        "link_revoked" => "links",
-        "person_added" or "person_password" or "person_deleted" => "people",
-        "bad_person" or "person_short_password" or "login_taken" => "people",
-        "last_owner" or "self_delete" or "other_owner" or "own_password" => "people",
-        "articles" => "articles",
-        "language" or "bad_language" => "language",
-        "invite_created" or "invite_revoked" or "invite_note" or "invite_term" => "signup",
-        "signup_open" or "signup_approved" or "signup_rejected" or "not_pending" => "signup",
-        _ => "appearance",
+        "password" or "wrong_password" or "short_password" or "password_mismatch" => "profile",
+        "language" or "bad_language" => "profile",
+        "general" or "bad_title" => "general",
+        "token_created" or "token_note" or "token_revoked" => "api",
+        "link_revoked" or "articles" => "publishing",
+        "person_added" or "person_password" or "person_deleted" => "users",
+        "bad_person" or "person_short_password" or "login_taken" => "users",
+        "last_owner" or "self_delete" or "other_owner" or "own_password" => "users",
+        "invite_created" or "invite_revoked" or "invite_note" or "invite_term" => "users",
+        "signup_open" or "signup_approved" or "signup_rejected" or "not_pending" => "users",
+        _ => "look",
     };
 
     internal static string? Message(Translator text, string? ok, string? err)

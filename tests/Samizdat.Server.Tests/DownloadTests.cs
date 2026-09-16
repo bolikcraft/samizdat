@@ -519,7 +519,7 @@ public class DownloadTests : IDisposable
                                 new() { ["readers"] = "on", ["guests"] = "on" });
 
         Assert.Equal(HttpStatusCode.Redirect, answer.StatusCode);
-        Assert.Equal("/settings?ok=articles#articles", answer.Headers.Location?.ToString());
+        Assert.Equal("/settings?ok=articles#publishing", answer.Headers.Location?.ToString());
 
         using var scope = factory.Services.CreateScope();
         Assert.Equal(new DownloadPolicy(true, true),

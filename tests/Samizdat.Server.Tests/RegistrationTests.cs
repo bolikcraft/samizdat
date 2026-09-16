@@ -252,7 +252,7 @@ public class RegistrationTests : IDisposable
             new() { ["note"] = "для Ивана", ["days"] = "7" });
 
         Assert.Equal(HttpStatusCode.Redirect, answer.StatusCode);
-        Assert.Equal("/settings?ok=invite_created#signup", answer.Headers.Location?.ToString());
+        Assert.Equal("/settings?ok=invite_created#users", answer.Headers.Location?.ToString());
 
         var invite = Invites(factory).Single();
         Assert.Equal("для Ивана", invite.Note);
@@ -274,7 +274,7 @@ public class RegistrationTests : IDisposable
 
         var answer = await Post(owner, $"/settings/invites/{id}/revoke", new());
 
-        Assert.Equal("/settings?ok=invite_revoked#signup", answer.Headers.Location?.ToString());
+        Assert.Equal("/settings?ok=invite_revoked#users", answer.Headers.Location?.ToString());
         Assert.Equal(HttpStatusCode.Gone,
             (await factory.CreateClient().GetAsync($"/i/{token}")).StatusCode);
     }
@@ -303,7 +303,7 @@ public class RegistrationTests : IDisposable
 
         var answer = await Post(owner, "/settings/invites", new() { ["days"] = "9999" });
 
-        Assert.Equal("/settings?err=invite_term#signup", answer.Headers.Location?.ToString());
+        Assert.Equal("/settings?err=invite_term#users", answer.Headers.Location?.ToString());
         Assert.Empty(Invites(factory));
     }
 
@@ -509,7 +509,7 @@ public class RegistrationTests : IDisposable
         var owner = await Login(factory, "hozyain", "parol-hozyaina");
 
         var on = await Post(owner, "/settings/signup/open", new() { ["open"] = "on" });
-        Assert.Equal("/settings?ok=signup_open#signup", on.Headers.Location?.ToString());
+        Assert.Equal("/settings?ok=signup_open#users", on.Headers.Location?.ToString());
         Assert.Equal(HttpStatusCode.OK, (await factory.CreateClient().GetAsync("/register")).StatusCode);
 
         await Post(owner, "/settings/signup/open", new());
@@ -529,7 +529,7 @@ public class RegistrationTests : IDisposable
 
         var answer = await Post(owner, $"/settings/signup/{id}/approve", new());
 
-        Assert.Equal("/settings?ok=signup_approved#signup", answer.Headers.Location?.ToString());
+        Assert.Equal("/settings?ok=signup_approved#users", answer.Headers.Location?.ToString());
         Assert.Equal(HttpStatusCode.Redirect, (await TryLogin(factory, "gost", "parol-gostya")).StatusCode);
     }
 
@@ -545,7 +545,7 @@ public class RegistrationTests : IDisposable
 
         var answer = await Post(owner, $"/settings/signup/{id}/reject", new());
 
-        Assert.Equal("/settings?ok=signup_rejected#signup", answer.Headers.Location?.ToString());
+        Assert.Equal("/settings?ok=signup_rejected#users", answer.Headers.Location?.ToString());
         Assert.DoesNotContain(Users(factory), row => row.Login == "gost");
     }
 
@@ -564,8 +564,8 @@ public class RegistrationTests : IDisposable
         var approved = await Post(owner, $"/settings/signup/{id}/approve", new());
         var rejected = await Post(owner, $"/settings/signup/{id}/reject", new());
 
-        Assert.Equal("/settings?err=not_pending#signup", approved.Headers.Location?.ToString());
-        Assert.Equal("/settings?err=not_pending#signup", rejected.Headers.Location?.ToString());
+        Assert.Equal("/settings?err=not_pending#users", approved.Headers.Location?.ToString());
+        Assert.Equal("/settings?err=not_pending#users", rejected.Headers.Location?.ToString());
         Assert.Contains(Users(factory), row => row.Login == "ivan");
     }
 
@@ -603,8 +603,8 @@ public class RegistrationTests : IDisposable
                 new FormUrlEncodedContent(new Dictionary<string, string> { [name] = value })));
 
         var person = Users(factory).SingleOrDefault(row => row.Login == "gost");
-        var wonByApprove = answers[0].Headers.Location?.ToString() == "/settings?ok=signup_approved#signup";
-        var wonByReject = answers[1].Headers.Location?.ToString() == "/settings?ok=signup_rejected#signup";
+        var wonByApprove = answers[0].Headers.Location?.ToString() == "/settings?ok=signup_approved#users";
+        var wonByReject = answers[1].Headers.Location?.ToString() == "/settings?ok=signup_rejected#users";
 
         // Ровно один из запросов победил, и база согласна с тем, кто именно: человек либо
         // одобрен и цел, либо снесён — не оба сразу и не ни одного.

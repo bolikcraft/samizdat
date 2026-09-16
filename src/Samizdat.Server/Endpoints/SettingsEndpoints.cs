@@ -165,23 +165,23 @@ public static class SettingsEndpoints
             var language = form["language"].ToString();
             var title = form["title"].ToString().Trim();
 
-            // Поля нет в форме — название не трогаем. Плохое название отменяет всю форму:
-            // владелец видит ошибку, и прочие поля не должны сохраниться молча.
+            // Каждое поле раздела «Общие» уходит своей формой. Поля нет в форме — его не трогаем.
             if (form.ContainsKey("title"))
             {
                 if (!SiteSettings.FitsTitle(title))
                     return Err("bad_title");
                 settings.Set("site.title", title);
-                // Снятый флажок форма не присылает. Название приходит всегда, поэтому флажок
-                // пишем вместе с ним.
-                settings.Set("site.show_title", form["show_title"].ToString() == "on" ? "on" : "off");
             }
+            // Снятый флажок форма не присылает, поэтому его форма несёт свою метку.
+            if (form.ContainsKey("show_title_form"))
+                settings.Set("site.show_title", form["show_title"].ToString() == "on" ? "on" : "off");
 
             if (themes.AvailableThemes().Contains(theme)) settings.Set("theme.name", theme);
             if (colorScheme is "light" or "dark" or "system") settings.Set("theme.color_scheme", colorScheme);
             if (catalog.Has(language)) settings.Set("site.language", language);
 
-            return Ok("appearance");
+            var general = form.ContainsKey("title") || form.ContainsKey("show_title_form") || form.ContainsKey("language");
+            return Ok(general ? "general" : "look");
         }).RequireValidToken().OwnerOnly();
 
         // Свой язык — раздел для всех вошедших, поэтому без OwnerOnly: читателю он тоже нужен.
