@@ -55,21 +55,10 @@ public sealed partial class VaultScanner(string vaultPath)
         }
     }
 
-    /// slug идёт прямо в URL и в имя каталога на диске: чужой хост через `//` или выход
-    /// за пределы data/articles через `..` быть не должны.
+    /// slug идёт прямо в URL и в имя каталога на диске. Правило общее с сервером: заметку, которую
+    /// сервер отвергнет, CLI должен остановить до выкладки.
     static string ValidateSlug(string slug, string file)
-    {
-        if (string.IsNullOrWhiteSpace(slug))
-            throw new CliException($"{file}: пустой slug");
-        if (slug.Contains('/') || slug.Contains('\\'))
-            throw new CliException($"{file}: slug «{slug}» не должен содержать / или \\");
-        if (slug.Contains(".."))
-            throw new CliException($"{file}: slug «{slug}» не должен содержать «..»");
-        if (slug.StartsWith('.'))
-            throw new CliException($"{file}: slug «{slug}» не должен начинаться с точки");
-
-        return slug;
-    }
+        => SafeName.SlugProblem(slug) is { } problem ? throw new CliException($"{file}: {problem}") : slug;
 
     bool IsHidden(string file)
         => Path.GetRelativePath(vaultPath, file)
@@ -90,7 +79,8 @@ public sealed partial class VaultScanner(string vaultPath)
             if (reference.StartsWith("http", StringComparison.OrdinalIgnoreCase)) continue;
 
             var name = Path.GetFileName(reference.Trim());
-            if (name.Length == 0 || found.ContainsKey(name)) continue;
+            // Сервер отвергнет всю статью из-за такого имени, а index.md затёр бы её текст.
+            if (!SafeName.IsAttachment(name) || found.ContainsKey(name)) continue;
 
             var file = Directory.EnumerateFiles(vaultPath, name, SearchOption.AllDirectories)
                                 .FirstOrDefault(candidate => !IsHidden(candidate));

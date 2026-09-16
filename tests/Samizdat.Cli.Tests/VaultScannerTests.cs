@@ -124,5 +124,37 @@ public class VaultScannerTests : IDisposable
         Assert.Contains(Path.Combine(vault, "a.md"), error.Message);
     }
 
+    [Fact]
+    public void Explicit_slug_longer_than_200_bytes_stops_scanning()
+    {
+        Note("a.md", $"---\ntitle: A\nslug: {new string('я', 101)}\npublish: true\n---\nx");
+
+        var error = Assert.Throws<CliException>(() => new VaultScanner(vault).Scan().ToList());
+        Assert.Contains(Path.Combine(vault, "a.md"), error.Message);
+        Assert.Contains("200", error.Message);
+    }
+
+    // Встроенная заметка index.md из другой папки затёрла бы на сервере текст статьи.
+    [Fact]
+    public void Note_named_index_md_is_not_an_attachment()
+    {
+        Note("a.md", "---\ntitle: A\npublish: true\n---\n![[index.md]] и ![[схема.png]]");
+        Note("docs/index.md", "чужая заметка");
+        File.WriteAllBytes(Path.Combine(vault, "схема.png"), [1]);
+
+        var names = new VaultScanner(vault).Scan().Single().Attachments.Select(item => item.Name);
+
+        Assert.Equal(["схема.png"], names);
+    }
+
+    [Fact]
+    public void Attachment_with_a_control_character_in_its_name_is_skipped()
+    {
+        Note("a.md", "---\ntitle: A\npublish: true\n---\n![[bad\u0001.png]]");
+        File.WriteAllBytes(Path.Combine(vault, "bad\u0001.png"), [1]);
+
+        Assert.Empty(new VaultScanner(vault).Scan().Single().Attachments);
+    }
+
     public void Dispose() => Directory.Delete(vault, recursive: true);
 }
