@@ -164,10 +164,88 @@ public class SettingsPageTests : IDisposable
 
         // Раздел выбирается якорем. Ссылка без своей панели оставила бы страницу пустой.
         var sections = Regex.Matches(html, "href=\"#([a-z]+)\"").Select(match => match.Groups[1].Value).ToList();
-        Assert.Equal(["appearance", "articles", "security", "language", "people", "signup", "tokens", "links"],
-                     sections);
+        Assert.Equal(["profile", "general", "look", "users", "publishing", "api"], sections);
         foreach (var section in sections)
             Assert.Contains($"class=\"settings-pane\" id=\"{section}\"", html);
+    }
+
+    [Fact]
+    public async Task The_owner_sees_two_groups_and_the_settings_title_is_not_repeated()
+    {
+        var factory = StartFactory();
+        AddOwner(factory, "aleks", "тайна");
+        var client = await LoginClient(factory, "aleks", "тайна");
+
+        var html = await client.GetStringAsync("/settings");
+
+        Assert.Equal(2, Regex.Matches(html, "class=\"settings-group\"").Count);
+        Assert.DoesNotContain("<h1>", html);
+        Assert.Contains("<title>Settings", html);
+    }
+
+    [Fact]
+    public async Task A_reader_sees_only_the_profile_and_no_group_names()
+    {
+        var factory = StartFactory();
+        AddOwner(factory, "aleks", "тайна");
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+            db.Users.Add(new UserRow
+            {
+                Login = "ivan", PasswordHash = PasswordHasher.Hash("пароль-ивана"), Role = UserRole.Reader,
+                CreatedAt = DateTimeOffset.UtcNow, ApprovedAt = DateTimeOffset.UtcNow,
+            });
+            db.SaveChanges();
+        }
+        var client = await LoginClient(factory, "ivan", "пароль-ивана");
+
+        var html = await client.GetStringAsync("/settings");
+
+        var sections = Regex.Matches(html, "href=\"#([a-z]+)\"").Select(match => match.Groups[1].Value).ToList();
+        Assert.Equal(["profile"], sections);
+        Assert.DoesNotContain("class=\"settings-group\"", html);
+    }
+
+    [Fact]
+    public async Task The_users_item_shows_the_number_of_waiting_requests()
+    {
+        var factory = StartFactory();
+        AddOwner(factory, "aleks", "тайна");
+        var client = await LoginClient(factory, "aleks", "тайна");
+
+        Assert.DoesNotContain("class=\"nav-badge\"", await client.GetStringAsync("/settings"));
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+            foreach (var login in new[] { "petr", "anna" })
+                db.Users.Add(new UserRow
+                {
+                    Login = login, PasswordHash = PasswordHasher.Hash("пароль-заявки"), Role = UserRole.Reader,
+                    // Заявка ещё не одобрена: у новой строки по умолчанию отметка одобрения стоит.
+                    CreatedAt = DateTimeOffset.UtcNow, ApprovedAt = null,
+                });
+            db.SaveChanges();
+        }
+
+        Assert.Matches("<span class=\"nav-badge\"[^>]*>2<", await client.GetStringAsync("/settings"));
+    }
+
+    [Fact]
+    public async Task The_general_section_saves_each_field_with_its_own_form()
+    {
+        var factory = StartFactory();
+        AddOwner(factory, "aleks", "тайна");
+        var client = await LoginClient(factory, "aleks", "тайна");
+
+        var html = await client.GetStringAsync("/settings");
+        var general = Regex.Match(html, "id=\"general\".*?</section>", RegexOptions.Singleline).Value;
+
+        Assert.Equal(3, Regex.Matches(general, "action=\"/settings/appearance\"").Count);
+        Assert.Contains("name=\"show_title_form\"", general);
+        Assert.Contains("data-autosave=\"show-title\"", general);
+        Assert.Contains("data-submit-on-change", general);
     }
 
     [Fact]

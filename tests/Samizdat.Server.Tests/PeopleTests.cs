@@ -70,7 +70,7 @@ public class PeopleTests : IDisposable
         Assert.Contains("/settings/appearance", html);
         Assert.Contains("Users", html);
         Assert.Contains("/settings/invites", html);
-        Assert.Contains("Registration", html);
+        Assert.Contains("Open registration", html);
     }
 
     [Fact]
@@ -219,7 +219,7 @@ public class PeopleTests : IDisposable
         Assert.Empty(db.ApiTokens.Where(row => row.UserId == ivan));
     }
 
-    // Ждущего эта кнопка не должна снести в обход очереди: его место — раздел «Регистрация».
+    // Ждущего эта кнопка не должна снести в обход очереди: его место — раздел «Пользователи».
     [Fact]
     public async Task A_pending_person_is_not_deleted_from_the_people_table()
     {

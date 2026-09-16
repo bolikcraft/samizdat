@@ -5,7 +5,7 @@ using static Samizdat.Server.Endpoints.SettingsPage;
 
 namespace Samizdat.Server.Endpoints;
 
-/// Раздел настроек «Регистрация»: галка открытой записи, очередь заявок и приглашения.
+/// Блок регистрации в разделе «Пользователи»: галка открытой записи, очередь заявок и приглашения.
 /// Живёт отдельно от SettingsEndpoints — тот и без него не короткий.
 public static class SignupSettingsEndpoints
 {

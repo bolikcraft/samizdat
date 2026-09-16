@@ -1,39 +1,93 @@
-<h1>{{ t.settings.title }}</h1>
-
 {{~## Раздел выбирается якорем: видна панель из :target, а без якоря — первая (правило в стилях).
 Поэтому и кнопки форм возвращают на /settings?...#раздел.
 
 Итог действия всплывает в углу окна поверх разделов и через несколько секунд гаснет сам.
-Он вне разделов, поэтому виден при любом якоре. ##~}}
+Он вне разделов, поэтому виден при любом якоре.
+
+Три вида форм. data-autosave — галка, сохраняется скриптом без перезагрузки. data-submit-on-change —
+список, который меняет вид всей страницы: уходит обычным POST сразу при выборе. Остальные — кнопкой.
+Кнопки первых двух видов прячет скрипт: без скриптов форма работает кнопкой. ##~}}
 {{ if message }}<p class="toast toast-{{ message_kind }}" role="{{ if message_kind == "err" }}alert{{ else }}status{{ end }}">{{ message | html.escape }}</p>{{ end }}
 <div class="settings-panes">
 
-{{~## Читателю тут открыт один раздел — свой пароль: остальные и не рисуются. Первый видимый
-раздел он же и раздел без якоря, поэтому у читателя открывается «Пароль». ##~}}
+{{~## «Профиль» стоит первым: это раздел без якоря и у владельца, и у читателя. ##~}}
+<section class="settings-pane" id="profile">
+  <h2>{{ t.settings.profile.title }}</h2>
+
+  <div class="settings-block">
+    <h3>{{ t.settings.language.title }}</h3>
+    <p class="hint">{{ t.settings.language.hint }}</p>
+    <form method="post" action="/settings/language" class="settings-form" data-submit-on-change>
+      {{ antiforgery }}
+      <label>{{ t.settings.language.mine }}
+        <select name="language">
+          <option value=""{{ if my_language_follows_site }} selected{{ end }}>{{ t.settings.language.as_site }}</option>
+          {{ for item in languages }}
+          <option value="{{ item.code | html.escape }}"{{ if item.mine }} selected{{ end }}>{{ item.name | html.escape }}</option>
+          {{ end }}
+        </select>
+      </label>
+      <button type="submit">{{ t.settings.save }}</button>
+    </form>
+  </div>
+
+  <div class="settings-block">
+    <h3>{{ t.settings.password.title }}</h3>
+    <form method="post" action="/settings/password" class="settings-form">
+      {{ antiforgery }}
+      <label>{{ t.settings.password.current }} <input type="password" name="current" autocomplete="current-password"></label>
+      <label>{{ t.settings.password.new_password }} <input type="password" name="new" autocomplete="new-password"></label>
+      <label>{{ t.settings.password.repeat }} <input type="password" name="new2" autocomplete="new-password"></label>
+      <button type="submit">{{ t.settings.password.submit }}</button>
+    </form>
+  </div>
+</section>
+
 {{~ if user && user.is_owner ~}}
-<section class="settings-pane" id="appearance">
+<section class="settings-pane" id="general">
+  <h2>{{ t.settings.general.title }}</h2>
+
+  {{~## Каждое поле — своя форма: сохранение одного не затирает несохранённую правку другого. ##~}}
+  <form method="post" action="/settings/appearance" class="settings-form">
+    {{ antiforgery }}
+    <label>{{ t.settings.appearance.site_title }}
+      <input type="text" name="title" value="{{ site_title | html.escape }}" maxlength="{{ max_title_length }}" aria-describedby="site-title-hint">
+      <small id="site-title-hint" class="field-hint">{{ t.settings.appearance.site_title_hint | string.replace "{0}" max_title_length }}</small>
+    </label>
+    <button type="submit">{{ t.settings.save }}</button>
+  </form>
+
+  <form method="post" action="/settings/appearance" class="settings-form" data-autosave="show-title">
+    {{ antiforgery }}
+    <input type="hidden" name="show_title_form" value="1">
+    <label class="check"><input type="checkbox" name="show_title" value="on"{{ if show_title }} checked{{ end }}>
+      {{ t.settings.appearance.show_title }}</label>
+    <button type="submit">{{ t.settings.save }}</button>
+  </form>
+
+  <form method="post" action="/settings/appearance" class="settings-form" data-submit-on-change>
+    {{ antiforgery }}
+    <label>{{ t.settings.appearance.language }}
+      <select name="language">
+        {{ for item in languages }}
+        <option value="{{ item.code | html.escape }}"{{ if item.selected }} selected{{ end }}>{{ item.name | html.escape }}</option>
+        {{ end }}
+      </select>
+    </label>
+    <button type="submit">{{ t.settings.save }}</button>
+  </form>
+</section>
+
+<section class="settings-pane" id="look">
   <h2>{{ t.settings.appearance.title }}</h2>
 
   <div class="settings-block">
-    <form method="post" action="/settings/appearance" class="settings-form">
+    <form method="post" action="/settings/appearance" class="settings-form" data-submit-on-change>
       {{ antiforgery }}
       <label>{{ t.settings.appearance.theme }}
         <select name="theme">
           {{ for theme in themes }}
           <option value="{{ theme.name | html.escape }}"{{ if theme.selected }} selected{{ end }}>{{ theme.name | html.escape }}</option>
-          {{ end }}
-        </select>
-      </label>
-      <label>{{ t.settings.appearance.site_title }}
-        <input type="text" name="title" value="{{ site_title | html.escape }}" maxlength="{{ max_title_length }}" aria-describedby="site-title-hint">
-        <small id="site-title-hint" class="field-hint">{{ t.settings.appearance.site_title_hint | string.replace "{0}" max_title_length }}</small>
-      </label>
-      <label class="check"><input type="checkbox" name="show_title" value="on"{{ if show_title }} checked{{ end }}>
-        {{ t.settings.appearance.show_title }}</label>
-      <label>{{ t.settings.appearance.language }}
-        <select name="language">
-          {{ for item in languages }}
-          <option value="{{ item.code | html.escape }}"{{ if item.selected }} selected{{ end }}>{{ item.name | html.escape }}</option>
           {{ end }}
         </select>
       </label>
@@ -119,117 +173,13 @@
     {{ end }}
   </div>
 </section>
-{{~ end ~}}
 
-{{~ if user && user.is_owner ~}}
-<section class="settings-pane" id="articles">
-  <h2>{{ t.settings.articles.title }}</h2>
-  <p class="hint">{{ t.settings.articles.hint }}</p>
-  <form method="post" action="/settings/articles" class="settings-form">
-    {{ antiforgery }}
-    <label class="check"><input type="checkbox" name="readers" value="on"{{ if download.readers }} checked{{ end }}>
-      {{ t.settings.articles.readers }}</label>
-    <label class="check"><input type="checkbox" name="guests" value="on"{{ if download.guests }} checked{{ end }}>
-      {{ t.settings.articles.guests }}</label>
-    <button type="submit">{{ t.settings.save }}</button>
-  </form>
-</section>
-{{~ end ~}}
-
-<section class="settings-pane" id="security">
-  <h2>{{ t.settings.password.title }}</h2>
-  <form method="post" action="/settings/password" class="settings-form">
-    {{ antiforgery }}
-    <label>{{ t.settings.password.current }} <input type="password" name="current" autocomplete="current-password"></label>
-    <label>{{ t.settings.password.new_password }} <input type="password" name="new" autocomplete="new-password"></label>
-    <label>{{ t.settings.password.repeat }} <input type="password" name="new2" autocomplete="new-password"></label>
-    <button type="submit">{{ t.settings.password.submit }}</button>
-  </form>
-</section>
-
-<section class="settings-pane" id="language">
-  <h2>{{ t.settings.language.title }}</h2>
-  <p class="hint">{{ t.settings.language.hint }}</p>
-  <form method="post" action="/settings/language" class="settings-form">
-    {{ antiforgery }}
-    <label>{{ t.settings.language.mine }}
-      <select name="language">
-        <option value=""{{ if my_language_follows_site }} selected{{ end }}>{{ t.settings.language.as_site }}</option>
-        {{ for item in languages }}
-        <option value="{{ item.code | html.escape }}"{{ if item.mine }} selected{{ end }}>{{ item.name | html.escape }}</option>
-        {{ end }}
-      </select>
-    </label>
-    <button type="submit">{{ t.settings.save }}</button>
-  </form>
-</section>
-
-{{~ if user && user.is_owner ~}}
-<section class="settings-pane" id="people">
+<section class="settings-pane" id="users">
   <h2>{{ t.settings.people.title }}</h2>
-  <p class="hint">{{ t.settings.people.hint }}</p>
-  <form method="post" action="/settings/people" class="settings-form">
-    {{ antiforgery }}
-    <label>{{ t.settings.login }} <input type="text" name="login" maxlength="100" autocomplete="off" required></label>
-    <label>{{ t.settings.people.password }} <input type="password" name="password" autocomplete="new-password"
-                         minlength="8" required></label>
-    <button type="submit">{{ t.settings.people.add }}</button>
-  </form>
-  <div class="table-scroll">
-  <table class="people settings-table">
-    <thead><tr><th>{{ t.settings.login }}</th><th>{{ t.settings.people.role }}</th><th>{{ t.settings.people.created }}</th><th>{{ t.settings.people.new_password }}</th><th></th></tr></thead>
-    <tbody>
-    {{ for person in people }}
-    <tr>
-      <td>{{ person.login | html.escape }}</td>
-      <td>{{ person.role | html.escape }}</td>
-      <td>{{ person.created_at | html.escape }}</td>
-      <td>
-        {{~ if person.can_change ~}}
-        <form method="post" action="/settings/people/{{ person.id }}/password" class="inline-form note-form">
-          {{ antiforgery }}
-          <input type="password" name="password" autocomplete="new-password"
-                 placeholder="{{ t.settings.people.new_password_hint }}" aria-label="{{ t.settings.people.new_password }}" minlength="8" required>
-          <button type="submit">{{ t.settings.people.change }}</button>
-        </form>
-        {{~ else ~}}—{{~ end ~}}
-      </td>
-      <td class="row-actions">
-        {{~ if person.can_change ~}}
-        <form method="post" action="/settings/people/{{ person.id }}/delete" class="inline-form">
-          {{ antiforgery }}
-          <button type="submit">{{ t.settings.people.delete }}</button>
-        </form>
-        {{~ end ~}}
-      </td>
-    </tr>
-    {{ end }}
-    </tbody>
-  </table>
-  </div>
-</section>
-{{~ end ~}}
 
-{{~ if user && user.is_owner ~}}
-<section class="settings-pane" id="signup">
-  <h2>{{ t.settings.signup.title }}</h2>
-
-  <div class="settings-block">
-    <h3>{{ t.settings.signup.open_title }}</h3>
-    <p class="hint">{{ t.settings.signup.open_hint }}</p>
-    <form method="post" action="/settings/signup/open" class="settings-form">
-      {{ antiforgery }}
-      <label class="signup-switch">
-        <input type="checkbox" name="open"{{ if signup.open }} checked{{ end }}>
-        {{ t.settings.signup.open_switch }}
-      </label>
-      <button type="submit">{{ t.settings.save }}</button>
-    </form>
-  </div>
-
+  {{ if signup.pending.size > 0 }}
   <div class="settings-block">
     <h3>{{ t.settings.signup.queue }}</h3>
-    {{ if signup.pending.size > 0 }}
     <div class="table-scroll">
     <table class="pending settings-table">
       <thead><tr><th>{{ t.settings.login }}</th><th>{{ t.settings.signup.sent }}</th><th></th></tr></thead>
@@ -253,9 +203,50 @@
       </tbody>
     </table>
     </div>
-    {{ else }}
-    <p class="empty">{{ t.settings.signup.no_requests }}</p>
-    {{ end }}
+  </div>
+  {{ end }}
+
+  <div class="settings-block">
+    <p class="hint">{{ t.settings.people.hint }}</p>
+    <form method="post" action="/settings/people" class="settings-form">
+      {{ antiforgery }}
+      <label>{{ t.settings.login }} <input type="text" name="login" maxlength="100" autocomplete="off" required></label>
+      <label>{{ t.settings.people.password }} <input type="password" name="password" autocomplete="new-password"
+                           minlength="8" required></label>
+      <button type="submit">{{ t.settings.people.add }}</button>
+    </form>
+    <div class="table-scroll">
+    <table class="people settings-table">
+      <thead><tr><th>{{ t.settings.login }}</th><th>{{ t.settings.people.role }}</th><th>{{ t.settings.people.created }}</th><th>{{ t.settings.people.new_password }}</th><th></th></tr></thead>
+      <tbody>
+      {{ for person in people }}
+      <tr>
+        <td>{{ person.login | html.escape }}</td>
+        <td>{{ person.role | html.escape }}</td>
+        <td>{{ person.created_at | html.escape }}</td>
+        <td>
+          {{~ if person.can_change ~}}
+          <form method="post" action="/settings/people/{{ person.id }}/password" class="inline-form note-form">
+            {{ antiforgery }}
+            <input type="password" name="password" autocomplete="new-password"
+                   placeholder="{{ t.settings.people.new_password_hint }}" aria-label="{{ t.settings.people.new_password }}" minlength="8" required>
+            <button type="submit">{{ t.settings.people.change }}</button>
+          </form>
+          {{~ else ~}}—{{~ end ~}}
+        </td>
+        <td class="row-actions">
+          {{~ if person.can_change ~}}
+          <form method="post" action="/settings/people/{{ person.id }}/delete" class="inline-form">
+            {{ antiforgery }}
+            <button type="submit">{{ t.settings.people.delete }}</button>
+          </form>
+          {{~ end ~}}
+        </td>
+      </tr>
+      {{ end }}
+      </tbody>
+    </table>
+    </div>
   </div>
 
   <div class="settings-block">
@@ -315,11 +306,75 @@
     <p class="empty">{{ t.settings.signup.no_invites }}</p>
     {{ end }}
   </div>
-</section>
-{{~ end ~}}
 
-{{~ if user && user.is_owner ~}}
-<section class="settings-pane" id="tokens">
+  <div class="settings-block">
+    <h3>{{ t.settings.signup.open_title }}</h3>
+    <p class="hint">{{ t.settings.signup.open_hint }}</p>
+    <form method="post" action="/settings/signup/open" class="settings-form" data-autosave="signup-open">
+      {{ antiforgery }}
+      <label class="check"><input type="checkbox" name="open"{{ if signup.open }} checked{{ end }}>
+        {{ t.settings.signup.open_switch }}</label>
+      <button type="submit">{{ t.settings.save }}</button>
+    </form>
+  </div>
+</section>
+
+<section class="settings-pane" id="publishing">
+  <h2>{{ t.settings.articles.title }}</h2>
+
+  <div class="settings-block">
+    <h3>{{ t.settings.articles.download }}</h3>
+    <p class="hint">{{ t.settings.articles.hint }}</p>
+    <form method="post" action="/settings/articles" class="settings-form" data-autosave="download">
+      {{ antiforgery }}
+      <label class="check"><input type="checkbox" name="readers" value="on"{{ if download.readers }} checked{{ end }}>
+        {{ t.settings.articles.readers }}</label>
+      <label class="check"><input type="checkbox" name="guests" value="on"{{ if download.guests }} checked{{ end }}>
+        {{ t.settings.articles.guests }}</label>
+      <button type="submit">{{ t.settings.save }}</button>
+    </form>
+  </div>
+
+  <div class="settings-block">
+    <h3>{{ t.settings.links.title }}</h3>
+    <p class="hint">{{ t.settings.links.hint }}</p>
+    {{ if links.size > 0 }}
+    <div class="table-scroll">
+    <table class="links settings-table">
+      <thead><tr><th>{{ t.settings.links.article }}</th><th>{{ t.settings.link }}</th><th>{{ t.settings.who }}</th><th>{{ t.settings.links.term }}</th><th>{{ t.settings.links.opens }}</th><th></th></tr></thead>
+      <tbody>
+      {{ for link in links }}
+      <tr id="link-{{ link.id }}"{{ if !link.alive }} class="dead-link"{{ end }}>
+        <td><a href="/{{ link.slug | html.escape }}">{{ link.title | html.escape }}</a></td>
+        <td>
+          <div class="link-cell">
+            <input class="link-url" type="text" readonly value="{{ link.url | html.escape }}">
+            <button type="button" class="copy-link" data-url="{{ link.url | html.escape }}" data-copied="{{ t.common.copied }}">{{ t.common.copy }}</button>
+          </div>
+        </td>
+        <td>{{ if link.note }}{{ link.note | html.escape }}{{ else }}—{{ end }}</td>
+        <td>{{ if link.alive }}{{ if link.expires_at }}{{ t.settings.state.until | string.replace "{0}" (link.expires_at | html.escape) }}{{ else }}{{ t.settings.state.no_term }}{{ end }}{{ else }}{{ t.settings.state.dead }}{{ end }}</td>
+        <td>{{ link.opened_count }}{{ if link.last_opened_at }}, {{ link.last_opened_at | html.escape }}{{ end }}</td>
+        <td class="row-actions">
+          {{ if link.alive }}
+          <form method="post" action="/settings/links/{{ link.id }}/revoke" class="inline-form">
+            {{ antiforgery }}
+            <button type="submit">{{ t.settings.revoke }}</button>
+          </form>
+          {{ end }}
+        </td>
+      </tr>
+      {{ end }}
+      </tbody>
+    </table>
+    </div>
+    {{ else }}
+    <p class="empty">{{ t.settings.links.no_links }}</p>
+    {{ end }}
+  </div>
+</section>
+
+<section class="settings-pane" id="api">
   <h2>{{ t.settings.tokens.title }}</h2>
   <p class="hint">{{ t.settings.tokens.hint }} <code>samizdat-server token new</code></p>
   {{ if new_token }}
@@ -366,44 +421,6 @@
   </div>
   {{ else }}
   <p class="empty">{{ t.settings.tokens.no_tokens }}</p>
-  {{ end }}
-</section>
-
-<section class="settings-pane" id="links">
-  <h2>{{ t.settings.links.title }}</h2>
-  <p class="hint">{{ t.settings.links.hint }}</p>
-  {{ if links.size > 0 }}
-  <div class="table-scroll">
-  <table class="links settings-table">
-    <thead><tr><th>{{ t.settings.links.article }}</th><th>{{ t.settings.link }}</th><th>{{ t.settings.who }}</th><th>{{ t.settings.links.term }}</th><th>{{ t.settings.links.opens }}</th><th></th></tr></thead>
-    <tbody>
-    {{ for link in links }}
-    <tr id="link-{{ link.id }}"{{ if !link.alive }} class="dead-link"{{ end }}>
-      <td><a href="/{{ link.slug | html.escape }}">{{ link.title | html.escape }}</a></td>
-      <td>
-        <div class="link-cell">
-          <input class="link-url" type="text" readonly value="{{ link.url | html.escape }}">
-          <button type="button" class="copy-link" data-url="{{ link.url | html.escape }}" data-copied="{{ t.common.copied }}">{{ t.common.copy }}</button>
-        </div>
-      </td>
-      <td>{{ if link.note }}{{ link.note | html.escape }}{{ else }}—{{ end }}</td>
-      <td>{{ if link.alive }}{{ if link.expires_at }}{{ t.settings.state.until | string.replace "{0}" (link.expires_at | html.escape) }}{{ else }}{{ t.settings.state.no_term }}{{ end }}{{ else }}{{ t.settings.state.dead }}{{ end }}</td>
-      <td>{{ link.opened_count }}{{ if link.last_opened_at }}, {{ link.last_opened_at | html.escape }}{{ end }}</td>
-      <td class="row-actions">
-        {{ if link.alive }}
-        <form method="post" action="/settings/links/{{ link.id }}/revoke" class="inline-form">
-          {{ antiforgery }}
-          <button type="submit">{{ t.settings.revoke }}</button>
-        </form>
-        {{ end }}
-      </td>
-    </tr>
-    {{ end }}
-    </tbody>
-  </table>
-  </div>
-  {{ else }}
-  <p class="empty">{{ t.settings.links.no_links }}</p>
   {{ end }}
 </section>
 {{~ end ~}}

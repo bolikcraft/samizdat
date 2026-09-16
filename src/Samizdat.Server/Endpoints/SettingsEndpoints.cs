@@ -71,7 +71,7 @@ public static class SettingsEndpoints
             }
 
             List<Dictionary<string, object?>> people = isOwner
-                // Ждущие сюда не попадают: они живут в очереди раздела «Регистрация», пока
+                // Ждущие сюда не попадают: они живут в очереди раздела «Пользователи», пока
                 // владелец не решит. Кнопки этого списка им не подходят.
                 ? db.Users.Where(row => row.ApprovedAt != null).OrderBy(row => row.Login).ToList()
                     .Select(row => new Dictionary<string, object?>
@@ -80,7 +80,7 @@ public static class SettingsEndpoints
                     ["login"] = row.Login,
                     ["role"] = text[row.Role == UserRole.Owner ? "role.owner" : "role.reader"],
                     ["created_at"] = row.CreatedAt.ToString("yyyy-MM-dd"),
-                    // Строка владельца — без кнопок: свой пароль меняют в разделе «Пароль»,
+                    // Строка владельца — без кнопок: свой пароль меняют в разделе «Профиль»,
                     // а чужого владельца не трогают вовсе.
                     ["can_change"] = row.Role != UserRole.Owner,
                 }).ToList()
@@ -96,6 +96,8 @@ public static class SettingsEndpoints
                 ["antiforgery"] = AntiforgeryHtml.Field(antiforgery, context),
                 ["message"] = Message(text, ok, err),
                 ["message_kind"] = err is not null ? "err" : ok is not null ? "ok" : null,
+                // Форма добавления открыта после своей ошибки: владелец видит, что исправить.
+                ["error_code"] = err,
                 ["color_scheme"] = settings.ColorScheme,
                 ["site_title"] = settings.Title,
                 ["show_title"] = settings.ShowTitle,
@@ -423,7 +425,7 @@ public static class SettingsEndpoints
 
             var person = db.Users.Find(id);
             if (person is null) return Results.NotFound();
-            // Свой пароль меняют в разделе «Пароль»: там спрашивают текущий. Чужой владелец
+            // Свой пароль меняют в разделе «Профиль»: там спрашивают текущий. Чужой владелец
             // не подчиняется даже владельцу — свою учётку он ведёт сам.
             if (person.Id == me.Id) return Err("own_password");
             if (person.Role == UserRole.Owner) return Err("other_owner");
@@ -442,7 +444,7 @@ public static class SettingsEndpoints
             var person = db.Users.Find(id);
             if (person is null) return Results.NotFound();
 
-            // Ждущего эта кнопка не трогает: его разбирают в разделе «Регистрация», в обход
+            // Ждущего эта кнопка не трогает: его разбирают в разделе «Пользователи», в обход
             // очереди тут его снести нельзя.
             if (person.ApprovedAt is null) return Err("not_pending");
 

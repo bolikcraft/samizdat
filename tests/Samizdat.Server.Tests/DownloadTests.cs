@@ -565,7 +565,7 @@ public class DownloadTests : IDisposable
         var client = await Login(factory, "hozyain", "parol");
         var html = await client.GetStringAsync("/settings");
 
-        Assert.Contains("id=\"articles\"", html);
+        Assert.Contains("id=\"publishing\"", html);
         Assert.Contains("name=\"readers\" value=\"on\" checked", html);
         Assert.Contains("name=\"guests\" value=\"on\">", html);
     }
