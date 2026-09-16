@@ -5,8 +5,8 @@ namespace Samizdat.Core.Rendering;
 /// Метка эмбеда картинки в Obsidian: "300" или "300x200" — размер, "подпись|300" — alt и размер.
 public static partial class EmbedSize
 {
-    // [0-9], а не \d: \d в .NET пропускает цифры других письменностей.
-    [GeneratedRegex(@"\A(?<width>[0-9]{1,5})(?:x(?<height>[0-9]{1,5}))?\z")]
+    // [0-9], а не \d: \d в .NET пропускает цифры других письменностей. Ноль и ведущий ноль — не размер.
+    [GeneratedRegex(@"\A(?<width>[1-9][0-9]{0,4})(?:x(?<height>[1-9][0-9]{0,4}))?\z")]
     private static partial Regex Size();
 
     public static (string? Alt, string? Width, string? Height) Parse(string? label)

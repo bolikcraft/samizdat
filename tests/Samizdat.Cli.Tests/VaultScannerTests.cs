@@ -222,6 +222,28 @@ public class VaultScannerTests : IDisposable
         Assert.Contains(Path.Combine(vault, "a.md"), error.Message);
     }
 
+    [Theory]
+    [InlineData("\"publish\"")]
+    [InlineData("'publish'")]
+    public void Broken_front_matter_with_quoted_publish_key_stops_scanning(string key)
+    {
+        Note("a.md", $"---\ntitle: {{{{title}}}}\n{key}: true\n---\nx");
+
+        Assert.Throws<CliException>(() => new VaultScanner(vault).Scan().ToList());
+    }
+
+    [Fact]
+    public void Scanning_twice_does_not_repeat_warnings()
+    {
+        Note("draft.md", "---\ntitle: {{title}}\npublish: false\n---\nx");
+
+        var scanner = new VaultScanner(vault);
+        scanner.Scan().ToList();
+        scanner.Scan().ToList();
+
+        Assert.Single(scanner.Warnings);
+    }
+
     [Fact]
     public void Broken_front_matter_with_publish_true_stops_scanning_with_windows_line_ends()
     {

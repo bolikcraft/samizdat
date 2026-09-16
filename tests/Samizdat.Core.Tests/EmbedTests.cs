@@ -146,4 +146,14 @@ public class EmbedTests
 
         Assert.Contains("""<img src="/statya/shema.png" alt="shema">""", html);
     }
+
+    [Theory]
+    [InlineData("0")]
+    [InlineData("300x0")]
+    public void Embed_zero_size_is_not_a_size(string label)
+    {
+        var html = renderer.Render($"![[shema.png|{label}]]", "statya", NoArticles.Instance);
+
+        Assert.Contains($"""<img src="/statya/shema.png" alt="{label}">""", html);
+    }
 }

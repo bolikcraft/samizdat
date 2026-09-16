@@ -25,7 +25,7 @@ public sealed partial class VaultScanner(string vaultPath)
     [GeneratedRegex(@"\A﻿?---[ \t]*\r?\n(?<yaml>.*?)^---[ \t]*\r?$", RegexOptions.Singleline | RegexOptions.Multiline)]
     private static partial Regex FrontMatterBlock();
 
-    [GeneratedRegex(@"^publish[ \t]*:(?<value>[^\r\n]*)", RegexOptions.Multiline)]
+    [GeneratedRegex(@"^(?<quote>[""']?)publish\k<quote>[ \t]*:(?<value>[^\r\n]*)", RegexOptions.Multiline)]
     private static partial Regex PublishLine();
 
     // Те же истинные значения, что понимает YamlDotNet; хвост "# ..." — комментарий YAML.
@@ -39,6 +39,7 @@ public sealed partial class VaultScanner(string vaultPath)
 
     public IEnumerable<VaultNote> Scan()
     {
+        warnings.Clear();
         var taken = new Dictionary<string, string>();
 
         foreach (var file in Directory.EnumerateFiles(vaultPath, "*.md", SearchOption.AllDirectories))
