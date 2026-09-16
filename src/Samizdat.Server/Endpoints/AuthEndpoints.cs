@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 using Samizdat.Core.Localization;
 using Samizdat.Core.Themes;
@@ -39,7 +40,17 @@ public static class AuthEndpoints
             await SessionCookie.SignIn(context, user);
 
             return Results.Redirect("/");
-        }).AllowAnonymous().RequireValidToken();
+        }).AllowAnonymous().RequireValidToken(context =>
+        {
+            // Токен на форме сверен с личностью на момент открытия страницы: сосед-вкладка успел
+            // войти или выйти, токен разошёлся с текущей учёткой. Не 400, а увести дальше без входа.
+            if (context.User.Identity?.IsAuthenticated == true) return Results.Redirect("/");
+
+            var returnUrl = context.Request.Query["ReturnUrl"].ToString();
+            return Results.Redirect(string.IsNullOrEmpty(returnUrl)
+                ? "/login"
+                : QueryHelpers.AddQueryString("/login", "ReturnUrl", returnUrl));
+        });
 
         app.MapPost("/logout", async (HttpContext context) =>
         {

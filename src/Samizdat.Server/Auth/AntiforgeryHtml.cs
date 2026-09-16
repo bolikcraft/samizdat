@@ -20,6 +20,12 @@ public static class AntiforgeryHtml
     // ([FromForm]/IFormCollection) — эти маршруты читают форму вручную через HttpContext, поэтому
     // проверяем явно фильтром, а не полагаемся на автовывод RequestDelegateFactory.
     public static TBuilder RequireValidToken<TBuilder>(this TBuilder builder) where TBuilder : IEndpointConventionBuilder
+        => builder.RequireValidToken(_ => Results.BadRequest());
+
+    /// Перегрузка со своим откликом на несовпавший токен — форме входа голый 400 не подходит,
+    /// ей нужно увести человека дальше (см. POST /login).
+    public static TBuilder RequireValidToken<TBuilder>(this TBuilder builder, Func<HttpContext, IResult> onInvalid)
+        where TBuilder : IEndpointConventionBuilder
         => builder.AddEndpointFilter(async (invocation, next) =>
         {
             var antiforgery = invocation.HttpContext.RequestServices.GetRequiredService<IAntiforgery>();
@@ -29,7 +35,7 @@ public static class AntiforgeryHtml
             }
             catch (AntiforgeryValidationException)
             {
-                return Results.BadRequest();
+                return onInvalid(invocation.HttpContext);
             }
             return await next(invocation);
         });

@@ -165,8 +165,9 @@ public class AuthTests : IDisposable
     }
 
     // Login CSRF: чужой сайт отправляет форму входа за жертву и впускает её в свою учётку.
+    // Раньше отвечали голым 400 — теперь уводим на страницу входа заново, вход не выполняя.
     [Fact]
-    public async Task Login_without_antiforgery_token_is_rejected()
+    public async Task Login_without_antiforgery_token_redirects_to_login_without_signing_in()
     {
         var factory = StartServer();
         AddOwner(factory, "aleks", "тайна");
@@ -176,8 +177,35 @@ public class AuthTests : IDisposable
 
         var response = await client.PostAsync("/login", fields);
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Found, response.StatusCode);
+        Assert.Equal("/login", response.Headers.Location?.OriginalString);
         Assert.Equal(HttpStatusCode.Found, (await client.GetAsync("/")).StatusCode);
+    }
+
+    // Регресс: сосед-вкладка успел войти, пока эта ждала на форме входа — токен на форме
+    // считался на анонимного гостя и не совпадает с уже вошедшей учёткой. Раньше это был голый 400.
+    [Fact]
+    public async Task Stale_token_after_signing_in_elsewhere_redirects_home_without_signing_in_again()
+    {
+        var factory = StartServer();
+        AddOwner(factory, "aleks", "тайна");
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+
+        // Токен снят со страницы входа до входа — форма его и держала бы, пока человек её не отправил.
+        var staleToken = TestLogin.AntiforgeryToken(await client.GetStringAsync("/login"));
+        var signIn = await TestLogin.PostLogin(client, "aleks", "тайна");
+        Assert.Equal(HttpStatusCode.Found, signIn.StatusCode);
+
+        var response = await client.PostAsync("/login", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["login"] = "aleks", ["password"] = "тайна", [staleToken.Name] = staleToken.Value,
+        }));
+
+        Assert.Equal(HttpStatusCode.Found, response.StatusCode);
+        Assert.Equal("/", response.Headers.Location?.OriginalString);
+        // Фильтр отказал до входа в обработчик — SignIn не вызывался повторно, новой cookie нет.
+        Assert.False(response.Headers.Contains("Set-Cookie"));
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/")).StatusCode);
     }
 
     [Fact]
