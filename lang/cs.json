@@ -63,6 +63,7 @@
   "settings.appearance.scheme": "Barevné schéma",
   "settings.appearance.site_title": "Název webu",
   "settings.appearance.site_title_hint": "Nejvýše {0} znaků.",
+  "settings.appearance.show_title": "Zobrazit název webu na domovské stránce",
   "settings.appearance.system": "Jako v systému",
   "settings.appearance.theme": "Téma",
   "settings.appearance.title": "Vzhled",

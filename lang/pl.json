@@ -63,6 +63,7 @@
   "settings.appearance.scheme": "Schemat kolorów",
   "settings.appearance.site_title": "Nazwa witryny",
   "settings.appearance.site_title_hint": "Maksymalnie {0} znaków.",
+  "settings.appearance.show_title": "Pokazuj nazwę witryny na stronie głównej",
   "settings.appearance.system": "Jak w systemie",
   "settings.appearance.theme": "Motyw",
   "settings.appearance.title": "Wygląd",

@@ -63,6 +63,7 @@
   "settings.appearance.scheme": "Skema warna",
   "settings.appearance.site_title": "Nama situs",
   "settings.appearance.site_title_hint": "Maksimal {0} karakter.",
+  "settings.appearance.show_title": "Tampilkan nama situs di beranda",
   "settings.appearance.system": "Sama seperti sistem",
   "settings.appearance.theme": "Tema",
   "settings.appearance.title": "Tampilan",

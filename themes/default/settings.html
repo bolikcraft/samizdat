@@ -28,6 +28,8 @@
         <input type="text" name="title" value="{{ site_title | html.escape }}" maxlength="{{ max_title_length }}" aria-describedby="site-title-hint">
         <small id="site-title-hint" class="field-hint">{{ t.settings.appearance.site_title_hint | string.replace "{0}" max_title_length }}</small>
       </label>
+      <label class="check"><input type="checkbox" name="show_title" value="on"{{ if show_title }} checked{{ end }}>
+        {{ t.settings.appearance.show_title }}</label>
       <label>{{ t.settings.appearance.language }}
         <select name="language">
           {{ for item in languages }}

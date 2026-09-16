@@ -63,6 +63,7 @@
   "settings.appearance.scheme": "Színséma",
   "settings.appearance.site_title": "A webhely neve",
   "settings.appearance.site_title_hint": "Legfeljebb {0} karakter.",
+  "settings.appearance.show_title": "A webhely nevének megjelenítése a kezdőlapon",
   "settings.appearance.system": "Mint a rendszerben",
   "settings.appearance.theme": "Téma",
   "settings.appearance.title": "Megjelenés",

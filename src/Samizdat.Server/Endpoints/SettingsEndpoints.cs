@@ -98,6 +98,7 @@ public static class SettingsEndpoints
                 ["message_kind"] = err is not null ? "err" : ok is not null ? "ok" : null,
                 ["color_scheme"] = settings.ColorScheme,
                 ["site_title"] = settings.Title,
+                ["show_title"] = settings.ShowTitle,
                 ["max_title_length"] = SiteSettings.MaxTitleLength,
                 ["background"] = BackgroundModel(settings, background, BackgroundCatalog.Read(theme)),
                 ["download"] = new Dictionary<string, object?>
@@ -171,6 +172,9 @@ public static class SettingsEndpoints
                 if (!SiteSettings.FitsTitle(title))
                     return Err("bad_title");
                 settings.Set("site.title", title);
+                // Снятый флажок форма не присылает. Название приходит всегда, поэтому флажок
+                // пишем вместе с ним.
+                settings.Set("site.show_title", form["show_title"].ToString() == "on" ? "on" : "off");
             }
 
             if (themes.AvailableThemes().Contains(theme)) settings.Set("theme.name", theme);

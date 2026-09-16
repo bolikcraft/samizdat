@@ -1,4 +1,4 @@
-<h1>{{ site.title | html.escape }}</h1>
+{{ if site.show_title && site.title != "" }}<h1>{{ site.title | html.escape }}</h1>{{ end }}
 <ul class="articles">
 {{ for item in articles }}
   <li>

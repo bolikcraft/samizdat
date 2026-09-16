@@ -63,6 +63,7 @@
   "settings.appearance.scheme": "Schéma de couleurs",
   "settings.appearance.site_title": "Nom du site",
   "settings.appearance.site_title_hint": "{0} caractères au maximum.",
+  "settings.appearance.show_title": "Afficher le nom du site sur la page d’accueil",
   "settings.appearance.system": "Comme le système",
   "settings.appearance.theme": "Thème",
   "settings.appearance.title": "Apparence",

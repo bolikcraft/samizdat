@@ -63,6 +63,7 @@
   "settings.appearance.scheme": "配色",
   "settings.appearance.site_title": "网站名称",
   "settings.appearance.site_title_hint": "最多 {0} 个字符。",
+  "settings.appearance.show_title": "在首页显示网站名称",
   "settings.appearance.system": "跟随系统",
   "settings.appearance.theme": "主题",
   "settings.appearance.title": "外观",

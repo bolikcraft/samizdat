@@ -329,6 +329,22 @@ public class SiteSettingsTests : IDisposable
     }
 
     [Fact]
+    public void The_site_title_is_shown_until_the_owner_turns_it_off()
+    {
+        var factory = StartFactory();
+        using (var scope = factory.Services.CreateScope())
+            Assert.True(scope.ServiceProvider.GetRequiredService<SiteSettings>().ShowTitle);
+
+        SetSetting(factory, "site.show_title", "off");
+        using (var scope = factory.Services.CreateScope())
+            Assert.False(scope.ServiceProvider.GetRequiredService<SiteSettings>().ShowTitle);
+
+        SetSetting(factory, "site.show_title", "on");
+        using (var scope = factory.Services.CreateScope())
+            Assert.True(scope.ServiceProvider.GetRequiredService<SiteSettings>().ShowTitle);
+    }
+
+    [Fact]
     public void The_site_title_comes_from_config_while_the_database_is_empty()
     {
         var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>

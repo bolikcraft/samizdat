@@ -63,6 +63,7 @@
   "settings.appearance.scheme": "Цветовая схема",
   "settings.appearance.site_title": "Название сайта",
   "settings.appearance.site_title_hint": "Не длиннее {0} символов.",
+  "settings.appearance.show_title": "Показывать название сайта на главной странице",
   "settings.appearance.system": "Как в системе",
   "settings.appearance.theme": "Тема",
   "settings.appearance.title": "Внешний вид",

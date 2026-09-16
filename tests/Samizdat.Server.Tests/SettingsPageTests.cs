@@ -774,4 +774,58 @@ public class SettingsPageTests : IDisposable
         Assert.Matches("<a class=\"top-home\" href=\"/\"><img src=\"/assets/icon.svg\" alt=\"\"[^>]*>"
                        + "<span class=\"top-title\">Samizdat</span></a>", html);
     }
+
+    [Fact]
+    public async Task The_home_page_shows_the_site_title_out_of_the_box()
+    {
+        var factory = StartFactory();
+        AddOwner(factory, "aleks", "тайна");
+        var client = await LoginClient(factory, "aleks", "тайна");
+
+        Assert.Contains("<h1>Samizdat</h1>", await client.GetStringAsync("/"));
+        Assert.Contains("name=\"show_title\" value=\"on\" checked", await client.GetStringAsync("/settings"));
+    }
+
+    [Fact]
+    public async Task The_owner_hides_the_site_title_on_the_home_page_and_the_header_keeps_it()
+    {
+        var factory = StartFactory();
+        AddOwner(factory, "aleks", "тайна");
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        await client.PostAsync("/login", new FormUrlEncodedContent(
+            new Dictionary<string, string> { ["login"] = "aleks", ["password"] = "тайна" }));
+        var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
+
+        // Снятый флажок форма не присылает: есть только название.
+        var response = await client.PostAsync("/settings/appearance", new FormUrlEncodedContent(
+            new Dictionary<string, string> { [name] = value, ["title"] = "Записки" }));
+        var index = await client.GetStringAsync("/");
+        var settings = await client.GetStringAsync("/settings");
+
+        Assert.Equal("/settings?ok=appearance#appearance", response.Headers.Location?.OriginalString);
+        Assert.DoesNotContain("<h1>", index);
+        Assert.Contains("<span class=\"top-title\">Записки</span>", index);
+        Assert.Contains("name=\"show_title\" value=\"on\">", settings);
+
+        await client.PostAsync("/settings/appearance", new FormUrlEncodedContent(
+            new Dictionary<string, string> { [name] = value, ["title"] = "Записки", ["show_title"] = "on" }));
+
+        Assert.Contains("<h1>Записки</h1>", await client.GetStringAsync("/"));
+    }
+
+    [Fact]
+    public async Task A_form_without_the_title_field_leaves_the_show_title_switch_alone()
+    {
+        var factory = StartFactory();
+        AddOwner(factory, "aleks", "тайна");
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        await client.PostAsync("/login", new FormUrlEncodedContent(
+            new Dictionary<string, string> { ["login"] = "aleks", ["password"] = "тайна" }));
+        var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
+
+        await client.PostAsync("/settings/appearance", new FormUrlEncodedContent(
+            new Dictionary<string, string> { [name] = value, ["color_scheme"] = "dark" }));
+
+        Assert.Contains("<h1>Samizdat</h1>", await client.GetStringAsync("/"));
+    }
 }

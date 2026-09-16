@@ -63,6 +63,7 @@
   "settings.appearance.scheme": "Renk şeması",
   "settings.appearance.site_title": "Site adı",
   "settings.appearance.site_title_hint": "En fazla {0} karakter.",
+  "settings.appearance.show_title": "Site adını ana sayfada göster",
   "settings.appearance.system": "Sistemle aynı",
   "settings.appearance.theme": "Tema",
   "settings.appearance.title": "Görünüm",

@@ -31,6 +31,9 @@ public sealed class SiteSettings(SamizdatDbContext db, IConfiguration configurat
     /// Имя для вкладки и для иконки в шапке, когда название пустое.
     public string TitleOrDefault => Title is { Length: > 0 } title ? title : DefaultTitle;
 
+    /// Заголовок с названием на главной. Шапку не трогает. Выключено только "off": пустое Get подменяет запасным "on".
+    public bool ShowTitle => Get("site.show_title", "on") != "off";
+
     /// Знаки считаются видимые: эмодзи — один знак, а не две половинки UTF-16. Длина в столбце
     /// проверяется отдельно: один видимый знак может нести сколько угодно диакритики.
     public static bool FitsTitle(string title)

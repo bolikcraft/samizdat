@@ -253,6 +253,7 @@ public static class PageEndpoints
     {
         ["title"] = settings.Title,
         ["icon_alt"] = settings.TitleOrDefault,
+        ["show_title"] = settings.ShowTitle,
         ["color_scheme"] = settings.ColorScheme,
         ["background_url"] = settings.BackgroundUrl,
         ["background_color"] = settings.BackgroundColor,
