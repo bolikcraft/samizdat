@@ -101,7 +101,7 @@ body {
 }
 
 .top {
-  width: calc(100% - 2rem);
+  width: calc(100% - 1rem);
   margin: 0 auto;
   padding: 1rem 0.5rem;
   color: var(--muted);
@@ -175,20 +175,20 @@ body {
    Потолка ширины нет намеренно: блоки тянутся под любое окно, отступ от краёв одинаковый.
    Ниже 720px они складываются в одну колонку со сворачиваемым деревом сверху. */
 .shell {
-  width: calc(100% - 2rem);
+  width: calc(100% - 1rem);
   /* Снизу тот же зазор, что по бокам: подвала нет, панель доходит до края окна. */
-  margin: 0 auto 1rem;
+  margin: 0 auto 0.5rem;
   display: grid;
-  grid-template-columns: 16rem minmax(0, 1fr);
+  grid-template-columns: 300px minmax(0, 1fr);
   gap: 0.25rem;
 }
 
 /* Страницы без дерева: вход, настройки, ошибки, статья по гостевой ссылке. */
-.shell-plain { display: block; width: min(52rem, calc(100% - 2rem)); }
+.shell-plain { display: block; width: min(52rem, calc(100% - 1rem)); }
 /* Вход — одна короткая форма, широкая панель вокруг неё смотрится пустой. */
-.shell-plain:has(.login) { width: min(26rem, calc(100% - 2rem)); }
+.shell-plain:has(.login) { width: min(26rem, calc(100% - 1rem)); }
 /* Статья по гостевой ссылке: панель во всю ширину окна, высоту ей даёт правило ниже. */
-.shell-full { width: calc(100% - 2rem); }
+.shell-full { width: calc(100% - 1rem); }
 
 /* Читалка: плотный фон, сквозь снимок длинный текст читать тяжело.
    Ширину не ограничиваем — статья тянется от боковика до правого края. */
@@ -241,10 +241,22 @@ body {
   border-radius: 4px;
 }
 
+/* Отступ панели перенесён внутрь дерева: так полоса прокрутки встаёт к правому краю панели. */
 #nav-tree {
   overflow-y: auto;
+  margin-right: -1rem;
+  padding-right: 1rem;
   font-family: system-ui, sans-serif;
   font-size: 0.92rem;
+}
+/* Тонкая полоса без стрелок у всех прокручиваемых столбцов: дерево, статья, разделы настроек. */
+:is(#nav-tree, .shell main, .sidebar-body, .settings-panes)::-webkit-scrollbar { width: 6px; }
+:is(#nav-tree, .shell main, .sidebar-body, .settings-panes)::-webkit-scrollbar-button { display: none; }
+:is(#nav-tree, .shell main, .sidebar-body, .settings-panes)::-webkit-scrollbar-track { background: transparent; }
+:is(#nav-tree, .shell main, .sidebar-body, .settings-panes)::-webkit-scrollbar-thumb { background: var(--muted); border-radius: 3px; }
+/* Chrome не применяет ::-webkit-scrollbar, если задан scrollbar-color, поэтому стандартные свойства — только для Firefox. */
+@supports not selector(::-webkit-scrollbar) {
+  :is(#nav-tree, .shell main, .sidebar-body, .settings-panes) { scrollbar-width: thin; scrollbar-color: var(--muted) transparent; }
 }
 #nav-tree [hidden] { display: none; }
 
@@ -305,6 +317,7 @@ body {
   .shell main { padding: 0.75rem; border-radius: 10px; }
   .sidebar { margin-bottom: 0.75rem; padding: 0.75rem; border-radius: 10px; }
   .nav-switch { display: block; }
+  #nav-tree { margin-right: 0; padding-right: 0; }
   .nav-switch summary {
     cursor: pointer;
     list-style: none;
@@ -327,6 +340,7 @@ a { color: var(--accent); }
 .articles { list-style: none; padding: 0; margin: 0; }
 .articles li { border-bottom: 1px solid var(--line); padding: 0.9rem 0; }
 .articles li:first-child { padding-top: 0; }
+.articles li:last-child { border-bottom: none; padding-bottom: 0; }
 .articles a { font-size: 1.1rem; font-weight: bold; text-decoration: none; }
 .articles a:hover { text-decoration: underline; }
 .articles .nav-closed { font-size: 1.1rem; font-weight: bold; }
@@ -464,12 +478,30 @@ button.is-busy::after {
   body:has(.settings-nav) .shell { flex: 1; min-height: 0; }
   body:has(.settings-nav) .sidebar { display: flex; flex-direction: column; overflow: hidden; }
   /* Столбец и так во всю высоту панели, липкость с потолком высоты тут только мешают. */
-  body:has(.settings-nav) .sidebar-body { position: static; max-height: none; min-height: 0; overflow-y: auto; }
+  /* Отступ панели перенесён внутрь столбца: полоса прокрутки встаёт к краю панели, как у дерева. */
+  body:has(.settings-nav) .sidebar-body { position: static; max-height: none; min-height: 0; overflow-y: auto; margin-right: -1rem; padding-right: 1rem; }
   body:has(.settings-nav) .shell main { display: flex; flex-direction: column; overflow: hidden; }
   /* Заголовок страницы стоит на месте, едет только раздел. */
   /* Прокрутка обрезает всё, что выходит за край, и у полей пропадала обводка фокуса (3px).
      Поля дают ей место, отрицательный отступ возвращает содержимое на прежнюю линию. */
-  body:has(.settings-nav) .settings-panes { flex: 1; min-height: 0; overflow-y: auto; padding: 0 4px; margin: 0 -4px; }
+  /* Справа отступ панели целиком, чтобы полоса встала к её краю. */
+  body:has(.settings-nav) .settings-panes { flex: 1; min-height: 0; overflow-y: auto; padding: 0 1.5rem 0 4px; margin: 0 -1.5rem 0 -4px; }
+
+  /* Страницы с деревом тоже занимают окно целиком: фон виден со всех сторон, у дерева и у статьи
+     своя прокрутка, полоса статьи стоит у края панели. */
+  body:has(#nav-tree) {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+  }
+  body:has(#nav-tree) .shell { flex: 1; min-height: 0; }
+  body:has(#nav-tree) .sidebar { display: flex; flex-direction: column; min-height: 0; }
+  body:has(#nav-tree) .sidebar-body { position: static; flex: 1; max-height: none; min-height: 0; }
+  body:has(#nav-tree) #nav-tree { flex: 1; min-height: 0; }
+  body:has(#nav-tree) .shell main { overflow-y: auto; }
 
   /* Гостевая статья: панель тянется до низа окна, но своей прокрутки не имеет. Длинный текст
      растит страницу, и шапка уезжает вместе с ней. Высоту даёт flex: 1 при body min-height: 100vh. */
@@ -524,7 +556,8 @@ button.is-busy::after {
 /* В узком окне подпись всё же переносится, и галка встаёт к первой строке, а не к середине. */
 .settings-form .field-hint { font-size: 0.8rem; }
 .settings-form label.check { display: flex; flex-direction: row; align-items: start; gap: 0.5rem; cursor: pointer; }
-.settings-form label.check input { width: auto; padding: 0; margin: 0.15rem 0 0; border: none; background: none; accent-color: var(--accent); }
+/* Галка ростом в 1em стоит по центру первой строки: отступ сверху — половина разницы высоты строки и галки. */
+.settings-form label.check input { flex-shrink: 0; width: 1em; height: 1em; padding: 0; margin: calc((1lh - 1em) / 2) 0 0; font: inherit; line-height: inherit; border: none; background: none; accent-color: var(--accent); }
 
 /* Форма загрузки и текущий фон стоят рядом, пока хватает ширины. */
 .inline-form { margin: 0; }
