@@ -249,14 +249,14 @@ body {
   font-family: system-ui, sans-serif;
   font-size: 0.92rem;
 }
-/* Тонкая полоса без стрелок у всех прокручиваемых столбцов: дерево, статья, разделы настроек. */
-:is(#nav-tree, .shell main, .sidebar-body, .settings-panes)::-webkit-scrollbar { width: 6px; }
-:is(#nav-tree, .shell main, .sidebar-body, .settings-panes)::-webkit-scrollbar-button { display: none; }
-:is(#nav-tree, .shell main, .sidebar-body, .settings-panes)::-webkit-scrollbar-track { background: transparent; }
-:is(#nav-tree, .shell main, .sidebar-body, .settings-panes)::-webkit-scrollbar-thumb { background: var(--muted); border-radius: 3px; }
+/* Тонкая полоса без стрелок у всех прокручиваемых столбцов: дерево, статья, разделы и таблицы настроек. */
+:is(#nav-tree, .shell main, .sidebar-body, .settings-panes, .table-scroll)::-webkit-scrollbar { width: 6px; height: 6px; }
+:is(#nav-tree, .shell main, .sidebar-body, .settings-panes, .table-scroll)::-webkit-scrollbar-button { display: none; }
+:is(#nav-tree, .shell main, .sidebar-body, .settings-panes, .table-scroll)::-webkit-scrollbar-track { background: transparent; }
+:is(#nav-tree, .shell main, .sidebar-body, .settings-panes, .table-scroll)::-webkit-scrollbar-thumb { background: var(--muted); border-radius: 3px; }
 /* Chrome не применяет ::-webkit-scrollbar, если задан scrollbar-color, поэтому стандартные свойства — только для Firefox. */
 @supports not selector(::-webkit-scrollbar) {
-  :is(#nav-tree, .shell main, .sidebar-body, .settings-panes) { scrollbar-width: thin; scrollbar-color: var(--muted) transparent; }
+  :is(#nav-tree, .shell main, .sidebar-body, .settings-panes, .table-scroll) { scrollbar-width: thin; scrollbar-color: var(--muted) transparent; }
 }
 #nav-tree [hidden] { display: none; }
 
@@ -528,7 +528,10 @@ button.is-busy::after {
 .settings-pane:target { display: block; }
 .settings-panes:not(:has(.settings-pane:target)) > .settings-pane:first-child { display: block; }
 
-.settings-pane h2 { margin: 0 0 0.4rem; font-size: 1.25rem; }
+.settings-pane { position: relative; }
+.settings-pane h2 { margin: 0 0 1rem; font-size: 1.25rem; }
+/* В «Общих» формы стоят без блоков: без отступа кнопка одной упиралась в поле следующей. */
+.settings-pane > .settings-form + .settings-form { margin-top: 1.5rem; }
 .settings-pane h3 { margin: 0 0 0.4rem; font-size: 1rem; }
 /* Подсказки и таблицы настроек — тем же шрифтом, что подписи полей. Засечки остаются у статей. */
 .settings-panes { font-family: system-ui, sans-serif; }
@@ -548,7 +551,7 @@ button.is-busy::after {
   border-color: var(--accent); outline: 2px solid var(--accent); outline-offset: 1px;
 }
 .settings-form fieldset.color-scheme {
-  border: 1px solid var(--line); border-radius: 8px; padding: 0.4rem 0.6rem 0.6rem; max-width: 24rem;
+  margin: 0; border: 1px solid var(--line); border-radius: 8px; padding: 0.4rem 0.6rem 0.6rem; max-width: 24rem;
 }
 .settings-form fieldset.color-scheme legend { font-family: system-ui, sans-serif; font-size: 0.85rem; color: var(--muted); padding: 0 0.3rem; }
 .settings-form button { justify-self: start; }
@@ -728,6 +731,8 @@ button.is-busy::after {
   font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted);
 }
 .settings-table td:first-child, .settings-table th:first-child { padding-left: 0; }
+/* Дата и срок, разбитые на две строки, раздували высоту строки. */
+.settings-table .nowrap { white-space: nowrap; }
 .settings-table .row-actions { text-align: right; white-space: nowrap; }
 table.pending .row-actions { display: flex; gap: 0.4rem; justify-content: flex-end; white-space: nowrap; }
 
@@ -754,10 +759,14 @@ form.is-saving { opacity: 0.6; pointer-events: none; }
   font-size: 0.875rem; font-weight: 600; cursor: pointer; list-style: none;
 }
 .add-form > summary::-webkit-details-marker { display: none; }
+/* Стрелка говорит, что кнопка раскрывает форму, а не отправляет её. */
+.add-form > summary::after { content: "▾"; margin-left: 0.5rem; font-size: 0.8em; }
+.add-form[open] > summary::after { content: "▴"; }
 .add-form[open] > summary { margin-bottom: 0.75rem; background: none; color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
 
-/* Меню «⋯» раскрывается внутри ячейки, а не поверх страницы: таблица лежит в обёртке
-   с прокруткой, и всплывающий блок обрезался бы ею. Кнопка «⋯» и при открытом меню у правого края. */
+/* Меню «⋯» всплывает поверх страницы. Его блок отсчитывается от раздела, а не от ячейки:
+   тогда обёртка таблицы с прокруткой его не обрезает, а right: 0 держит его в пределах раздела
+   и на узком экране. Верх не задан — блок встаёт сразу под «⋯». */
 .row-menu { display: inline-block; text-align: right; }
 .row-menu > summary {
   display: inline-grid; place-items: center; width: 2.125rem; height: 2.125rem;
@@ -766,16 +775,20 @@ form.is-saving { opacity: 0.6; pointer-events: none; }
 .row-menu > summary::-webkit-details-marker { display: none; }
 .row-menu > summary:hover, .row-menu[open] > summary { background: var(--callout); color: var(--fg); }
 .row-menu-body {
-  display: grid; gap: 0.6rem; justify-items: end; min-width: min(16rem, 70vw); text-align: left;
-  margin-top: 0.4rem; padding: 0.75rem; border: 1px solid var(--line); border-radius: 8px; background: var(--bg);
+  position: absolute; right: 0; z-index: 5;
+  display: grid; gap: 0.6rem; justify-items: start; text-align: left; white-space: normal;
+  margin-top: 0.25rem; padding: 0.75rem; border: 1px solid var(--panel-border); border-radius: 10px;
+  background: var(--panel-solid); box-shadow: var(--shadow);
 }
+.row-menu-body:has(.settings-form) { width: min(18rem, calc(100vw - 3rem)); }
 .row-menu-body .settings-form { width: 100%; }
-.settings-table .row-actions { vertical-align: top; }
+.row-menu-body > form + form { width: 100%; padding-top: 0.6rem; border-top: 1px solid var(--line); }
 
 /* Неработающие ссылки и приглашения скрыты, пока галка снята. */
 .dead-filter:has(.show-dead:not(:checked)) .gone { display: none; }
-.show-dead-label { display: flex; gap: 0.5rem; align-items: center; margin: 0 0 0.5rem; font-size: 0.9rem; color: var(--muted); cursor: pointer; }
-.show-dead { accent-color: var(--accent); }
+.show-dead-label { display: flex; gap: 0.5rem; align-items: center; margin: 0 0 0.75rem; font-size: 0.9rem; color: var(--muted); cursor: pointer; }
+/* Галка того же размера и на той же линии, что галки в формах. */
+.show-dead { width: 1em; height: 1em; margin: 0; flex-shrink: 0; accent-color: var(--accent); }
 .muted { color: var(--muted); }
 
 .visibility-form { display: flex; align-items: center; gap: 0.75rem; margin: 1rem 0 0; }

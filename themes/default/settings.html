@@ -187,7 +187,7 @@
       {{ for person in signup.pending }}
       <tr>
         <td>{{ person.login | html.escape }}</td>
-        <td>{{ person.created_at | html.escape }}</td>
+        <td class="nowrap">{{ person.created_at | html.escape }}</td>
         <td class="row-actions">
           <form method="post" action="/settings/signup/{{ person.id }}/approve" class="inline-form approve-form">
             {{ antiforgery }}
@@ -227,7 +227,7 @@
       <tr>
         <td>{{ person.login | html.escape }}</td>
         <td>{{ person.role | html.escape }}</td>
-        <td>{{ person.created_at | html.escape }}</td>
+        <td class="nowrap">{{ person.created_at | html.escape }}</td>
         <td class="row-actions">
           {{~ if person.can_change ~}}
           <details class="row-menu">
@@ -291,7 +291,7 @@
             </div>
           </td>
           <td>{{ if invite.note }}{{ invite.note | html.escape }}{{ else }}—{{ end }}</td>
-          <td>
+          <td class="nowrap">
             {{~ if invite.used_at ~}}
             {{ t.settings.signup.used | string.replace "{0}" (invite.used_by | html.escape) | string.replace "{1}" (invite.used_at | html.escape) }}
             {{~ else if invite.alive ~}}
@@ -372,8 +372,8 @@
             </div>
           </td>
           <td>{{ if link.note }}{{ link.note | html.escape }}{{ else }}—{{ end }}</td>
-          <td>{{ if link.alive }}{{ if link.expires_at }}{{ t.settings.state.until | string.replace "{0}" (link.expires_at | html.escape) }}{{ else }}{{ t.settings.state.no_term }}{{ end }}{{ else }}{{ t.settings.state.dead }}{{ end }}</td>
-          <td>{{ link.opened_count }}{{ if link.last_opened_at }}, {{ link.last_opened_at | html.escape }}{{ end }}</td>
+          <td class="nowrap">{{ if link.alive }}{{ if link.expires_at }}{{ t.settings.state.until | string.replace "{0}" (link.expires_at | html.escape) }}{{ else }}{{ t.settings.state.no_term }}{{ end }}{{ else }}{{ t.settings.state.dead }}{{ end }}</td>
+          <td class="nowrap">{{ link.opened_count }}{{ if link.last_opened_at }}, {{ link.last_opened_at | html.escape }}{{ end }}</td>
           <td class="row-actions">
             {{~ if link.alive ~}}
             <details class="row-menu">
@@ -427,8 +427,8 @@
     {{ for token in tokens }}
     <tr>
       <td>{{ if token.note }}{{ token.note | html.escape }}{{ else }}<span class="muted">{{ t.settings.tokens.no_note }}</span>{{ end }}</td>
-      <td>{{ token.created_at | html.escape }}</td>
-      <td>{{ if token.last_used_at }}{{ token.last_used_at | html.escape }}{{ else }}{{ t.settings.tokens.never_used }}{{ end }}</td>
+      <td class="nowrap">{{ token.created_at | html.escape }}</td>
+      <td class="nowrap">{{ if token.last_used_at }}{{ token.last_used_at | html.escape }}{{ else }}{{ t.settings.tokens.never_used }}{{ end }}</td>
       <td class="row-actions">
         <details class="row-menu">
           <summary aria-label="{{ t.settings.actions }}">⋯</summary>
