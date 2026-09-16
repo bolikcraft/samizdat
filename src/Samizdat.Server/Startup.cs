@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration.Json;
 using Microsoft.Extensions.Configuration.Xml;
+using Samizdat.Core.Localization;
 using Samizdat.Core.Rendering;
 using Samizdat.Core.Themes;
 using Samizdat.Server.Auth;
@@ -30,7 +31,23 @@ public static class Startup
         builder.Services.AddScoped<SiteSettings>();
         builder.Services.AddScoped<IThemeSource>(services =>
             services.GetRequiredService<ThemeFactory>().Get(services.GetRequiredService<SiteSettings>().ThemeName));
-        builder.Services.AddScoped(services => new PageRenderer(services.GetRequiredService<IThemeSource>()));
+        builder.Services.AddHttpContextAccessor();
+        builder.Services.AddSingleton(new LanguageCatalog(new LayeredLanguageSource(
+            new DiskLanguageSource(Path.Combine(dataRoot, "lang")), new EmbeddedLanguageSource())));
+        builder.Services.AddScoped(services =>
+        {
+            var catalog = services.GetRequiredService<LanguageCatalog>();
+            var settings = services.GetRequiredService<SiteSettings>();
+            var login = services.GetRequiredService<IHttpContextAccessor>().HttpContext?.User.Identity?.Name;
+            // Личный язык сильнее сайтового; пусто или пакета нет — язык сайта.
+            var personal = login is null
+                ? null
+                : services.GetRequiredService<SamizdatDbContext>().Users
+                    .Where(row => row.Login == login).Select(row => row.Language).FirstOrDefault();
+            return catalog.For(catalog.Has(personal) ? personal : settings.Language);
+        });
+        builder.Services.AddScoped(services => new PageRenderer(services.GetRequiredService<IThemeSource>(),
+                                                               services.GetRequiredService<Translator>()));
         builder.Services.AddSingleton<ArticleRenderer>();
         builder.Services.AddSingleton<PageCache>();
 

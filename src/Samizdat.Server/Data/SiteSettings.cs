@@ -15,6 +15,9 @@ public sealed class SiteSettings(SamizdatDbContext db, IConfiguration configurat
     public string ThemeName => Get("theme.name", configuration["Samizdat:Theme"] ?? "default");
     public string ColorScheme => Get("theme.color_scheme", configuration["Samizdat:ColorScheme"] ?? "system");
 
+    /// Язык сайта. По умолчанию английский: сайт ставят и читают не только по-русски.
+    public string Language => Get("site.language", configuration["Samizdat:Language"] ?? "en");
+
     /// Открытая регистрация. По умолчанию выключена: сайт личный, и пускать к нему кого попало
     /// владелец должен решить сам.
     public bool OpenRegistration => Get("auth.open_registration", "false") == "true";

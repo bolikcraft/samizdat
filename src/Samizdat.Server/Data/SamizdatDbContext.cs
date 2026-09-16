@@ -46,6 +46,7 @@ public sealed class SamizdatDbContext(DbContextOptions<SamizdatDbContext> option
             user.ToTable("users");
             user.HasIndex(row => row.Login).IsUnique();
             user.Property(row => row.Login).HasMaxLength(100).UseCollation(CaseInsensitive);
+            user.Property(row => row.Language).HasMaxLength(16).HasDefaultValue("");
         });
 
         model.Entity<ApiTokenRow>(token =>

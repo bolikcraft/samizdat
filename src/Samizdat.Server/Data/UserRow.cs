@@ -23,6 +23,9 @@ public sealed class UserRow
     // дату ставит только открытая регистрация, и она делает это явно.
     public DateTimeOffset? ApprovedAt { get; set; } = DateTimeOffset.UtcNow;
 
+    /// Язык интерфейса этого человека. Пусто — как на сайте.
+    public string Language { get; set; } = "";
+
     /// Метка сессии: едет в cookie и сверяется с базой на каждом запросе. Новая метка гасит
     /// выданные cookie — так смена пароля закрывает чужие сессии.
     public string SessionStamp { get; set; } = NewSessionStamp();
