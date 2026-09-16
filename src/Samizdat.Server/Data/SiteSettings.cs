@@ -1,3 +1,4 @@
+using System.Globalization;
 using Samizdat.Server.Auth;
 using Samizdat.Server.Storage;
 
@@ -12,8 +13,21 @@ public sealed class SiteSettings(SamizdatDbContext db, IConfiguration configurat
     public const string PresetPrefix = "preset:";
     public const string ColorPrefix = "color:";
 
+    /// Равна длине столбца site_settings.value.
+    public const int MaxValueLength = 500;
+
+    public const int MaxTitleLength = 60;
+
     public string ThemeName => Get("theme.name", configuration["Samizdat:Theme"] ?? "default");
     public string ColorScheme => Get("theme.color_scheme", configuration["Samizdat:ColorScheme"] ?? "system");
+
+    public string Title => Get("site.title", configuration["Samizdat:Title"] ?? "Samizdat");
+
+    /// Знаки считаются видимые: эмодзи — один знак, а не две половинки UTF-16. Длина в столбце
+    /// проверяется отдельно: один видимый знак может нести сколько угодно диакритики.
+    public static bool FitsTitle(string title)
+        => title.Length is > 0 and <= MaxValueLength
+           && new StringInfo(title).LengthInTextElements <= MaxTitleLength;
 
     /// Язык сайта. По умолчанию английский: сайт ставят и читают не только по-русски.
     public string Language => Get("site.language", configuration["Samizdat:Language"] ?? "en");
@@ -49,10 +63,10 @@ public sealed class SiteSettings(SamizdatDbContext db, IConfiguration configurat
 
     /// Всё, что вид страницы берёт из настроек. Задумана как часть ключа кэша страниц:
     /// layout.html рендерится внутри закэшированной страницы, и без этого отпечатка смена
-    /// схемы, фона или разрешения скачивать была бы не видна на статье, отрендеренной раньше.
+    /// названия, схемы, фона или разрешения скачивать была бы не видна на статье, отрендеренной раньше.
     public string ViewFingerprint
         => $"{ThemeName}|{ColorScheme}|{Get("theme.background", "")}|{background.Version(BackgroundFileName)}"
-           + $"|{Download.Readers}|{Download.Guests}";
+           + $"|{Download.Readers}|{Download.Guests}|{Title}";
 
     public string Get(string key, string fallback)
         => db.Settings.Find(key)?.Value is { Length: > 0 } value ? value : fallback;

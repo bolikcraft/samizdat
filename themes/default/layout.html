@@ -16,7 +16,7 @@
 <style>:root { --backdrop: {{ site.background_color }}; --brand: {{ site.background_color }}; }</style>{{ end }}</head>
 <body>
 <header class="top">
-  <a href="/">{{ site.title | html.escape }}</a>
+  <a class="top-home" href="/"><img src="/assets/icon.svg" alt="" width="24" height="24"><span class="top-title">{{ site.title | html.escape }}</span></a>
   {{ if user }}
   <form class="search" action="/search" method="get" role="search">
     <input type="search" name="q" value="{{ if search_query }}{{ search_query | html.escape }}{{ end }}"

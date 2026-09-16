@@ -98,6 +98,8 @@ public static class SettingsEndpoints
                 ["message_kind"] = err is not null ? "err" : ok is not null ? "ok" : null,
                 ["message_section"] = (err ?? ok) is { } code ? SectionOf(code) : null,
                 ["color_scheme"] = settings.ColorScheme,
+                ["site_title"] = settings.Title,
+                ["max_title_length"] = SiteSettings.MaxTitleLength,
                 ["background"] = BackgroundModel(settings, background, BackgroundCatalog.Read(theme)),
                 ["download"] = new Dictionary<string, object?>
                 {
@@ -161,6 +163,16 @@ public static class SettingsEndpoints
             var theme = form["theme"].ToString();
             var colorScheme = form["color_scheme"].ToString();
             var language = form["language"].ToString();
+            var title = form["title"].ToString().Trim();
+
+            // Поля нет в форме — название не трогаем. Плохое название отменяет всю форму:
+            // владелец видит ошибку, и прочие поля не должны сохраниться молча.
+            if (form.ContainsKey("title"))
+            {
+                if (!SiteSettings.FitsTitle(title))
+                    return Err("bad_title");
+                settings.Set("site.title", title);
+            }
 
             if (themes.AvailableThemes().Contains(theme)) settings.Set("theme.name", theme);
             if (colorScheme is "light" or "dark" or "system") settings.Set("theme.color_scheme", colorScheme);

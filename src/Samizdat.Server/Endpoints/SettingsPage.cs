@@ -60,6 +60,7 @@ public static class SettingsPage
             return err switch
             {
                 "short_password" or "person_short_password" => text.Format($"settings.msg.{err}", MinPasswordLength),
+                "bad_title" => text.Format("settings.msg.bad_title", SiteSettings.MaxTitleLength),
                 _ => Known(text, err) ?? text["settings.msg.failed"],
             };
 

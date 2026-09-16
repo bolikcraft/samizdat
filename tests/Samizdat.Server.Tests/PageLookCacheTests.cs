@@ -225,4 +225,21 @@ public class PageLookCacheTests : IDisposable
 
         Assert.NotEqual(first, settings.ViewFingerprint);
     }
+
+    [Fact]
+    public async Task An_article_page_picks_up_a_new_site_title()
+    {
+        WriteArticle("zametka", "---\ntitle: Заметка\n---\nтекст\n");
+        var factory = StartFactory();
+        RegisterArticle(factory, "zametka", "Заметка");
+        var client = await OwnerClient(factory);
+
+        Assert.Contains(">Samizdat</span>", await client.GetStringAsync("/zametka"));
+
+        var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
+        await client.PostAsync("/settings/appearance", new FormUrlEncodedContent(
+            new Dictionary<string, string> { [name] = value, ["title"] = "Записки" }));
+
+        Assert.Contains(">Записки</span>", await client.GetStringAsync("/zametka"));
+    }
 }

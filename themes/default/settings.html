@@ -27,6 +27,9 @@
           {{ end }}
         </select>
       </label>
+      <label>{{ t.settings.appearance.site_title }}
+        <input type="text" name="title" value="{{ site_title | html.escape }}" maxlength="{{ max_title_length }}" required>
+      </label>
       <label>{{ t.settings.appearance.language }}
         <select name="language">
           {{ for item in languages }}

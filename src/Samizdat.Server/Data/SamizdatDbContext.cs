@@ -62,7 +62,7 @@ public sealed class SamizdatDbContext(DbContextOptions<SamizdatDbContext> option
             setting.ToTable("site_settings");
             setting.HasKey(row => row.Key);
             setting.Property(row => row.Key).HasMaxLength(100);
-            setting.Property(row => row.Value).HasMaxLength(500);
+            setting.Property(row => row.Value).HasMaxLength(SiteSettings.MaxValueLength);
         });
 
         model.Entity<ShareLinkRow>(link =>

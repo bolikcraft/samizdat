@@ -328,6 +328,40 @@ public class SiteSettingsTests : IDisposable
         Assert.NotEqual(afterReaders, settings.ViewFingerprint);
     }
 
+    [Fact]
+    public void The_site_title_comes_from_config_while_the_database_is_empty()
+    {
+        var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("Samizdat:DataRoot", dataRoot);
+            builder.UseSetting("ConnectionStrings:Postgres", database.ConnectionString);
+            builder.UseSetting("hostBuilder:reloadConfigOnChange", "false");
+            builder.UseSetting("Samizdat:Title", "Из конфига");
+        });
+
+        using (var scope = factory.Services.CreateScope())
+            Assert.Equal("Из конфига", scope.ServiceProvider.GetRequiredService<SiteSettings>().Title);
+
+        SetSetting(factory, "site.title", "Из базы");
+        using (var scope = factory.Services.CreateScope())
+            Assert.Equal("Из базы", scope.ServiceProvider.GetRequiredService<SiteSettings>().Title);
+    }
+
+    [Theory]
+    [InlineData("Записки", true)]
+    [InlineData("", false)]
+    public void A_title_fits_when_it_is_not_empty(string title, bool fits)
+        => Assert.Equal(fits, SiteSettings.FitsTitle(title));
+
+    [Fact]
+    public void A_title_of_one_letter_with_endless_accents_does_not_fit_the_column()
+    {
+        // Один видимый знак, но в столбец на 500 он не влезет.
+        var title = "я" + new string('\u0301', SiteSettings.MaxValueLength);
+
+        Assert.False(SiteSettings.FitsTitle(title));
+    }
+
     static byte[] Jpeg() => [0xFF, 0xD8, 0xFF, 0xE0, 1, 2, 3, 4];
 
     sealed class CapturingLoggerProvider : ILoggerProvider

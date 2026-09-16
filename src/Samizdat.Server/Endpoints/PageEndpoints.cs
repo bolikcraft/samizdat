@@ -40,7 +40,7 @@ public static class PageEndpoints
 
             return Results.Content(pages.Render("index.html", new()
             {
-                ["page_title"] = "Samizdat",
+                ["page_title"] = settings.Title,
                 ["site"] = SiteModel(settings),
                 ["articles"] = list,
                 ["nav"] = Navigation(db, currentSlug: null, isOwner),
@@ -251,7 +251,7 @@ public static class PageEndpoints
 
     internal static Dictionary<string, object?> SiteModel(SiteSettings settings) => new()
     {
-        ["title"] = "Samizdat",
+        ["title"] = settings.Title,
         ["color_scheme"] = settings.ColorScheme,
         ["background_url"] = settings.BackgroundUrl,
         ["background_color"] = settings.BackgroundColor,

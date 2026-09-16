@@ -659,4 +659,116 @@ public class SettingsPageTests : IDisposable
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Contains("action=\"/login\"", await client.GetStringAsync("/"));
     }
+
+    [Fact]
+    public async Task The_site_title_out_of_the_box_is_samizdat()
+    {
+        var factory = StartFactory();
+        AddOwner(factory, "aleks", "тайна");
+        var client = await LoginClient(factory, "aleks", "тайна");
+
+        var html = await client.GetStringAsync("/");
+
+        Assert.Contains("<title>Samizdat</title>", html);
+        Assert.Contains("<span class=\"top-title\">Samizdat</span>", html);
+    }
+
+    [Fact]
+    public async Task The_owner_renames_the_site_and_the_header_and_the_tab_follow()
+    {
+        var factory = StartFactory();
+        AddOwner(factory, "aleks", "тайна");
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        await client.PostAsync("/login", new FormUrlEncodedContent(
+            new Dictionary<string, string> { ["login"] = "aleks", ["password"] = "тайна" }));
+        var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
+
+        var response = await client.PostAsync("/settings/appearance", new FormUrlEncodedContent(
+            new Dictionary<string, string> { [name] = value, ["title"] = "  Записки <Алекса>  " }));
+        var index = await client.GetStringAsync("/");
+        var settings = await client.GetStringAsync("/settings");
+
+        Assert.Equal("/settings?ok=appearance#appearance", response.Headers.Location?.OriginalString);
+        Assert.Contains("<title>Записки &lt;Алекса&gt;</title>", index);
+        Assert.Contains("<span class=\"top-title\">Записки &lt;Алекса&gt;</span>", index);
+        Assert.Contains("name=\"title\" value=\"Записки &lt;Алекса&gt;\"", settings);
+        Assert.Contains("maxlength=\"60\"", settings);
+    }
+
+    [Theory]
+    [InlineData("   ")]
+    [InlineData("")]
+    public async Task An_empty_site_title_is_refused(string title)
+    {
+        var factory = StartFactory();
+        AddOwner(factory, "aleks", "тайна");
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        await client.PostAsync("/login", new FormUrlEncodedContent(
+            new Dictionary<string, string> { ["login"] = "aleks", ["password"] = "тайна" }));
+        var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
+
+        var response = await client.PostAsync("/settings/appearance", new FormUrlEncodedContent(
+            new Dictionary<string, string> { [name] = value, ["title"] = title, ["color_scheme"] = "dark" }));
+        var index = await client.GetStringAsync("/");
+        var page = await client.GetStringAsync("/settings?err=bad_title");
+
+        Assert.Equal("/settings?err=bad_title#appearance", response.Headers.Location?.OriginalString);
+        Assert.Contains("<title>Samizdat</title>", index);
+        // Форма с ошибкой не сохраняется целиком: схема тоже осталась прежней.
+        Assert.Contains("data-color-scheme=\"system\"", index);
+        Assert.Contains("The site name must not be empty or longer than 60 characters.", page);
+    }
+
+    [Fact]
+    public async Task A_site_title_longer_than_the_limit_is_refused()
+    {
+        var factory = StartFactory();
+        AddOwner(factory, "aleks", "тайна");
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        await client.PostAsync("/login", new FormUrlEncodedContent(
+            new Dictionary<string, string> { ["login"] = "aleks", ["password"] = "тайна" }));
+        var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
+
+        var tooLong = await client.PostAsync("/settings/appearance", new FormUrlEncodedContent(
+            new Dictionary<string, string> { [name] = value, ["title"] = new string('я', SiteSettings.MaxTitleLength + 1) }));
+        Assert.Equal("/settings?err=bad_title#appearance", tooLong.Headers.Location?.OriginalString);
+        Assert.Contains("<title>Samizdat</title>", await client.GetStringAsync("/"));
+
+        var exact = new string('я', SiteSettings.MaxTitleLength);
+        var fits = await client.PostAsync("/settings/appearance", new FormUrlEncodedContent(
+            new Dictionary<string, string> { [name] = value, ["title"] = exact }));
+        Assert.Equal("/settings?ok=appearance#appearance", fits.Headers.Location?.OriginalString);
+        Assert.Contains($"<title>{exact}</title>", await client.GetStringAsync("/"));
+    }
+
+    [Fact]
+    public async Task A_title_of_emoji_counts_characters_not_code_units()
+    {
+        var factory = StartFactory();
+        AddOwner(factory, "aleks", "тайна");
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        await client.PostAsync("/login", new FormUrlEncodedContent(
+            new Dictionary<string, string> { ["login"] = "aleks", ["password"] = "тайна" }));
+        var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
+
+        // Каждый знак тут — две половинки UTF-16: по string.Length строка вдвое длиннее предела.
+        var title = string.Concat(Enumerable.Repeat("📚", SiteSettings.MaxTitleLength));
+        var response = await client.PostAsync("/settings/appearance", new FormUrlEncodedContent(
+            new Dictionary<string, string> { [name] = value, ["title"] = title }));
+
+        Assert.Equal("/settings?ok=appearance#appearance", response.Headers.Location?.OriginalString);
+    }
+
+    [Fact]
+    public async Task The_header_shows_the_icon_before_the_title()
+    {
+        var factory = StartFactory();
+        AddOwner(factory, "aleks", "тайна");
+        var client = await LoginClient(factory, "aleks", "тайна");
+
+        var html = await client.GetStringAsync("/");
+
+        Assert.Matches("<a class=\"top-home\" href=\"/\"><img src=\"/assets/icon.svg\" alt=\"\"[^>]*>"
+                       + "<span class=\"top-title\">Samizdat</span></a>", html);
+    }
 }

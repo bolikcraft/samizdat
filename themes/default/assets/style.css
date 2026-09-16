@@ -110,6 +110,10 @@ body {
 /* Шапка держится над панелью: иначе выпадающее меню владельца уходит ей за край. */
 .top { position: relative; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
 .top a { color: var(--fg); font-family: system-ui, sans-serif; font-weight: bold; text-decoration: none; }
+/* Длинное название обрезается многоточием: min-width: 0 даёт ссылке сжаться во flex-строке шапки. */
+.top-home { display: flex; align-items: center; gap: 0.4em; min-width: 0; }
+.top-home img { flex-shrink: 0; width: 1.4em; height: 1.4em; }
+.top-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Меню владельца: <details> без js, раскрывается вправо под именем. */
 .user-menu { position: relative; font-family: system-ui, sans-serif; font-size: 0.9rem; }
@@ -451,7 +455,9 @@ button.is-busy::after {
   body:has(.settings-nav) .sidebar-body { position: static; max-height: none; min-height: 0; overflow-y: auto; }
   body:has(.settings-nav) .shell main { display: flex; flex-direction: column; overflow: hidden; }
   /* Заголовок страницы стоит на месте, едет только раздел. */
-  body:has(.settings-nav) .settings-panes { flex: 1; min-height: 0; overflow-y: auto; }
+  /* Прокрутка обрезает всё, что выходит за край, и у полей пропадала обводка фокуса (3px).
+     Поля дают ей место, отрицательный отступ возвращает содержимое на прежнюю линию. */
+  body:has(.settings-nav) .settings-panes { flex: 1; min-height: 0; overflow-y: auto; padding: 0 4px; margin: 0 -4px; }
 
   /* Гостевая статья: панель тянется до низа окна, но своей прокрутки не имеет. Длинный текст
      растит страницу, и шапка уезжает вместе с ней. Высоту даёт flex: 1 при body min-height: 100vh. */
