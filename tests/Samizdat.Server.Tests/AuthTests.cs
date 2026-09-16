@@ -236,5 +236,24 @@ public class AuthTests : IDisposable
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/login")).StatusCode);
     }
 
-    public void Dispose() => Directory.Delete(dataRoot, recursive: true);
+    // Место под хэш одно, очереди нет: пока тест держит место, вход обязан получить 429, а не
+    // запустить ещё один Argon2id на 64 МБ.
+    [Fact]
+    public async Task Login_waits_for_a_free_password_hash_slot()
+    {
+        var factory = StartServer(("Samizdat:Auth:ParallelHashes", "1"), ("Samizdat:Auth:HashQueue", "0"));
+        AddOwner(factory, "aleks", "тайна");
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        var held = await factory.Services.GetRequiredService<PasswordGate>().Enter(CancellationToken.None);
+        Assert.True(held.IsAcquired);
+
+        var busy = await TestLogin.PostLogin(client, "aleks", "тайна");
+        held.Dispose();
+        var free = await TestLogin.PostLogin(client, "aleks", "тайна");
+
+        Assert.Equal(HttpStatusCode.TooManyRequests, busy.StatusCode);
+        Assert.Equal(HttpStatusCode.Redirect, free.StatusCode);
+    }
+
+    public void Dispose() =>Directory.Delete(dataRoot, recursive: true);
 }

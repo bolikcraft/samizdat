@@ -43,7 +43,7 @@ public static class RegistrationEndpoints
 
         app.MapPost("/i/{token}", async (string token, HttpContext context, SamizdatDbContext db,
                                          PageRenderer pages, SiteSettings settings,
-                                         IAntiforgery antiforgery, Translator text) =>
+                                         IAntiforgery antiforgery, Translator text, PasswordGate gate) =>
         {
             if (context.User.Identity?.IsAuthenticated == true) return Results.Redirect("/");
 
@@ -58,10 +58,21 @@ public static class RegistrationEndpoints
                 return Form(pages, settings, text, antiforgery, context, $"/i/{token}", invite.Note,
                             form.Login, fault);
 
+            // Занятый логин отвечаем до хэша: иначе залп с чужим логином считает Argon2id впустую.
+            // Гонку двух заявок на один логин ловит уникальный индекс ниже.
+            if (await db.Users.AnyAsync(row => row.Login == form.Login))
+                return Form(pages, settings, text, antiforgery, context, $"/i/{token}", invite.Note,
+                            form.Login, text["register.err.login_taken"]);
+
             // Хэш считается до транзакции: Argon2id занимает десятые доли секунды, и соседняя
             // вкладка ждала бы их на блокировке строки.
             var now = DateTimeOffset.UtcNow;
-            var person = form.ToReader(now, approved: true);
+            UserRow person;
+            using (var lease = await gate.Enter(context.RequestAborted))
+            {
+                if (!lease.IsAcquired) return PasswordGate.Busy();
+                person = form.ToReader(now, approved: true);
+            }
 
             await using var transaction = await db.Database.BeginTransactionAsync();
 
@@ -111,7 +122,8 @@ public static class RegistrationEndpoints
         }).AllowAnonymous().RefuseWhenClosed();
 
         app.MapPost("/register", async (HttpContext context, SamizdatDbContext db, PageRenderer pages,
-                                        SiteSettings settings, IAntiforgery antiforgery, Translator text) =>
+                                        SiteSettings settings, IAntiforgery antiforgery, Translator text,
+                                        PasswordGate gate) =>
         {
             if (context.User.Identity?.IsAuthenticated == true) return Results.Redirect("/");
 
@@ -126,9 +138,20 @@ public static class RegistrationEndpoints
                 return Form(pages, settings, text, antiforgery, context, "/register", note: null,
                             form.Login, text["register.err.queue_full"]);
 
+            // Занятый логин не вставит строку и не заполнит очередь, поэтому предел очереди его не
+            // остановит. Отвечаем до хэша; гонку двух заявок ловит уникальный индекс ниже.
+            if (await db.Users.AnyAsync(row => row.Login == form.Login))
+                return Form(pages, settings, text, antiforgery, context, "/register", note: null,
+                            form.Login, text["register.err.login_taken"]);
+
             // Хэш считается до транзакции: Argon2id занимает десятые доли секунды, и соседняя
             // заявка ждала бы их под блокировкой очереди.
-            var person = form.ToReader(DateTimeOffset.UtcNow, approved: false);
+            UserRow person;
+            using (var lease = await gate.Enter(context.RequestAborted))
+            {
+                if (!lease.IsAcquired) return PasswordGate.Busy();
+                person = form.ToReader(DateTimeOffset.UtcNow, approved: false);
+            }
 
             // Считают и вставляют под общей блокировкой: без неё параллельные заявки читают один
             // и тот же счётчик и проходят предел все сразу.

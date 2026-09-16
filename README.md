@@ -135,6 +135,9 @@ To change the limit, set `Samizdat__Auth__AttemptsPerMinute` in the `environment
 in `compose.yaml`. The value `0` removes the limit.
 The server does not use the header `X-Forwarded-For`. Behind a reverse proxy, all clients have the address
 of the proxy and share one limit.
+Each password hash uses 64 MB of memory. The server calculates at most 2 hashes at the same time
+(`Samizdat__Auth__ParallelHashes`) and keeps at most 32 more requests in a queue (`Samizdat__Auth__HashQueue`).
+When the queue is full, the server sends the status 429.
 
 ### From the source code
 

@@ -441,8 +441,10 @@ public class RegistrationTests : IDisposable
     public async Task A_burst_of_requests_does_not_break_the_queue_limit()
     {
         database.ResetDatabase();
-        // Двадцать заявок с одного адреса: окно попыток отсекло бы половину и гонку бы не поймало.
-        using var factory = CreateFactory(("Samizdat:Auth:AttemptsPerMinute", "0"));
+        // Двадцать заявок с одного адреса и разом: окно попыток отсекло бы половину, а предел
+        // хэшей развёл бы заявки по две. Гонка тогда не ловится.
+        using var factory = CreateFactory(("Samizdat:Auth:AttemptsPerMinute", "0"),
+                                          ("Samizdat:Auth:ParallelHashes", "20"));
         OpenRegistration(factory);
         FillTheQueue(factory, 49);
 
@@ -486,6 +488,45 @@ public class RegistrationTests : IDisposable
 
         Assert.Equal(HttpStatusCode.TooManyRequests, second.StatusCode);
         Assert.Empty(Users(factory));
+    }
+
+    // Место под хэш занято, очереди нет: заявка, которой нужен Argon2id, получила бы 429.
+    // Ответ «логин занят» значит, что сервер ответил без хэша.
+    [Fact]
+    public async Task A_busy_login_is_refused_before_the_password_hash()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory(("Samizdat:Auth:ParallelHashes", "1"), ("Samizdat:Auth:HashQueue", "0"));
+        OpenRegistration(factory);
+        AddPerson(factory, "ivan", "parol-ivana", UserRole.Reader);
+        var token = AddInvite(factory, note: null);
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        using var held = await factory.Services.GetRequiredService<PasswordGate>().Enter(CancellationToken.None);
+
+        var open = await client.PostAsync("/register", await RegisterFields(client, "Ivan", "drugoy-parol"));
+        var invite = await client.PostAsync($"/i/{token}", await InviteFields(client, token, "ivan", "drugoy-parol"));
+
+        Assert.Contains("This login is in use.", await open.Content.ReadAsStringAsync());
+        Assert.Contains("This login is in use.", await invite.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task A_free_login_waits_for_a_password_hash_slot()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory(("Samizdat:Auth:ParallelHashes", "1"), ("Samizdat:Auth:HashQueue", "0"));
+        OpenRegistration(factory);
+        var token = AddInvite(factory, note: null);
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        using var held = await factory.Services.GetRequiredService<PasswordGate>().Enter(CancellationToken.None);
+
+        var open = await client.PostAsync("/register", await RegisterFields(client, "ivan", "parol-ivana"));
+        var invite = await client.PostAsync($"/i/{token}", await InviteFields(client, token, "petr", "parol-petra"));
+
+        Assert.Equal(HttpStatusCode.TooManyRequests, open.StatusCode);
+        Assert.Equal(HttpStatusCode.TooManyRequests, invite.StatusCode);
+        Assert.Empty(Users(factory));
+        Assert.Null(Invites(factory).Single().UsedAt);
     }
 
     [Fact]

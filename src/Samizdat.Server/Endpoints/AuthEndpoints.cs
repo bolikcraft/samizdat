@@ -21,14 +21,24 @@ public static class AuthEndpoints
 
         // Токен нужен и анонимной форме: без него чужой сайт впустит жертву в свою учётку (login CSRF).
         app.MapPost("/login", async (HttpContext context, SamizdatDbContext db, PageRenderer pages,
-                                     SiteSettings settings, Translator text, IAntiforgery antiforgery) =>
+                                     SiteSettings settings, Translator text, IAntiforgery antiforgery,
+                                     PasswordGate gate) =>
         {
             var form = await context.Request.ReadFormAsync();
             var login = form["login"].ToString();
             var password = form["password"].ToString();
 
             var user = await db.Users.FirstOrDefaultAsync(row => row.Login == login);
-            if (user is null || !PasswordHasher.Verify(password, user.PasswordHash))
+            if (user is null)
+                return LoginPage(pages, settings, text, antiforgery, context, text["login.err.bad_credentials"]);
+
+            bool matches;
+            using (var lease = await gate.Enter(context.RequestAborted))
+            {
+                if (!lease.IsAcquired) return PasswordGate.Busy();
+                matches = PasswordHasher.Verify(password, user.PasswordHash);
+            }
+            if (!matches)
                 return LoginPage(pages, settings, text, antiforgery, context, text["login.err.bad_credentials"]);
 
             // Отдельное сообщение, а не «неверный пароль»: иначе человек решит, что опечатался,
