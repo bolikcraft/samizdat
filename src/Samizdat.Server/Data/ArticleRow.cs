@@ -5,6 +5,11 @@ public sealed class ArticleRow
     public required string Slug { get; set; }
     public required string Title { get; set; }
     public string Folder { get; set; } = "";
+
+    /// Имя файла заметки в вольте без .md. По нему находится [[ссылка]], если slug задан
+    /// в шапке или взят из title. null — клиент имени не прислал.
+    public string? NoteName { get; set; }
+
     public string? Description { get; set; }
     public DateOnly? Date { get; set; }
     public string? Theme { get; set; }

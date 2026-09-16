@@ -47,6 +47,9 @@ public static class ApiEndpoints
             var form = await request.ReadFormAsync();
             var folder = form["folder"].ToString();
             if (!ArticleFiles.IsValidFolder(folder)) return Results.BadRequest($"{slug}: плохая папка");
+            // Имя файла заметки без .md. Старый CLI и плагин его не шлют: тогда [[ссылка]] найдёт
+            // статью только по slug.
+            var sentName = form["name"].ToString() is { Length: > 0 } nameField ? nameField : null;
 
             var source = form.Files.GetFile("index.md");
             if (source is null) return Results.BadRequest("Нет файла index.md");
@@ -92,10 +95,16 @@ public static class ApiEndpoints
 
             row.Title = parsed.FrontMatter.Title ?? slug;
             row.Folder = folder;
+            // Цель ссылки длиннее MaxSlug индекс не пишет, совпасть такому имени не с чем.
+            row.NoteName = sentName is { Length: <= ArticleIndexer.MaxSlug } && !sentName.Any(char.IsControl)
+                ? sentName
+                : null;
             row.Description = parsed.FrontMatter.Description;
             row.Date = parsed.FrontMatter.Date;
             row.Theme = parsed.FrontMatter.Theme;
-            row.ContentHash = ArticleHash.Compute(markdown, attachments, folder);
+            // Хэш от присланного имени, даже если его не храним: иначе он разойдётся с хэшем клиента,
+            // и каждый push выкладывал бы статью заново.
+            row.ContentHash = ArticleHash.Compute(markdown, attachments, folder, sentName);
             row.UpdatedAt = DateTimeOffset.UtcNow;
 
             // Сам откат может отказать (площадка потеряла право записи, диск отвалился). Тогда файлы

@@ -60,10 +60,11 @@ public static class TestPublisher
     }
 
     public static async Task<HttpResponseMessage> Push(HttpClient client, string slug, string markdown,
-                                                       string folder = "")
+                                                       string folder = "", string? name = null)
     {
         using var form = Form(markdown);
         form.Add(new StringContent(folder), "folder");
+        if (name is not null) form.Add(new StringContent(name), "name");
 
         return await client.PutAsync($"/api/articles/{slug}", form);
     }

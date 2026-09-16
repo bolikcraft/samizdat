@@ -1,8 +1,10 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Samizdat.Core;
 using Samizdat.Server.Data;
 
 namespace Samizdat.Server.Tests;
@@ -442,6 +444,61 @@ public class PublishApiTests(DatabaseFixture database) : IDisposable
 
         var download = await pages.GetAsync($"/download/{Uri.EscapeDataString(slug)}");
         Assert.Equal(HttpStatusCode.OK, download.StatusCode);
+    }
+
+    [Fact]
+    public async Task Put_stores_the_note_name_and_hashes_it()
+    {
+        var (factory, client) = StartWithToken();
+        var slug = UniqueSlug();
+        const string markdown = "---\ntitle: Как настроить сервер\n---\nтекст\n";
+        var content = Article(markdown);
+        content.Add(new StringContent("Моя заметка"), "name");
+
+        var response = await client.PutAsync($"/api/articles/{slug}", content);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+        var row = db.Articles.Single(article => article.Slug == slug);
+        Assert.Equal("Моя заметка", row.NoteName);
+        Assert.Equal(ArticleHash.Compute(Encoding.UTF8.GetBytes(markdown), [], "", "Моя заметка"), row.ContentHash);
+    }
+
+    // Старый CLI и плагин Obsidian поля name не шлют: хэш должен совпасть с их хэшем.
+    [Fact]
+    public async Task Put_without_name_keeps_the_hash_of_an_old_client()
+    {
+        var (factory, client) = StartWithToken();
+        var slug = UniqueSlug();
+
+        var response = await client.PutAsync($"/api/articles/{slug}", Article("текст"));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+        var row = db.Articles.Single(article => article.Slug == slug);
+        Assert.Null(row.NoteName);
+        Assert.Equal(ArticleHash.Compute(Encoding.UTF8.GetBytes("текст"), [], ""), row.ContentHash);
+    }
+
+    [Fact]
+    public async Task Too_long_note_name_is_not_stored_but_is_hashed()
+    {
+        var (factory, client) = StartWithToken();
+        var slug = UniqueSlug();
+        var name = new string('я', 201);
+        var content = Article("текст");
+        content.Add(new StringContent(name), "name");
+
+        var response = await client.PutAsync($"/api/articles/{slug}", content);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+        var row = db.Articles.Single(article => article.Slug == slug);
+        Assert.Null(row.NoteName);
+        Assert.Equal(ArticleHash.Compute(Encoding.UTF8.GetBytes("текст"), [], "", name), row.ContentHash);
     }
 
     public void Dispose() => Directory.Delete(dataRoot, recursive: true);
