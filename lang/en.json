@@ -95,7 +95,7 @@
   "settings.msg.background_unknown": "The theme has no such background.",
   "settings.msg.bad_language": "The site does not have this language.",
   "settings.msg.bad_person": "The login must not be empty.",
-  "settings.msg.bad_title": "The site name must not be empty or longer than {0} characters.",
+  "settings.msg.bad_title": "The site name must not be longer than {0} characters.",
   "settings.msg.failed": "The server cannot do this action.",
   "settings.msg.invite_created": "The invitation is made.",
   "settings.msg.invite_note": "The note is more than 200 characters.",

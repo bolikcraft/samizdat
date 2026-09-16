@@ -95,7 +95,7 @@
   "settings.msg.background_unknown": "Tema tidak punya latar itu.",
   "settings.msg.bad_language": "Situs tidak punya bahasa ini.",
   "settings.msg.bad_person": "Nama pengguna tidak boleh kosong.",
-  "settings.msg.bad_title": "Nama situs tidak boleh kosong atau lebih dari {0} karakter.",
+  "settings.msg.bad_title": "Nama situs tidak boleh lebih dari {0} karakter.",
   "settings.msg.failed": "Server tidak dapat melakukan tindakan ini.",
   "settings.msg.invite_created": "Undangan dibuat.",
   "settings.msg.invite_note": "Catatan lebih dari 200 karakter.",

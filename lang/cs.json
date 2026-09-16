@@ -95,7 +95,7 @@
   "settings.msg.background_unknown": "Téma takové pozadí nemá.",
   "settings.msg.bad_language": "Web tento jazyk nemá.",
   "settings.msg.bad_person": "Přihlašovací jméno nesmí být prázdné.",
-  "settings.msg.bad_title": "Název webu nesmí být prázdný ani delší než {0} znaků.",
+  "settings.msg.bad_title": "Název webu nesmí být delší než {0} znaků.",
   "settings.msg.failed": "Server tuto akci nemůže provést.",
   "settings.msg.invite_created": "Pozvánka je vytvořena.",
   "settings.msg.invite_note": "Poznámka je delší než 200 znaků.",

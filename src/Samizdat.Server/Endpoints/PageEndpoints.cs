@@ -40,7 +40,7 @@ public static class PageEndpoints
 
             return Results.Content(pages.Render("index.html", new()
             {
-                ["page_title"] = settings.Title,
+                ["page_title"] = settings.TitleOrDefault,
                 ["site"] = SiteModel(settings),
                 ["articles"] = list,
                 ["nav"] = Navigation(db, currentSlug: null, isOwner),
@@ -252,6 +252,7 @@ public static class PageEndpoints
     internal static Dictionary<string, object?> SiteModel(SiteSettings settings) => new()
     {
         ["title"] = settings.Title,
+        ["icon_alt"] = settings.TitleOrDefault,
         ["color_scheme"] = settings.ColorScheme,
         ["background_url"] = settings.BackgroundUrl,
         ["background_color"] = settings.BackgroundColor,

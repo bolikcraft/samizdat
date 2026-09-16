@@ -95,7 +95,7 @@
   "settings.msg.background_unknown": "A témában nincs ilyen háttér.",
   "settings.msg.bad_language": "A webhelyen nincs ilyen nyelv.",
   "settings.msg.bad_person": "A felhasználónév nem lehet üres.",
-  "settings.msg.bad_title": "A webhely neve nem lehet üres, és nem lehet hosszabb {0} karakternél.",
+  "settings.msg.bad_title": "A webhely neve nem lehet hosszabb {0} karakternél.",
   "settings.msg.failed": "A kiszolgáló nem tudja végrehajtani ezt a műveletet.",
   "settings.msg.invite_created": "A meghívó elkészült.",
   "settings.msg.invite_note": "A megjegyzés több mint 200 karakter.",

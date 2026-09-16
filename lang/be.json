@@ -95,7 +95,7 @@
   "settings.msg.background_unknown": "Такога фону няма ў наборы тэмы.",
   "settings.msg.bad_language": "Такой мовы на сайце няма.",
   "settings.msg.bad_person": "Лагін не можа быць пустым.",
-  "settings.msg.bad_title": "Назва сайта не павінна быць пустой або даўжэйшай за {0} знакаў.",
+  "settings.msg.bad_title": "Назва сайта не павінна быць даўжэйшай за {0} знакаў.",
   "settings.msg.failed": "Сервер не можа выканаць гэта дзеянне.",
   "settings.msg.invite_created": "Запрашэнне створанае.",
   "settings.msg.invite_note": "Нататка даўжэйшая за 200 сімвалаў.",

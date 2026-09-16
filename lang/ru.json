@@ -95,7 +95,7 @@
   "settings.msg.background_unknown": "Такого фона нет в наборе темы.",
   "settings.msg.bad_language": "Такого языка на сайте нет.",
   "settings.msg.bad_person": "Логин не должен быть пустым.",
-  "settings.msg.bad_title": "Название сайта не должно быть пустым или длиннее {0} символов.",
+  "settings.msg.bad_title": "Название сайта не должно быть длиннее {0} символов.",
   "settings.msg.failed": "Не удалось выполнить действие.",
   "settings.msg.invite_created": "Приглашение создано.",
   "settings.msg.invite_note": "Заметка длиннее 200 символов.",

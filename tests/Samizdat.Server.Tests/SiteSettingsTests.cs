@@ -345,12 +345,17 @@ public class SiteSettingsTests : IDisposable
         SetSetting(factory, "site.title", "Из базы");
         using (var scope = factory.Services.CreateScope())
             Assert.Equal("Из базы", scope.ServiceProvider.GetRequiredService<SiteSettings>().Title);
+
+        // Пустое название — выбор владельца, а не пропуск: конфиг его не подменяет.
+        SetSetting(factory, "site.title", "");
+        using (var scope = factory.Services.CreateScope())
+            Assert.Equal("", scope.ServiceProvider.GetRequiredService<SiteSettings>().Title);
     }
 
     [Theory]
     [InlineData("Записки", true)]
-    [InlineData("", false)]
-    public void A_title_fits_when_it_is_not_empty(string title, bool fits)
+    [InlineData("", true)]
+    public void A_title_fits_when_it_is_not_too_long(string title, bool fits)
         => Assert.Equal(fits, SiteSettings.FitsTitle(title));
 
     [Fact]

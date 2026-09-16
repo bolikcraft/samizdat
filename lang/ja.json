@@ -95,7 +95,7 @@
   "settings.msg.background_unknown": "テーマにその背景はありません。",
   "settings.msg.bad_language": "サイトにこの言語はありません。",
   "settings.msg.bad_person": "ログイン名を空にできません。",
-  "settings.msg.bad_title": "サイト名は空にできず、{0} 文字を超えることもできません。",
+  "settings.msg.bad_title": "サイト名は {0} 文字を超えることはできません。",
   "settings.msg.failed": "サーバーはこの操作をできません。",
   "settings.msg.invite_created": "招待を作りました。",
   "settings.msg.invite_note": "メモが200文字を超えています。",

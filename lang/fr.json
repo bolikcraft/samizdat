@@ -95,7 +95,7 @@
   "settings.msg.background_unknown": "Le thème n’a pas ce fond.",
   "settings.msg.bad_language": "Le site n’a pas cette langue.",
   "settings.msg.bad_person": "L’identifiant ne doit pas être vide.",
-  "settings.msg.bad_title": "Le nom du site ne doit pas être vide ni dépasser {0} caractères.",
+  "settings.msg.bad_title": "Le nom du site ne doit pas dépasser {0} caractères.",
   "settings.msg.failed": "Le serveur ne peut pas faire cette action.",
   "settings.msg.invite_created": "L’invitation est créée.",
   "settings.msg.invite_note": "La note dépasse 200 caractères.",

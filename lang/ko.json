@@ -95,7 +95,7 @@
   "settings.msg.background_unknown": "테마에 그런 배경이 없습니다.",
   "settings.msg.bad_language": "사이트에 그런 언어가 없습니다.",
   "settings.msg.bad_person": "아이디를 비울 수 없습니다.",
-  "settings.msg.bad_title": "사이트 이름은 비어 있거나 {0}자를 넘을 수 없습니다.",
+  "settings.msg.bad_title": "사이트 이름은 {0}자를 넘을 수 없습니다.",
   "settings.msg.failed": "서버가 이 일을 할 수 없습니다.",
   "settings.msg.invite_created": "초대장을 만들었습니다.",
   "settings.msg.invite_note": "메모가 200자보다 깁니다.",

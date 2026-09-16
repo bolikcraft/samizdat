@@ -16,7 +16,8 @@
 <style>:root { --backdrop: {{ site.background_color }}; --brand: {{ site.background_color }}; }</style>{{ end }}</head>
 <body>
 <header class="top">
-  <a class="top-home" href="/"><img src="/assets/icon.svg" alt="" width="24" height="24"><span class="top-title">{{ site.title | html.escape }}</span></a>
+  {{~## Без названия иконка сама называет ссылку. С названием alt пустой: текст рядом уже прочитан. ##~}}
+  <a class="top-home" href="/"><img src="/assets/icon.svg" alt="{{ if site.title == "" }}{{ site.icon_alt | html.escape }}{{ end }}" width="24" height="24">{{ if site.title != "" }}<span class="top-title">{{ site.title | html.escape }}</span>{{ end }}</a>
   {{ if user }}
   <form class="search" action="/search" method="get" role="search">
     <input type="search" name="q" value="{{ if search_query }}{{ search_query | html.escape }}{{ end }}"

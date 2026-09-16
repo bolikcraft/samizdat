@@ -697,7 +697,7 @@ public class SettingsPageTests : IDisposable
     [Theory]
     [InlineData("   ")]
     [InlineData("")]
-    public async Task An_empty_site_title_is_refused(string title)
+    public async Task An_empty_site_title_leaves_only_the_icon_in_the_header(string title)
     {
         var factory = StartFactory();
         AddOwner(factory, "aleks", "тайна");
@@ -707,15 +707,17 @@ public class SettingsPageTests : IDisposable
         var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
 
         var response = await client.PostAsync("/settings/appearance", new FormUrlEncodedContent(
-            new Dictionary<string, string> { [name] = value, ["title"] = title, ["color_scheme"] = "dark" }));
+            new Dictionary<string, string> { [name] = value, ["title"] = title }));
         var index = await client.GetStringAsync("/");
-        var page = await client.GetStringAsync("/settings?err=bad_title");
+        var settings = await client.GetStringAsync("/settings");
 
-        Assert.Equal("/settings?err=bad_title#appearance", response.Headers.Location?.OriginalString);
+        Assert.Equal("/settings?ok=appearance#appearance", response.Headers.Location?.OriginalString);
+        // Без текста ссылку на главную называет сама иконка, а вкладке нужно хоть какое-то имя.
+        Assert.Matches("<a class=\"top-home\" href=\"/\"><img src=\"/assets/icon.svg\" alt=\"Samizdat\"[^>]*></a>", index);
+        Assert.DoesNotContain("top-title", index);
         Assert.Contains("<title>Samizdat</title>", index);
-        // Форма с ошибкой не сохраняется целиком: схема тоже осталась прежней.
-        Assert.Contains("data-color-scheme=\"system\"", index);
-        Assert.Contains("The site name must not be empty or longer than 60 characters.", page);
+        Assert.Contains("name=\"title\" value=\"\"", settings);
+        Assert.DoesNotMatch("name=\"title\"[^>]*required", settings);
     }
 
     [Fact]
@@ -732,6 +734,8 @@ public class SettingsPageTests : IDisposable
             new Dictionary<string, string> { [name] = value, ["title"] = new string('я', SiteSettings.MaxTitleLength + 1) }));
         Assert.Equal("/settings?err=bad_title#appearance", tooLong.Headers.Location?.OriginalString);
         Assert.Contains("<title>Samizdat</title>", await client.GetStringAsync("/"));
+        Assert.Contains("The site name must not be longer than 60 characters.",
+                        await client.GetStringAsync("/settings?err=bad_title"));
 
         var exact = new string('я', SiteSettings.MaxTitleLength);
         var fits = await client.PostAsync("/settings/appearance", new FormUrlEncodedContent(

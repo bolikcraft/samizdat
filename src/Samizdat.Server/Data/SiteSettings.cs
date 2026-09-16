@@ -21,12 +21,20 @@ public sealed class SiteSettings(SamizdatDbContext db, IConfiguration configurat
     public string ThemeName => Get("theme.name", configuration["Samizdat:Theme"] ?? "default");
     public string ColorScheme => Get("theme.color_scheme", configuration["Samizdat:ColorScheme"] ?? "system");
 
-    public string Title => Get("site.title", configuration["Samizdat:Title"] ?? "Samizdat");
+    public const string DefaultTitle = "Samizdat";
+
+    /// Пустая строка в базе — это выбор владельца: в шапке остаётся одна иконка. Поэтому тут
+    /// не Get, который пустое значение подменяет запасным.
+    public string Title => db.Settings.Find("site.title")?.Value
+                           ?? configuration["Samizdat:Title"] ?? DefaultTitle;
+
+    /// Имя для вкладки и для иконки в шапке, когда название пустое.
+    public string TitleOrDefault => Title is { Length: > 0 } title ? title : DefaultTitle;
 
     /// Знаки считаются видимые: эмодзи — один знак, а не две половинки UTF-16. Длина в столбце
     /// проверяется отдельно: один видимый знак может нести сколько угодно диакритики.
     public static bool FitsTitle(string title)
-        => title.Length is > 0 and <= MaxValueLength
+        => title.Length <= MaxValueLength
            && new StringInfo(title).LengthInTextElements <= MaxTitleLength;
 
     /// Язык сайта. По умолчанию английский: сайт ставят и читают не только по-русски.
