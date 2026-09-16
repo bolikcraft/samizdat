@@ -51,7 +51,7 @@ public sealed class ArticleFiles(string dataRoot)
     }
 
     /// Вложения статьи по алфавиту: имя и полный путь. Каждое имя проходит через AttachmentPath,
-    /// поэтому index.md сюда не попадает, а симлинк наружу отсеивается.
+    /// поэтому index.md и имена с «\» сюда не попадают, а симлинк наружу отсеивается.
     public IEnumerable<(string Name, string FullPath)> Attachments(string slug)
     {
         var folder = Folder(slug);
@@ -70,10 +70,9 @@ public sealed class ArticleFiles(string dataRoot)
         if (!IsValidSlug(slug)) return null;
         // Вложения лежат в папке статьи плоско. Имя с каталогом отвергаем целиком: Path.GetFullPath
         // не разворачивает симлинк каталога, и "d/tayna.txt" увёл бы за пределы папки.
-        if (name != Path.GetFileName(name)) return null;
         // index.md отдают /api и /download своими путями с пересборкой шапки, а не этот метод:
         // как вложение он ушёл бы как есть, и чужой фронтматтер утёк бы читателю.
-        if (name.Equals("index.md", StringComparison.OrdinalIgnoreCase)) return null;
+        if (!SafeName.IsAttachment(name)) return null;
 
         var folder = Path.GetFullPath(Folder(slug)) + Path.DirectorySeparatorChar;
         var full = Path.GetFullPath(Path.Combine(folder, name));
@@ -106,9 +105,10 @@ public sealed class ArticleFiles(string dataRoot)
             File.WriteAllBytes(Path.Combine(staging, "index.md"), markdown);
             foreach (var (name, bytes) in attachments)
             {
-                var safe = Path.GetFileName(name);
-                if (safe.Length == 0 || safe is "." or "..") continue;
-                File.WriteAllBytes(Path.Combine(staging, safe), bytes);
+                // PUT уже отвечает 400 на такое имя. Бросаем внутри try: staging-каталог уберёт catch.
+                if (!SafeName.IsAttachment(name))
+                    throw new ArgumentException($"Недопустимое имя вложения «{name}»", nameof(attachments));
+                File.WriteAllBytes(Path.Combine(staging, name), bytes);
             }
         }
         catch

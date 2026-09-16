@@ -186,5 +186,29 @@ public class ArticleFilesTests : IDisposable
         Assert.Equal(written, files.ReadMarkdownBytes("tayna"));
     }
 
+    [Fact]
+    public void Attachment_named_index_md_does_not_overwrite_the_source()
+    {
+        files.Replace("st", "v1"u8.ToArray(), []);
+
+        Assert.Throws<ArgumentException>(
+            () => files.Replace("st", "v2"u8.ToArray(), [("index.md", "чужое"u8.ToArray())]));
+
+        Assert.Equal("v1", files.ReadMarkdown("st"));
+        Assert.Equal(["st"], files.AllSlugs());
+    }
+
+    // Файл с «\» в имени мог лечь до проверки в PUT. В zip он стал бы путём «tayna/..\..\evil.exe».
+    [Fact]
+    [SupportedOSPlatform("linux")]
+    public void File_with_a_backslash_in_its_name_is_not_an_attachment()
+    {
+        files.Replace("tayna", "текст"u8.ToArray(), [("ezh.png", [1])]);
+        File.WriteAllBytes(Path.Combine(files.Folder("tayna"), "..\\..\\evil.exe"), [2]);
+
+        Assert.Equal(["ezh.png"], files.Attachments("tayna").Select(one => one.Name));
+        Assert.Null(files.AttachmentPath("tayna", "..\\..\\evil.exe"));
+    }
+
     public void Dispose() => Directory.Delete(dataRoot, recursive: true);
 }

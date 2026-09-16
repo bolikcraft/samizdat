@@ -58,9 +58,14 @@ public static class ApiEndpoints
             var attachments = new List<(string Name, byte[] Bytes)>();
             foreach (var file in form.Files.Where(file => file.Name == "attachments"))
             {
+                var name = Path.GetFileName(file.FileName);
+                // index.md затёр бы саму статью, а «\» в zip из /download на Windows выводит из папки.
+                if (!SafeName.IsAttachment(name))
+                    return Results.BadRequest($"{slug}: недопустимое имя вложения «{name}»");
+
                 using var one = new MemoryStream();
                 await file.CopyToAsync(one);
-                attachments.Add((Path.GetFileName(file.FileName), one.ToArray()));
+                attachments.Add((name, one.ToArray()));
             }
 
             ParsedDocument parsed;

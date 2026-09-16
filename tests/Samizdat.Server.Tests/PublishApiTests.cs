@@ -131,6 +131,27 @@ public class PublishApiTests(DatabaseFixture database) : IDisposable
         Assert.False(File.Exists(Path.Combine(folder, "old.png")));
     }
 
+    // index.md затирал саму статью. Хэш совпадал с хэшем CLI, и следующий push ничего не чинил.
+    [Theory]
+    [InlineData("index.md")]
+    [InlineData("INDEX.MD")]
+    [InlineData("a\\b.png")]
+    [InlineData("..\\..\\evil.exe")]
+    [InlineData("bad.png")]
+    public async Task Put_with_a_bad_attachment_name_is_refused_and_the_article_stays(string name)
+    {
+        var (_, client) = StartWithToken();
+        var slug = UniqueSlug();
+        (await client.PutAsync($"/api/articles/{slug}", Article("v1"))).EnsureSuccessStatusCode();
+
+        var response = await client.PutAsync($"/api/articles/{slug}", Article("v2", (name, [1, 2, 3])));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var folder = Path.Combine(dataRoot, "articles", slug);
+        Assert.Equal("v1", File.ReadAllText(Path.Combine(folder, "index.md")));
+        Assert.Equal(["index.md"], Directory.EnumerateFiles(folder).Select(file => Path.GetFileName(file)!));
+    }
+
     [Fact]
     public async Task State_returns_slug_to_hash()
     {
