@@ -6,7 +6,6 @@ public class SafeNameTests
     [InlineData("privet-mir")]
     [InlineData("Привет")]
     [InlineData("日本語")]
-    [InlineData("a%2fb")]
     public void Normal_slug_has_no_problem(string slug) => Assert.Null(SafeName.SlugProblem(slug));
 
     [Theory]
@@ -20,6 +19,11 @@ public class SafeNameTests
     [InlineData("..")]
     [InlineData("a..b")]
     [InlineData(".hidden")]
+    // ?, # и % в адресе значат «запрос», «якорь» и «процентный код» — ссылка на статью и
+    // редирект на неё разъедутся с самим адресом.
+    [InlineData("a%2fb")]
+    [InlineData("a?b")]
+    [InlineData("a#b")]
     public void Bad_slug_gets_a_reason(string slug) => Assert.NotNull(SafeName.SlugProblem(slug));
 
     [Fact]

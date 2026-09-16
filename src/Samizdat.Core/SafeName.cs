@@ -32,6 +32,10 @@ public static class SafeName
         if (slug.Contains("..")) return $"slug «{slug}» не должен содержать «..»";
         if (slug.StartsWith('.')) return $"slug «{slug}» не должен начинаться с точки";
         if (!IsSegment(slug)) return $"slug «{slug}» не должен содержать /, \\ и управляющие символы";
+        // ?, # и % в адресе значат «запрос», «якорь» и «процентный код» — ссылка на статью
+        // и редирект на неё разъедутся с самим адресом.
+        if (slug.Any(symbol => symbol is '?' or '#' or '%'))
+            return $"slug «{slug}» не должен содержать ?, # и %";
         if (Encoding.UTF8.GetByteCount(slug) > MaxSlugBytes)
             return $"slug «{slug}» длиннее {MaxSlugBytes} байт в UTF-8";
         return null;

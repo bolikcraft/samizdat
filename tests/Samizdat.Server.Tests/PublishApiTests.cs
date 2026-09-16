@@ -324,19 +324,22 @@ public class PublishApiTests(DatabaseFixture database) : IDisposable
     }
 
     // %2f/%2F в значении маршрута ASP.NET Core намеренно не декодирует в "/" (иначе слаг мог бы
-    // расползтись на сегменты пути) — слаг остаётся текстом с процентами и не расширяет каталог.
+    // расползтись на сегменты пути), а %3f и %23 декодирует как обычный текст, в "?" и "#". В обоих
+    // случаях slug получает буквальный ?, # или % — ссылка на статью раскодирует его снова, уже не туда.
     [Theory]
     [InlineData("a%2fb")]
     [InlineData("a%2Fb")]
-    public async Task Percent_encoded_slash_in_slug_stays_a_literal_file_name(string rawSlug)
+    [InlineData("a%3Fb")]
+    [InlineData("a%23b")]
+    public async Task Slug_with_a_url_reserved_character_is_refused(string rawSlug)
     {
         var (_, client) = StartWithToken();
 
         var response = await client.PutAsync($"/api/articles/{rawSlug}", Article("x"));
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.True(File.Exists(Path.Combine(dataRoot, "articles", rawSlug, "index.md")));
-        Assert.False(Directory.Exists(Path.Combine(dataRoot, "articles", "a")));
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var articles = Path.Combine(dataRoot, "articles");
+        Assert.Empty(Directory.Exists(articles) ? Directory.EnumerateFileSystemEntries(articles) : []);
     }
 
     [Fact]

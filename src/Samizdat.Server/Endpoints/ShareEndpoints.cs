@@ -234,8 +234,11 @@ public static class ShareEndpoints
         }).RequireValidToken();
     }
 
-    // Kestrel не пишет не-ASCII в заголовок Location и отвечает 500: slug кодируем сами.
-    static IResult BackToArticle(string slug) => Results.Redirect($"/{AsciiRedirect.Target(slug)}");
+    // Kestrel не пишет не-ASCII в заголовок Location и отвечает 500: slug кодируем сами. Здесь,
+    // в отличие от AsciiRedirect (см. AuthEndpoints), значение — не готовый путь, а сам slug:
+    // Uri.EscapeDataString заодно экранирует ?, # и % (SafeName их и так не пускает при выкладке,
+    // но чужой slug мог лечь до этого запрета).
+    static IResult BackToArticle(string slug) => Results.Redirect($"/{Uri.EscapeDataString(slug)}");
 
     // День, неделя, месяц, год и «без срока»: другие значения формой не выдаются и не принимаются.
     static readonly int[] AllowedDays = [0, 1, 7, 30, 365];
