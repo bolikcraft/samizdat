@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
+using Samizdat.Core.Localization;
 using Samizdat.Core.Themes;
 using Samizdat.Server.Auth;
 using Samizdat.Server.Data;
@@ -11,11 +12,12 @@ public static class AuthEndpoints
 {
     public static void MapAuth(this WebApplication app)
     {
-        app.MapGet("/login", (PageRenderer pages, SiteSettings settings) => LoginPage(pages, settings, null))
+        app.MapGet("/login", (PageRenderer pages, SiteSettings settings, Translator text)
+                => LoginPage(pages, settings, text, null))
             .AllowAnonymous();
 
         app.MapPost("/login", async (HttpContext context, SamizdatDbContext db, PageRenderer pages,
-                                     SiteSettings settings) =>
+                                     SiteSettings settings, Translator text) =>
         {
             var form = await context.Request.ReadFormAsync();
             var login = form["login"].ToString();
@@ -23,13 +25,13 @@ public static class AuthEndpoints
 
             var user = await db.Users.FirstOrDefaultAsync(row => row.Login == login);
             if (user is null || !PasswordHasher.Verify(password, user.PasswordHash))
-                return LoginPage(pages, settings, "Неверный логин или пароль");
+                return LoginPage(pages, settings, text, text["login.err.bad_credentials"]);
 
             // Отдельное сообщение, а не «неверный пароль»: иначе человек решит, что опечатался,
             // и будет бить в форму. То, что такой логин есть, форма регистрации и так говорит
             // вслух словом «занят».
             if (user.ApprovedAt is null)
-                return LoginPage(pages, settings, "Заявка ещё не одобрена. Дождитесь ответа владельца.");
+                return LoginPage(pages, settings, text, text["login.err.not_approved"]);
 
             await SessionCookie.SignIn(context, user);
 
@@ -43,11 +45,11 @@ public static class AuthEndpoints
         }).RequireValidToken();
     }
 
-    static IResult LoginPage(PageRenderer pages, SiteSettings settings, string? error)
+    static IResult LoginPage(PageRenderer pages, SiteSettings settings, Translator text, string? error)
         => Results.Content(
             pages.Render("login.html", new()
             {
-                ["page_title"] = "Вход",
+                ["page_title"] = text["login.title"],
                 ["error"] = error,
                 ["registration_open"] = settings.OpenRegistration,
                 ["site"] = PageEndpoints.SiteModel(settings),

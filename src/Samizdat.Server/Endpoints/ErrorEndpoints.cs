@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Diagnostics;
+using Samizdat.Core.Localization;
 using Samizdat.Core.Themes;
 
 namespace Samizdat.Server.Endpoints;
@@ -28,9 +29,10 @@ public static class ErrorEndpoints
             try
             {
                 var pages = context.RequestServices.GetRequiredService<PageRenderer>();
+                var text = context.RequestServices.GetRequiredService<Translator>();
                 await context.Response.WriteAsync(pages.Render("500.html", new()
                 {
-                    ["page_title"] = "Ошибка",
+                    ["page_title"] = text["error.failed.title"],
                     ["site"] = new Dictionary<string, object?> { ["title"] = "Samizdat" },
                 }));
             }

@@ -196,14 +196,14 @@ public class SettingsPageTests : IDisposable
         var client = await LoginClient(factory, "aleks", "тайна");
 
         // Разделы переключаются якорем, без перезагрузки. Сообщение над всеми разделами оставалось
-        // висеть над чужой формой: выбрал фон, перешёл на пароль — «Фон выбран.» ещё тут.
+        // висеть над чужой формой: выбрал фон, перешёл на пароль — «фон выбран» ещё тут.
         var background = await client.GetStringAsync("/settings?ok=background");
-        Assert.InRange(background.IndexOf("Фон выбран.", StringComparison.Ordinal),
+        Assert.InRange(background.IndexOf("The background is set.", StringComparison.Ordinal),
                        background.IndexOf("id=\"appearance\"", StringComparison.Ordinal),
                        background.IndexOf("id=\"security\"", StringComparison.Ordinal));
 
         var password = await client.GetStringAsync("/settings?ok=password");
-        Assert.InRange(password.IndexOf("Пароль изменён.", StringComparison.Ordinal),
+        Assert.InRange(password.IndexOf("The password is changed.", StringComparison.Ordinal),
                        password.IndexOf("id=\"security\"", StringComparison.Ordinal),
                        password.IndexOf("id=\"tokens\"", StringComparison.Ordinal));
     }

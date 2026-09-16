@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
+using Samizdat.Core.Localization;
 using Samizdat.Core.Themes;
 using Samizdat.Server.Auth;
 using Samizdat.Server.Data;
@@ -32,7 +33,7 @@ public static class SettingsEndpoints
 
         group.MapGet("/", (PageRenderer pages, SamizdatDbContext db, SiteSettings settings, ClaimsPrincipal user,
                            ThemeFactory themes, IThemeSource theme, BackgroundFile background,
-                           IAntiforgery antiforgery, HttpContext context,
+                           IAntiforgery antiforgery, HttpContext context, Translator text,
                            string? ok, string? err) =>
         {
             // Читателю открыт один раздел — свой пароль, поэтому чужие списки ему и не собираем.
@@ -77,7 +78,7 @@ public static class SettingsEndpoints
                 {
                     ["id"] = row.Id,
                     ["login"] = row.Login,
-                    ["role"] = row.Role == UserRole.Owner ? "владелец" : "читатель",
+                    ["role"] = text[row.Role == UserRole.Owner ? "role.owner" : "role.reader"],
                     ["created_at"] = row.CreatedAt.ToString("yyyy-MM-dd"),
                     // Строка владельца — без кнопок: свой пароль меняют в разделе «Пароль»,
                     // а чужого владельца не трогают вовсе.
@@ -87,13 +88,13 @@ public static class SettingsEndpoints
 
             return Results.Content(pages.Render("settings.html", new()
             {
-                ["page_title"] = "Настройки",
+                ["page_title"] = text["settings.title"],
                 ["site"] = PageEndpoints.SiteModel(settings),
                 // Вместо дерева статей в боковике — список разделов настроек.
                 ["side_nav"] = "settings-nav",
                 ["user"] = PageEndpoints.UserModel(user),
                 ["antiforgery"] = AntiforgeryHtml.Field(antiforgery, context),
-                ["message"] = Message(ok, err),
+                ["message"] = Message(text, ok, err),
                 ["message_kind"] = err is not null ? "err" : ok is not null ? "ok" : null,
                 ["message_section"] = (err ?? ok) is { } code ? SectionOf(code) : null,
                 ["color_scheme"] = settings.ColorScheme,

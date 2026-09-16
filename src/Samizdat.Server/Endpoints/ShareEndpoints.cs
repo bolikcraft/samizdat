@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.EntityFrameworkCore;
 using Samizdat.Core;
+using Samizdat.Core.Localization;
 using Samizdat.Core.Rendering;
 using Samizdat.Core.Themes;
 using Samizdat.Server.Auth;
@@ -19,17 +20,18 @@ public static class ShareEndpoints
     {
         app.MapGet("/s/{token}", (string token, SamizdatDbContext db, ArticleFiles files,
                                   PageRenderer pages, ArticleRenderer markdown, PageCache cache,
-                                  IThemeSource theme, SiteSettings settings, HttpContext context) =>
+                                  IThemeSource theme, SiteSettings settings, HttpContext context,
+                                  Translator text) =>
         {
             // Ставим до любого ответа: после отзыва ссылки страница не должна лежать в браузере или прокси.
             context.Response.Headers.CacheControl = "no-store";
 
             var link = db.ShareLinks.FirstOrDefault(row => row.Token == token);
-            if (link is null) return GuestPages.NotFound(pages, settings);
-            if (!link.IsAlive(DateTimeOffset.UtcNow)) return GuestPages.Gone(pages, settings);
+            if (link is null) return GuestPages.NotFound(pages, settings, text);
+            if (!link.IsAlive(DateTimeOffset.UtcNow)) return GuestPages.Gone(pages, settings, text);
 
             var row = db.Articles.Find(link.Slug);
-            if (row is null || !files.MarkdownExists(link.Slug)) return GuestPages.NotFound(pages, settings);
+            if (row is null || !files.MarkdownExists(link.Slug)) return GuestPages.NotFound(pages, settings, text);
 
             // Видимость ссылке не указ: она про пользователей сайта, а ссылка — про постороннего,
             // и живёт своим сроком. Передумал — отзови её кнопкой.

@@ -144,6 +144,58 @@ public class LanguageTests : IDisposable
     }
 
     [Fact]
+    public async Task Page_title_speaks_the_chosen_language()
+    {
+        var factory = StartFactory();
+        var client = await LoginAsOwner(factory);
+
+        Assert.Contains("<title>Settings</title>", await client.GetStringAsync("/settings"));
+    }
+
+    [Fact]
+    public async Task Search_title_carries_the_query()
+    {
+        var factory = StartFactory();
+        var client = await LoginAsOwner(factory);
+
+        Assert.Contains("<title>Search: hedgehog</title>", await client.GetStringAsync("/search?q=hedgehog"));
+    }
+
+    [Fact]
+    public async Task Settings_message_speaks_the_chosen_language()
+    {
+        var factory = StartFactory();
+        SetSiteLanguage(factory, "ru");
+        var client = await LoginAsOwner(factory);
+
+        Assert.Contains("Неверный текущий пароль", await client.GetStringAsync("/settings?err=wrong_password"));
+    }
+
+    [Fact]
+    public async Task People_list_names_the_role_in_the_site_language()
+    {
+        var factory = StartFactory();
+        var client = await LoginAsOwner(factory);
+
+        var page = await client.GetStringAsync("/settings");
+
+        Assert.Contains("Owner", page);
+        Assert.DoesNotContain("владелец", page);
+    }
+
+    [Fact]
+    public async Task Login_error_speaks_the_site_language()
+    {
+        var factory = StartFactory();
+        AddUser(factory, "aleks", UserRole.Owner);
+
+        var answer = await factory.CreateClient().PostAsync("/login", new FormUrlEncodedContent(
+            new Dictionary<string, string> { ["login"] = "aleks", ["password"] = "не та" }));
+
+        Assert.Contains("Wrong login or password", await answer.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
     public async Task A_language_pack_on_disk_adds_a_new_language()
     {
         var folder = Path.Combine(dataRoot, "lang");

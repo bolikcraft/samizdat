@@ -46,7 +46,7 @@ public class RegistrationTests : IDisposable
         var answer = await TryLogin(factory, "gost", "parol-gostya");
 
         Assert.Equal(HttpStatusCode.OK, answer.StatusCode);
-        Assert.Contains("Заявка ещё не одобрена", await answer.Content.ReadAsStringAsync());
+        Assert.Contains("must approve your request", await answer.Content.ReadAsStringAsync());
     }
 
     [Fact]
@@ -210,15 +210,15 @@ public class RegistrationTests : IDisposable
         var answer = await client.PostAsync($"/i/{token}", await InviteFields(client, token, wanted, "drugoy-parol"));
 
         Assert.Equal(HttpStatusCode.OK, answer.StatusCode);
-        Assert.Contains("логин уже занят", await answer.Content.ReadAsStringAsync());
+        Assert.Contains("This login is in use.", await answer.Content.ReadAsStringAsync());
         Assert.Null(Invites(factory).Single().UsedAt);
     }
 
     [Theory]
-    [InlineData("ivan", "korotko", "korotko", "не короче")]
-    [InlineData("ivan", "parol-ivana", "drugoy-parol", "не совпадают")]
-    [InlineData("", "parol-ivana", "parol-ivana", "не должен быть пустым")]
-    [InlineData(LoginOverTheLimit, "parol-ivana", "parol-ivana", "длиннее 100")]
+    [InlineData("ivan", "korotko", "korotko", "needs 8 characters or more")]
+    [InlineData("ivan", "parol-ivana", "drugoy-parol", "are not the same")]
+    [InlineData("", "parol-ivana", "parol-ivana", "must not be empty")]
+    [InlineData(LoginOverTheLimit, "parol-ivana", "parol-ivana", "more than 100 characters")]
     public async Task A_bad_form_shows_the_reason_and_keeps_the_invite(string login, string password,
                                                                       string repeat, string expected)
     {
@@ -414,7 +414,7 @@ public class RegistrationTests : IDisposable
 
         var answer = await client.PostAsync("/register", await RegisterFields(client, "ivan", "drugoy-parol"));
 
-        Assert.Contains("логин уже занят", await answer.Content.ReadAsStringAsync());
+        Assert.Contains("This login is in use.", await answer.Content.ReadAsStringAsync());
         Assert.Single(Users(factory));
     }
 
@@ -429,7 +429,7 @@ public class RegistrationTests : IDisposable
 
         var answer = await client.PostAsync("/register", await RegisterFields(client, "ivan", "parol-ivana"));
 
-        Assert.Contains("временно закрыта", await answer.Content.ReadAsStringAsync());
+        Assert.Contains("too many requests", await answer.Content.ReadAsStringAsync());
         Assert.Equal(50, Users(factory).Count);
     }
 

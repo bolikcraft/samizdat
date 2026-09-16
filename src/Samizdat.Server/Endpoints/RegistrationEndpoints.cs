@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
+using Samizdat.Core.Localization;
 using Samizdat.Core.Themes;
 using Samizdat.Server.Auth;
 using Samizdat.Server.Data;
@@ -19,12 +20,11 @@ public static class RegistrationEndpoints
     // его берут все заявки разом и никто больше.
     const long QueueLock = 761_923_401;
 
-    const string QueueFullMessage = "Регистрация временно закрыта: слишком много заявок ждут ответа.";
-
     public static void MapRegistration(this WebApplication app)
     {
         app.MapGet("/i/{token}", (string token, HttpContext context, SamizdatDbContext db,
-                                  PageRenderer pages, SiteSettings settings, IAntiforgery antiforgery) =>
+                                  PageRenderer pages, SiteSettings settings, IAntiforgery antiforgery,
+                                  Translator text) =>
         {
             // Ставим до любого ответа: после того как ссылку погасили, форма не должна лежать
             // в браузере или прокси.
@@ -34,28 +34,28 @@ public static class RegistrationEndpoints
             if (context.User.Identity?.IsAuthenticated == true) return Results.Redirect("/");
 
             var invite = db.Invites.AsNoTracking().FirstOrDefault(row => row.Token == token);
-            if (invite is null) return GuestPages.NotFound(pages, settings);
-            if (!invite.IsAlive(DateTimeOffset.UtcNow)) return GuestPages.Gone(pages, settings);
+            if (invite is null) return GuestPages.NotFound(pages, settings, text);
+            if (!invite.IsAlive(DateTimeOffset.UtcNow)) return GuestPages.Gone(pages, settings, text);
 
-            return Form(pages, settings, antiforgery, context, $"/i/{token}", invite.Note,
+            return Form(pages, settings, text, antiforgery, context, $"/i/{token}", invite.Note,
                         login: "", error: null);
         }).AllowAnonymous();
 
         app.MapPost("/i/{token}", async (string token, HttpContext context, SamizdatDbContext db,
                                          PageRenderer pages, SiteSettings settings,
-                                         IAntiforgery antiforgery) =>
+                                         IAntiforgery antiforgery, Translator text) =>
         {
             if (context.User.Identity?.IsAuthenticated == true) return Results.Redirect("/");
 
             // Развилка 404/410 и источник заметки для формы. Настоящий замок ниже — условие
             // внутри UPDATE; без него эта проверка пропускает обе вкладки разом.
             var invite = await db.Invites.AsNoTracking().FirstOrDefaultAsync(row => row.Token == token);
-            if (invite is null) return GuestPages.NotFound(pages, settings);
-            if (!invite.IsAlive(DateTimeOffset.UtcNow)) return GuestPages.Gone(pages, settings);
+            if (invite is null) return GuestPages.NotFound(pages, settings, text);
+            if (!invite.IsAlive(DateTimeOffset.UtcNow)) return GuestPages.Gone(pages, settings, text);
 
             var form = await RegistrationForm.Read(context);
-            if (form.Fault() is { } fault)
-                return Form(pages, settings, antiforgery, context, $"/i/{token}", invite.Note,
+            if (form.Fault(text) is { } fault)
+                return Form(pages, settings, text, antiforgery, context, $"/i/{token}", invite.Note,
                             form.Login, fault);
 
             // Хэш считается до транзакции: Argon2id занимает десятые доли секунды, и соседняя
@@ -76,7 +76,7 @@ public static class RegistrationEndpoints
             if (burned == 0)
             {
                 await transaction.RollbackAsync();
-                return GuestPages.Gone(pages, settings);
+                return GuestPages.Gone(pages, settings, text);
             }
 
             db.Users.Add(person);
@@ -92,8 +92,8 @@ public static class RegistrationEndpoints
                 await transaction.RollbackAsync();
                 // Забываем строку: в базе её нет, а трекер держал бы её к следующему сохранению.
                 db.Entry(person).State = EntityState.Detached;
-                return Form(pages, settings, antiforgery, context, $"/i/{token}", invite.Note,
-                            form.Login, "Такой логин уже занят.");
+                return Form(pages, settings, text, antiforgery, context, $"/i/{token}", invite.Note,
+                            form.Login, text["register.err.login_taken"]);
             }
 
             await transaction.CommitAsync();
@@ -102,29 +102,29 @@ public static class RegistrationEndpoints
         }).AllowAnonymous().RequireValidToken();
 
         app.MapGet("/register", (HttpContext context, PageRenderer pages, SiteSettings settings,
-                                 IAntiforgery antiforgery) =>
+                                 IAntiforgery antiforgery, Translator text) =>
         {
             if (context.User.Identity?.IsAuthenticated == true) return Results.Redirect("/");
 
-            return Form(pages, settings, antiforgery, context, "/register", note: null,
+            return Form(pages, settings, text, antiforgery, context, "/register", note: null,
                         login: "", error: null);
         }).AllowAnonymous().RefuseWhenClosed();
 
         app.MapPost("/register", async (HttpContext context, SamizdatDbContext db, PageRenderer pages,
-                                        SiteSettings settings, IAntiforgery antiforgery) =>
+                                        SiteSettings settings, IAntiforgery antiforgery, Translator text) =>
         {
             if (context.User.Identity?.IsAuthenticated == true) return Results.Redirect("/");
 
             var form = await RegistrationForm.Read(context);
-            if (form.Fault() is { } fault)
-                return Form(pages, settings, antiforgery, context, "/register", note: null,
+            if (form.Fault(text) is { } fault)
+                return Form(pages, settings, text, antiforgery, context, "/register", note: null,
                             form.Login, fault);
 
             // Дешёвый счёт до хэша: забитая очередь не должна стоить Argon2id на каждый запрос.
             // Точную проверку делает второй счёт, под блокировкой.
             if (await db.Users.CountAsync(row => row.ApprovedAt == null) >= MaxPending)
-                return Form(pages, settings, antiforgery, context, "/register", note: null,
-                            form.Login, QueueFullMessage);
+                return Form(pages, settings, text, antiforgery, context, "/register", note: null,
+                            form.Login, text["register.err.queue_full"]);
 
             // Хэш считается до транзакции: Argon2id занимает десятые доли секунды, и соседняя
             // заявка ждала бы их под блокировкой очереди.
@@ -138,8 +138,8 @@ public static class RegistrationEndpoints
             if (await db.Users.CountAsync(row => row.ApprovedAt == null) >= MaxPending)
             {
                 await transaction.RollbackAsync();
-                return Form(pages, settings, antiforgery, context, "/register", note: null, form.Login,
-                            QueueFullMessage);
+                return Form(pages, settings, text, antiforgery, context, "/register", note: null, form.Login,
+                            text["register.err.queue_full"]);
             }
 
             db.Users.Add(person);
@@ -153,14 +153,14 @@ public static class RegistrationEndpoints
                 await transaction.RollbackAsync();
                 // Забываем строку: в базе её нет, а трекер держал бы её к следующему сохранению.
                 db.Entry(person).State = EntityState.Detached;
-                return Form(pages, settings, antiforgery, context, "/register", note: null,
-                            form.Login, "Такой логин уже занят.");
+                return Form(pages, settings, text, antiforgery, context, "/register", note: null,
+                            form.Login, text["register.err.login_taken"]);
             }
 
             await transaction.CommitAsync();
             return Results.Content(pages.Render("register-sent.html", new()
             {
-                ["page_title"] = "Заявка отправлена",
+                ["page_title"] = text["register.sent.title"],
                 ["site"] = PageEndpoints.SiteModel(settings),
                 ["noindex"] = true,
             }), "text/html; charset=utf-8");
@@ -178,14 +178,15 @@ public static class RegistrationEndpoints
 
             return settings.OpenRegistration
                 ? await next(invocation)
-                : GuestPages.NotFound(services.GetRequiredService<PageRenderer>(), settings);
+                : GuestPages.NotFound(services.GetRequiredService<PageRenderer>(), settings,
+                                      services.GetRequiredService<Translator>());
         });
 
-    static IResult Form(PageRenderer pages, SiteSettings settings, IAntiforgery antiforgery,
+    static IResult Form(PageRenderer pages, SiteSettings settings, Translator text, IAntiforgery antiforgery,
                         HttpContext context, string action, string? note, string login, string? error)
         => Results.Content(pages.Render("register.html", new()
         {
-            ["page_title"] = "Регистрация",
+            ["page_title"] = text["register.title"],
             ["site"] = PageEndpoints.SiteModel(settings),
             ["noindex"] = true,
             ["antiforgery"] = AntiforgeryHtml.Field(antiforgery, context),

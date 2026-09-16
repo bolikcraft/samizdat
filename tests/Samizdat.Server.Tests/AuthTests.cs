@@ -164,7 +164,7 @@ public class AuthTests : IDisposable
         var response = await client.PostAsync("/login", new FormUrlEncodedContent(
             new Dictionary<string, string> { ["login"] = "aleks", ["password"] = "мимо" }));
 
-        Assert.Contains("Неверный", await response.Content.ReadAsStringAsync());
+        Assert.Contains("Wrong login or password", await response.Content.ReadAsStringAsync());
         Assert.Equal(HttpStatusCode.Found, (await client.GetAsync("/")).StatusCode);
     }
 

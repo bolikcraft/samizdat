@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Samizdat.Core.Localization;
 using Samizdat.Server.Data;
 
 namespace Samizdat.Server.Endpoints;
@@ -49,47 +50,19 @@ public static class SettingsPage
         _ => "appearance",
     };
 
-    internal static string? Message(string? ok, string? err) => err switch
+    internal static string? Message(Translator text, string? ok, string? err)
     {
-        "wrong_password" => "Неверный текущий пароль.",
-        "short_password" => $"Новый пароль должен быть не короче {MinPasswordLength} символов.",
-        "password_mismatch" => "Новый пароль и повтор не совпадают.",
-        "background_missing" => "Файл не выбран.",
-        "background_type" => "Это не картинка. Подойдёт jpeg, png или webp.",
-        "background_too_big" => "Картинка больше 8 МБ.",
-        "background_unknown" => "Такого фона нет в наборе темы.",
-        "bad_person" => "Логин не должен быть пустым.",
-        "person_short_password" => $"Пароль должен быть не короче {MinPasswordLength} символов.",
-        "login_taken" => "Такой логин уже занят.",
-        "last_owner" => "Это последний владелец, его нельзя удалить.",
-        "self_delete" => "Себя удалить нельзя.",
-        "other_owner" => "Другого владельца менять нельзя.",
-        "own_password" => "Свой пароль меняйте в разделе «Пароль»: там спрашивают текущий.",
-        "invite_note" => "Заметка длиннее 200 символов.",
-        "invite_term" => "Такого срока нет в списке.",
-        "not_pending" => "Этот человек уже не в очереди.",
-        not null => "Не удалось выполнить действие.",
-        null => ok switch
-        {
-            "password" => "Пароль изменён.",
-            "appearance" => "Настройки внешнего вида сохранены.",
-            "articles" => "Настройки статей сохранены.",
-            "token_created" => "Токен создан.",
-            "token_note" => "Заметка сохранена.",
-            "token_revoked" => "Токен отозван.",
-            "link_revoked" => "Ссылка отозвана.",
-            "person_added" => "Пользователь заведён.",
-            "person_password" => "Пароль изменён.",
-            "person_deleted" => "Пользователь удалён.",
-            "background" => "Фон выбран.",
-            "background_color" => "Цвет фона выбран.",
-            "background_removed" => "Фон убран.",
-            "invite_created" => "Приглашение создано.",
-            "invite_revoked" => "Приглашение отозвано.",
-            "signup_open" => "Настройка регистрации сохранена.",
-            "signup_approved" => "Пользователь пущен.",
-            "signup_rejected" => "Заявка отклонена.",
-            _ => null,
-        },
-    };
+        if (err is not null)
+            return err switch
+            {
+                "short_password" or "person_short_password" => text.Format($"settings.msg.{err}", MinPasswordLength),
+                _ => Known(text, err) ?? text["settings.msg.failed"],
+            };
+
+        return ok is null ? null : Known(text, ok);
+    }
+
+    /// Незнакомый код перевода не имеет: переводчик отдаёт сам ключ, и это значит «строки нет».
+    static string? Known(Translator text, string code)
+        => text[$"settings.msg.{code}"] is var value && value != $"settings.msg.{code}" ? value : null;
 }
