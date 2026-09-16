@@ -15,14 +15,26 @@
   });
 
   document.querySelectorAll("#nav-tree details.nav-folder[data-path]").forEach(function (folder) {
+    // Сервер ставит open только папкам с текущей статьёй: их не сворачиваем, иначе статью не видно.
+    var hasCurrent = folder.open;
+    var userToggled = false;
+
     try {
       var saved = localStorage.getItem(STORAGE_PREFIX + folder.dataset.path);
-      if (saved !== null) folder.open = saved === "1";
+      if (saved !== null && !hasCurrent) folder.open = saved === "1";
     } catch (e) {
       // Приватный режим и т.п. — просто не запоминаем раскрытие.
     }
 
+    // Событие toggle приходит позже и от любой смены open, в том числе от фильтра.
+    // Поэтому запоминаем только раскрытие, которое сделал сам пользователь щелчком по заголовку.
+    folder.querySelector(":scope > summary").addEventListener("click", function () {
+      userToggled = true;
+    });
+
     folder.addEventListener("toggle", function () {
+      if (!userToggled) return;
+      userToggled = false;
       try {
         localStorage.setItem(STORAGE_PREFIX + folder.dataset.path, folder.open ? "1" : "0");
       } catch (e) {
@@ -55,7 +67,22 @@
     return visible;
   }
 
+  // Раскрытие до начала фильтра: после очистки поля дерево возвращается к нему.
+  var openBeforeFilter = null;
+
   filterInput.addEventListener("input", function () {
-    applyFilter(tree, filterInput.value.trim().toLowerCase());
+    var query = filterInput.value.trim().toLowerCase();
+    var folders = tree.querySelectorAll("details.nav-folder");
+
+    if (query !== "" && openBeforeFilter === null) {
+      openBeforeFilter = Array.prototype.map.call(folders, function (folder) { return folder.open; });
+    }
+
+    applyFilter(tree, query);
+
+    if (query === "" && openBeforeFilter !== null) {
+      folders.forEach(function (folder, i) { folder.open = openBeforeFilter[i]; });
+      openBeforeFilter = null;
+    }
   });
 })();
