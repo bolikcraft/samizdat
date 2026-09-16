@@ -99,7 +99,7 @@ public static class RegistrationEndpoints
             await transaction.CommitAsync();
             await SessionCookie.SignIn(context, person);
             return Results.Redirect("/");
-        }).AllowAnonymous().RequireValidToken();
+        }).AllowAnonymous().RequireValidToken().RequireRateLimiting(AuthLimits.Policy);
 
         app.MapGet("/register", (HttpContext context, PageRenderer pages, SiteSettings settings,
                                  IAntiforgery antiforgery, Translator text) =>
@@ -164,7 +164,7 @@ public static class RegistrationEndpoints
                 ["site"] = PageEndpoints.SiteModel(settings),
                 ["noindex"] = true,
             }), "text/html; charset=utf-8");
-        }).AllowAnonymous().RefuseWhenClosed().RequireValidToken();
+        }).AllowAnonymous().RefuseWhenClosed().RequireValidToken().RequireRateLimiting(AuthLimits.Policy);
     }
 
     /// Закрытая регистрация отвечает «нет такой страницы» раньше, чем проверка токена.

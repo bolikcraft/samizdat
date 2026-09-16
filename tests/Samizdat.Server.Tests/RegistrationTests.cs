@@ -441,7 +441,8 @@ public class RegistrationTests : IDisposable
     public async Task A_burst_of_requests_does_not_break_the_queue_limit()
     {
         database.ResetDatabase();
-        using var factory = CreateFactory();
+        // Двадцать заявок с одного адреса: окно попыток отсекло бы половину и гонку бы не поймало.
+        using var factory = CreateFactory(("Samizdat:Auth:AttemptsPerMinute", "0"));
         OpenRegistration(factory);
         FillTheQueue(factory, 49);
 
@@ -454,6 +455,37 @@ public class RegistrationTests : IDisposable
         await Task.WhenAll(clients.Select((client, i) => client.PostAsync("/register", fields[i])));
 
         Assert.Equal(50, Users(factory).Count);
+    }
+
+    [Fact]
+    public async Task Open_registration_attempts_from_one_address_are_limited()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory(("Samizdat:Auth:AttemptsPerMinute", "1"));
+        OpenRegistration(factory);
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+
+        await client.PostAsync("/register", await RegisterFields(client, "ivan", "parol-ivana"));
+        var second = await client.PostAsync("/register", await RegisterFields(client, "petr", "parol-petra"));
+
+        Assert.Equal(HttpStatusCode.TooManyRequests, second.StatusCode);
+        Assert.Single(Users(factory));
+    }
+
+    [Fact]
+    public async Task Invite_attempts_from_one_address_are_limited()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory(("Samizdat:Auth:AttemptsPerMinute", "1"));
+        var token = AddInvite(factory, note: null);
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+
+        // Короткий пароль форма отвергает без хэша, но попытка всё равно считается.
+        await client.PostAsync($"/i/{token}", await InviteFields(client, token, "ivan", "short"));
+        var second = await client.PostAsync($"/i/{token}", await InviteFields(client, token, "ivan", "parol-ivana"));
+
+        Assert.Equal(HttpStatusCode.TooManyRequests, second.StatusCode);
+        Assert.Empty(Users(factory));
     }
 
     [Fact]
@@ -655,7 +687,7 @@ public class RegistrationTests : IDisposable
         Assert.DoesNotContain($"/settings/people/{pendingId}/delete", ownerHtml);
     }
 
-    WebApplicationFactory<Program> CreateFactory() =>
+    WebApplicationFactory<Program> CreateFactory(params (string Key, string Value)[] settings) =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseSetting("Samizdat:DataRoot", dataRoot);
@@ -663,6 +695,7 @@ public class RegistrationTests : IDisposable
             // Слежение за файлом настроек тут не нужно: тесты поднимают десятки хостов,
             // и наблюдатели inotify упираются в системный лимит.
             builder.UseSetting("hostBuilder:reloadConfigOnChange", "false");
+            foreach (var (key, value) in settings) builder.UseSetting(key, value);
         });
 
     static void AddPerson(WebApplicationFactory<Program> factory, string login, string password,

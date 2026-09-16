@@ -18,7 +18,7 @@ public class AuthTests : IDisposable
         database.ResetDatabase();
     }
 
-    WebApplicationFactory<Program> StartServer() =>
+    WebApplicationFactory<Program> StartServer(params (string Key, string Value)[] settings) =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseSetting("Samizdat:DataRoot", dataRoot);
@@ -26,6 +26,7 @@ public class AuthTests : IDisposable
             // Слежение за файлом настроек тут не нужно: тесты поднимают десятки хостов,
             // и наблюдатели inotify упираются в системный лимит.
             builder.UseSetting("hostBuilder:reloadConfigOnChange", "false");
+            foreach (var (key, value) in settings) builder.UseSetting(key, value);
         });
 
     void AddOwner(WebApplicationFactory<Program> factory, string login, string password)
@@ -216,6 +217,23 @@ public class AuthTests : IDisposable
         Assert.Matches(
             "<form class=\"login\" method=\"post\" action=\"/login\">\\s*<input type=\"hidden\" name=\"[^\"]+\" value=\"[^\"]+\">",
             html);
+    }
+
+    [Fact]
+    public async Task Too_many_login_attempts_from_one_address_get_429()
+    {
+        var factory = StartServer(("Samizdat:Auth:AttemptsPerMinute", "2"));
+        AddOwner(factory, "aleks", "тайна");
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+
+        await TestLogin.PostLogin(client, "aleks", "мимо");
+        await TestLogin.PostLogin(client, "aleks", "мимо");
+        var third = await TestLogin.PostLogin(client, "aleks", "тайна");
+
+        Assert.Equal(HttpStatusCode.TooManyRequests, third.StatusCode);
+        Assert.True(third.Headers.Contains("Retry-After"));
+        // Страница формы попыткой не считается.
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/login")).StatusCode);
     }
 
     public void Dispose() => Directory.Delete(dataRoot, recursive: true);

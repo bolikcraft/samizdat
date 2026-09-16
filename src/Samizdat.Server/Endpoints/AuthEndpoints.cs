@@ -50,7 +50,7 @@ public static class AuthEndpoints
             return Results.Redirect(string.IsNullOrEmpty(returnUrl)
                 ? "/login"
                 : QueryHelpers.AddQueryString("/login", "ReturnUrl", returnUrl));
-        });
+        }).RequireRateLimiting(AuthLimits.Policy);
 
         app.MapPost("/logout", async (HttpContext context) =>
         {

@@ -98,6 +98,7 @@ public static class Startup
             .AddScheme<AuthenticationSchemeOptions, ApiTokenAuthenticationHandler>(ApiToken.Scheme, _ => { });
         builder.Services.AddAuthorization();
         builder.Services.AddAntiforgery();
+        builder.AddAuthLimits();
     }
 
     public static void Configure(WebApplication app)
@@ -117,6 +118,7 @@ public static class Startup
         app.MapErrorHandling();
         app.UseAuthentication();
         app.UseAuthorization();
+        app.UseRateLimiter();
         app.UseAntiforgery();
         app.MapAuth();
         app.MapRegistration();
