@@ -366,6 +366,8 @@ public class PageEndpointsTests : IDisposable
     [Theory]
     [InlineData("pic.png", "image/png")]
     [InlineData("pic.jpg", "image/jpeg")]
+    [InlineData("clip.mp4", "video/mp4")]
+    [InlineData("song.mp3", "audio/mpeg")]
     public async Task Raster_picture_is_served_inline_in_a_sandbox(string name, string type)
     {
         WriteArticle("st", "---\ntitle: T\n---\nтекст\n");

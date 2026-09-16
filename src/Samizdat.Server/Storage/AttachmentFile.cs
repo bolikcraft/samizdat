@@ -10,10 +10,12 @@ public static class AttachmentFile
 
     static readonly FileExtensionContentTypeProvider ContentTypes = new();
 
-    /// Растровые картинки кода не несут, их можно открыть прямо во вкладке.
+    /// Растровые картинки, видео и аудио кода не несут, их можно открыть прямо во вкладке.
     static readonly HashSet<string> InlineTypes = new(StringComparer.OrdinalIgnoreCase)
     {
         "image/png", "image/jpeg", "image/gif", "image/webp", "image/avif", "image/bmp", "image/x-icon",
+        "video/mp4", "video/webm", "video/ogg", "video/quicktime",
+        "audio/mpeg", "audio/ogg", "audio/wav", "audio/webm", "audio/mp4", "audio/flac",
     };
 
     public static IResult Serve(HttpContext context, string path)
@@ -23,7 +25,7 @@ public static class AttachmentFile
 
         var name = Path.GetFileName(path);
         var type = ContentTypes.TryGetContentType(path, out var found) ? found : "application/octet-stream";
-        if (InlineTypes.Contains(type)) return Results.File(path, type);
+        if (InlineTypes.Contains(type)) return Results.File(path, type, enableRangeProcessing: true);
 
         // SVG может нести <script>. Тег <img> заголовок attachment не читает и картинку показывает,
         // а прямой адрес только скачивает файл.
