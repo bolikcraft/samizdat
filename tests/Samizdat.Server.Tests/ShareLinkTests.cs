@@ -1060,4 +1060,72 @@ public class ShareLinkTests : IDisposable
         Assert.DoesNotContain("/share/revoke", readerPage);
         Assert.DoesNotContain("action=\"/share\"", readerPage);
     }
+
+    [Fact]
+    public async Task Parallel_shares_leave_one_live_link()
+    {
+        using var factory = StartFactory();
+        WriteArticle("statya", "Текст статьи.");
+        RegisterArticle(factory, "statya", "Про ежей");
+        var client = await LoginClient(factory);
+        // Токен один на все запросы: параллельные GET выдали бы разные antiforgery-cookie.
+        var antiforgery = AntiforgeryToken(await client.GetStringAsync("/statya"));
+
+        var answers = await Task.WhenAll(Enumerable.Range(0, 50).Select(_ =>
+            client.PostAsync("/share", new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                [antiforgery.Name] = antiforgery.Value, ["slug"] = "statya", ["days"] = "7",
+            }))));
+
+        Assert.All(answers, answer => Assert.Equal(HttpStatusCode.Redirect, answer.StatusCode));
+        Assert.Single(AllLinks(factory));
+    }
+
+    [Fact]
+    public async Task Revoke_closes_every_live_link_of_the_article()
+    {
+        using var factory = StartFactory();
+        WriteArticle("statya", "Текст статьи.");
+        RegisterArticle(factory, "statya", "Про ежей");
+        // Два живых адреса — след гонки, случившейся до блокировки.
+        var first = AddLink(factory, "statya");
+        var second = AddLink(factory, "statya");
+        var owner = await LoginClient(factory);
+
+        var answer = await PostRevoke(owner, "statya");
+
+        var guest = factory.CreateClient();
+        Assert.Equal(HttpStatusCode.Redirect, answer.StatusCode);
+        Assert.Equal(HttpStatusCode.Gone, (await guest.GetAsync($"/s/{first}")).StatusCode);
+        Assert.Equal(HttpStatusCode.Gone, (await guest.GetAsync($"/s/{second}")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Reader_revoke_does_not_close_the_owner_link_next_to_his_own()
+    {
+        using var factory = StartFactory();
+        WriteArticle("otkrytaya", "Текст статьи.");
+        RegisterArticle(factory, "otkrytaya", "Открытая", ArticleVisibility.Shared);
+        var ownerLink = AddLink(factory, "otkrytaya");
+        var (reader, readerId) = await LoginWithId(factory, UserRole.Reader);
+        string readerLink;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+            var link = new ShareLinkRow
+            {
+                Token = ShareToken.Create(), Slug = "otkrytaya", CreatedAt = DateTimeOffset.UtcNow,
+                CreatedByUserId = readerId,
+            };
+            db.ShareLinks.Add(link);
+            db.SaveChanges();
+            readerLink = link.Token;
+        }
+
+        var answer = await PostRevoke(reader, "otkrytaya");
+
+        Assert.Equal(HttpStatusCode.Redirect, answer.StatusCode);
+        Assert.NotNull(LinkByToken(factory, readerLink).RevokedAt);
+        Assert.Null(LinkByToken(factory, ownerLink).RevokedAt);
+    }
 }

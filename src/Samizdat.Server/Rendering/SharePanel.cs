@@ -20,8 +20,7 @@ public static class SharePanel
         if (!canShare) return "";
 
         var now = DateTimeOffset.UtcNow;
-        var live = db.ShareLinks.Where(link => link.Slug == slug).AsEnumerable()
-            .FirstOrDefault(link => link.IsAlive(now));
+        var live = ShareEndpoints.LiveLinks(db, slug, now).FirstOrDefault();
         var canManage = live is not null
                         && ArticleAccess.CanManageShare(ArticleAccess.RoleOf(user), live.CreatedByUserId,
                                                         SettingsPage.CurrentUser(db, user)?.Id);

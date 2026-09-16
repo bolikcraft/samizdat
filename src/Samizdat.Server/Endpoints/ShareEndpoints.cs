@@ -112,7 +112,7 @@ public static class ShareEndpoints
             // Пустой slug — испорченная форма, а не «статьи нет»: спека обещает тут 400.
             if (slug.Length == 0) return Results.BadRequest();
 
-            var article = db.Articles.Find(slug);
+            var article = await db.Articles.FindAsync(slug);
             if (article is null) return Results.NotFound();
             var role = ArticleAccess.RoleOf(user);
             // Именно StatusCode, а не Results.Forbid(): Forbid отдаёт cookie-схеме редирект
@@ -125,18 +125,26 @@ public static class ShareEndpoints
             var now = DateTimeOffset.UtcNow;
             var expires = days == 0 ? null : (DateTimeOffset?)now.AddDays(days);
 
+            // Проверка «живая уже есть» и вставка — под блокировкой: без неё двойное нажатие
+            // даёт два живых адреса.
+            await using var transaction = await db.Database.BeginTransactionAsync();
+            await LockSlug(db, slug);
+
             // Живая ссылка у статьи одна: второе нажатие меняет ей срок, а не плодит адрес.
             // Мёртвую не оживляем — отозванный или истёкший адрес остаётся мёртвым навсегда.
-            var live = db.ShareLinks.Where(link => link.Slug == slug).AsEnumerable()
-                .FirstOrDefault(link => link.IsAlive(now));
+            var live = await LiveLinks(db, slug, now).FirstOrDefaultAsync();
             if (live is not null)
             {
                 if (!ArticleAccess.CanManageShare(role, live.CreatedByUserId, me.Id))
+                {
+                    await transaction.RollbackAsync();
                     return Results.StatusCode(StatusCodes.Status403Forbidden);
+                }
 
                 live.ExpiresAt = expires;
                 if (note.Length > 0) live.Note = note;
-                db.SaveChanges();
+                await db.SaveChangesAsync();
+                await transaction.CommitAsync();
                 return Results.Redirect($"/{slug}");
             }
 
@@ -149,7 +157,8 @@ public static class ShareEndpoints
                 ExpiresAt = expires,
                 CreatedByUserId = me.Id,
             });
-            db.SaveChanges();
+            await db.SaveChangesAsync();
+            await transaction.CommitAsync();
 
             // Ссылка видна прямо на статье, в блоке «Поделиться» — возвращаемся туда.
             return Results.Redirect($"/{slug}");
@@ -161,7 +170,7 @@ public static class ShareEndpoints
             var slug = form["slug"].ToString();
             if (slug.Length == 0) return Results.BadRequest();
 
-            var article = db.Articles.Find(slug);
+            var article = await db.Articles.FindAsync(slug);
             if (article is null) return Results.NotFound();
             var role = ArticleAccess.RoleOf(user);
             if (!ArticleAccess.CanShare(article.Visibility, role))
@@ -170,16 +179,29 @@ public static class ShareEndpoints
                 return Results.StatusCode(StatusCodes.Status403Forbidden);
 
             var now = DateTimeOffset.UtcNow;
-            var live = db.ShareLinks.Where(link => link.Slug == slug).AsEnumerable()
-                .FirstOrDefault(link => link.IsAlive(now));
-            if (live is not null)
-            {
-                if (!ArticleAccess.CanManageShare(role, live.CreatedByUserId, me.Id))
-                    return Results.StatusCode(StatusCodes.Status403Forbidden);
+            // Под той же блокировкой, что создание: иначе параллельный /share добавит ссылку
+            // между выборкой и отзывом, и она останется живой.
+            await using var transaction = await db.Database.BeginTransactionAsync();
+            await LockSlug(db, slug);
 
-                live.RevokedAt = now;
-                db.SaveChanges();
+            var live = await LiveLinks(db, slug, now)
+                .Select(link => new { link.Id, link.CreatedByUserId })
+                .ToListAsync();
+            var allowed = live
+                .Where(link => ArticleAccess.CanManageShare(role, link.CreatedByUserId, me.Id))
+                .Select(link => link.Id)
+                .ToList();
+            if (live.Count > 0 && allowed.Count == 0)
+            {
+                await transaction.RollbackAsync();
+                return Results.StatusCode(StatusCodes.Status403Forbidden);
             }
+
+            // Все живые разом: дубли, оставшиеся от гонки до блокировки, гаснут вместе.
+            await db.ShareLinks
+                .Where(link => allowed.Contains(link.Id))
+                .ExecuteUpdateAsync(set => set.SetProperty(link => link.RevokedAt, (DateTimeOffset?)now));
+            await transaction.CommitAsync();
 
             return Results.Redirect($"/{slug}");
         }).RequireAuthorization().RequireValidToken();
@@ -219,4 +241,20 @@ public static class ShareEndpoints
     // Адрес скачивания в кэшированном html — тоже плейсхолдер: html один на статью, а токен
     // у каждой ссылки свой.
     internal const string DownloadUrl = "__SHARE_DOWNLOAD__";
+
+    // Своё пространство ключей: ApiEndpoints держит slug на время PUT/DELETE статьи,
+    // и «Поделиться» не должно ждать выкладку.
+    const int ShareLockNamespace = 587_240_120;
+
+    static Task LockSlug(SamizdatDbContext db, string slug)
+        => db.Database.ExecuteSqlAsync($"SELECT pg_advisory_xact_lock({ShareLockNamespace}, hashtext({slug}))");
+
+    /// Живые ссылки статьи, новые первыми. Условие повторяет ShareLinkRow.IsAlive: сам метод
+    /// в SQL не переводится. Порядок нужен, чтобы панель и форма брали одну и ту же ссылку.
+    internal static IQueryable<ShareLinkRow> LiveLinks(SamizdatDbContext db, string slug, DateTimeOffset now)
+        => db.ShareLinks
+            .Where(link => link.Slug == slug && link.RevokedAt == null
+                           && (link.ExpiresAt == null || link.ExpiresAt > now))
+            .OrderByDescending(link => link.CreatedAt)
+            .ThenByDescending(link => link.Id);
 }
