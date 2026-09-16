@@ -50,8 +50,7 @@ public class ShareLinkTests : IDisposable
         // Без автоперехода: тесты проверяют сам редирект после POST. Вход это не ломает —
         // cookie ставится уже на первом ответе.
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
-        await client.PostAsync("/login", new FormUrlEncodedContent(
-            new Dictionary<string, string> { ["login"] = login, ["password"] = "тайна" }));
+        await TestLogin.PostLogin(client, login, "тайна");
         return client;
     }
 

@@ -141,8 +141,7 @@ public class BackgroundTests : IDisposable
         PutBackground(factory, Jpeg(), "background.jpg");
 
         var client = factory.CreateClient();
-        await client.PostAsync("/login", new FormUrlEncodedContent(
-            new Dictionary<string, string> { ["login"] = "aleks", ["password"] = "тайна" }));
+        await TestLogin.PostLogin(client, "aleks", "тайна");
         var html = await client.GetStringAsync("/");
 
         // Вместе с соседней строкой: комментарий темы, утёкший в разметку, встанет между ними
@@ -157,8 +156,7 @@ public class BackgroundTests : IDisposable
         AddOwner(factory, "aleks", "тайна");
 
         var client = factory.CreateClient();
-        await client.PostAsync("/login", new FormUrlEncodedContent(
-            new Dictionary<string, string> { ["login"] = "aleks", ["password"] = "тайна" }));
+        await TestLogin.PostLogin(client, "aleks", "тайна");
         var html = await client.GetStringAsync("/");
 
         Assert.DoesNotContain("/background", html);
@@ -192,8 +190,7 @@ public class BackgroundTests : IDisposable
     {
         AddOwner(factory, "aleks", "тайна");
         var client = factory.CreateClient();
-        await client.PostAsync("/login", new FormUrlEncodedContent(
-            new Dictionary<string, string> { ["login"] = "aleks", ["password"] = "тайна" }));
+        await TestLogin.PostLogin(client, "aleks", "тайна");
         return client;
     }
 

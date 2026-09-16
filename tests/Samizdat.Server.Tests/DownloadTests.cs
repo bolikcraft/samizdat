@@ -395,8 +395,7 @@ public class DownloadTests : IDisposable
     static async Task<HttpClient> Login(WebApplicationFactory<Program> factory, string login, string password)
     {
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
-        var answer = await client.PostAsync("/login", new FormUrlEncodedContent(
-            new Dictionary<string, string> { ["login"] = login, ["password"] = password }));
+        var answer = await TestLogin.PostLogin(client, login, password);
         Assert.Equal(HttpStatusCode.Redirect, answer.StatusCode);
         return client;
     }

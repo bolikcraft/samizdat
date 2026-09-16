@@ -65,8 +65,7 @@ public class LanguageTests : IDisposable
         {
             AllowAutoRedirect = followRedirects,
         });
-        await client.PostAsync("/login", new FormUrlEncodedContent(
-            new Dictionary<string, string> { ["login"] = login, ["password"] = Password }));
+        await TestLogin.PostLogin(client, login, Password);
         return client;
     }
 
@@ -234,8 +233,7 @@ public class LanguageTests : IDisposable
         var factory = StartFactory();
         AddUser(factory, "aleks", UserRole.Owner);
 
-        var answer = await factory.CreateClient().PostAsync("/login", new FormUrlEncodedContent(
-            new Dictionary<string, string> { ["login"] = "aleks", ["password"] = "не та" }));
+        var answer = await TestLogin.PostLogin(factory.CreateClient(), "aleks", "не та");
 
         Assert.Contains("Wrong login or password", await answer.Content.ReadAsStringAsync());
     }

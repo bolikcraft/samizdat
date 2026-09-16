@@ -54,8 +54,7 @@ public class PageEndpointsTests : IDisposable
         }
 
         var client = factory.CreateClient();
-        client.PostAsync("/login", new FormUrlEncodedContent(
-            new Dictionary<string, string> { ["login"] = login, ["password"] = "тайна" })).Wait();
+        TestLogin.PostLogin(client, login, "тайна").Wait();
         return client;
     }
 

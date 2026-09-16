@@ -141,8 +141,7 @@ public class ApiTokenTests(DatabaseFixture database) : IDisposable
         var factory = StartServer();
         AddOwner(factory, "aleks", "тайна");
         var client = factory.CreateClient();
-        await client.PostAsync("/login", new FormUrlEncodedContent(
-            new Dictionary<string, string> { ["login"] = "aleks", ["password"] = "тайна" }));
+        await TestLogin.PostLogin(client, "aleks", "тайна");
 
         Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/state")).StatusCode);
     }

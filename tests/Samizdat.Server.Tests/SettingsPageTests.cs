@@ -50,8 +50,7 @@ public class SettingsPageTests : IDisposable
     async Task<HttpClient> LoginClient(WebApplicationFactory<Program> factory, string login, string password)
     {
         var client = factory.CreateClient();
-        await client.PostAsync("/login", new FormUrlEncodedContent(
-            new Dictionary<string, string> { ["login"] = login, ["password"] = password }));
+        await TestLogin.PostLogin(client, login, password);
         return client;
     }
 
@@ -254,8 +253,7 @@ public class SettingsPageTests : IDisposable
         var factory = StartFactory();
         AddOwner(factory, "aleks", "тайна");
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
-        await client.PostAsync("/login", new FormUrlEncodedContent(
-            new Dictionary<string, string> { ["login"] = "aleks", ["password"] = "тайна" }));
+        await TestLogin.PostLogin(client, "aleks", "тайна");
         var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
 
         var appearance = await client.PostAsync("/settings/appearance", new FormUrlEncodedContent(
@@ -381,8 +379,7 @@ public class SettingsPageTests : IDisposable
         Assert.Contains("ok=password", response.RequestMessage!.RequestUri!.ToString());
 
         var checkClient = factory.CreateClient();
-        await checkClient.PostAsync("/login", new FormUrlEncodedContent(
-            new Dictionary<string, string> { ["login"] = "aleks", ["password"] = "новыйпарольок" }));
+        await TestLogin.PostLogin(checkClient, "aleks", "новыйпарольок");
         Assert.Equal(HttpStatusCode.OK, (await checkClient.GetAsync("/")).StatusCode);
     }
 
@@ -404,8 +401,7 @@ public class SettingsPageTests : IDisposable
         Assert.Contains("err=wrong_password", response.RequestMessage!.RequestUri!.ToString());
 
         var checkClient = factory.CreateClient();
-        await checkClient.PostAsync("/login", new FormUrlEncodedContent(
-            new Dictionary<string, string> { ["login"] = "aleks", ["password"] = "тайна" }));
+        await TestLogin.PostLogin(checkClient, "aleks", "тайна");
         Assert.Equal(HttpStatusCode.OK, (await checkClient.GetAsync("/")).StatusCode);
     }
 
@@ -423,8 +419,7 @@ public class SettingsPageTests : IDisposable
         Assert.Contains("err=short_password", response.RequestMessage!.RequestUri!.ToString());
 
         var checkClient = factory.CreateClient();
-        await checkClient.PostAsync("/login", new FormUrlEncodedContent(
-            new Dictionary<string, string> { ["login"] = "aleks", ["password"] = "тайна" }));
+        await TestLogin.PostLogin(checkClient, "aleks", "тайна");
         Assert.Equal(HttpStatusCode.OK, (await checkClient.GetAsync("/")).StatusCode);
     }
 
@@ -445,8 +440,7 @@ public class SettingsPageTests : IDisposable
         Assert.Contains("err=password_mismatch", response.RequestMessage!.RequestUri!.ToString());
 
         var checkClient = factory.CreateClient();
-        await checkClient.PostAsync("/login", new FormUrlEncodedContent(
-            new Dictionary<string, string> { ["login"] = "aleks", ["password"] = "тайна" }));
+        await TestLogin.PostLogin(checkClient, "aleks", "тайна");
         Assert.Equal(HttpStatusCode.OK, (await checkClient.GetAsync("/")).StatusCode);
     }
 
@@ -755,8 +749,7 @@ public class SettingsPageTests : IDisposable
         var factory = StartFactory();
         AddOwner(factory, "aleks", "тайна");
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
-        await client.PostAsync("/login", new FormUrlEncodedContent(
-            new Dictionary<string, string> { ["login"] = "aleks", ["password"] = "тайна" }));
+        await TestLogin.PostLogin(client, "aleks", "тайна");
         var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
 
         var response = await client.PostAsync("/settings/appearance", new FormUrlEncodedContent(
@@ -780,8 +773,7 @@ public class SettingsPageTests : IDisposable
         var factory = StartFactory();
         AddOwner(factory, "aleks", "тайна");
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
-        await client.PostAsync("/login", new FormUrlEncodedContent(
-            new Dictionary<string, string> { ["login"] = "aleks", ["password"] = "тайна" }));
+        await TestLogin.PostLogin(client, "aleks", "тайна");
         var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
 
         var response = await client.PostAsync("/settings/appearance", new FormUrlEncodedContent(
@@ -804,8 +796,7 @@ public class SettingsPageTests : IDisposable
         var factory = StartFactory();
         AddOwner(factory, "aleks", "тайна");
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
-        await client.PostAsync("/login", new FormUrlEncodedContent(
-            new Dictionary<string, string> { ["login"] = "aleks", ["password"] = "тайна" }));
+        await TestLogin.PostLogin(client, "aleks", "тайна");
         var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
 
         var tooLong = await client.PostAsync("/settings/appearance", new FormUrlEncodedContent(
@@ -828,8 +819,7 @@ public class SettingsPageTests : IDisposable
         var factory = StartFactory();
         AddOwner(factory, "aleks", "тайна");
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
-        await client.PostAsync("/login", new FormUrlEncodedContent(
-            new Dictionary<string, string> { ["login"] = "aleks", ["password"] = "тайна" }));
+        await TestLogin.PostLogin(client, "aleks", "тайна");
         var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
 
         // Каждый знак тут — две половинки UTF-16: по string.Length строка вдвое длиннее предела.
@@ -870,8 +860,7 @@ public class SettingsPageTests : IDisposable
         var factory = StartFactory();
         AddOwner(factory, "aleks", "тайна");
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
-        await client.PostAsync("/login", new FormUrlEncodedContent(
-            new Dictionary<string, string> { ["login"] = "aleks", ["password"] = "тайна" }));
+        await TestLogin.PostLogin(client, "aleks", "тайна");
         var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
 
         await client.PostAsync("/settings/appearance", new FormUrlEncodedContent(
@@ -899,8 +888,7 @@ public class SettingsPageTests : IDisposable
         var factory = StartFactory();
         AddOwner(factory, "aleks", "тайна");
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
-        await client.PostAsync("/login", new FormUrlEncodedContent(
-            new Dictionary<string, string> { ["login"] = "aleks", ["password"] = "тайна" }));
+        await TestLogin.PostLogin(client, "aleks", "тайна");
         var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
 
         // Название и схема сохраняются своими формами и флажок не трогают.
@@ -923,8 +911,7 @@ public class SettingsPageTests : IDisposable
         var factory = StartFactory();
         AddOwner(factory, "aleks", "тайна");
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
-        await client.PostAsync("/login", new FormUrlEncodedContent(
-            new Dictionary<string, string> { ["login"] = "aleks", ["password"] = "тайна" }));
+        await TestLogin.PostLogin(client, "aleks", "тайна");
         var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
 
         var response = await client.PostAsync("/settings/appearance", new FormUrlEncodedContent(

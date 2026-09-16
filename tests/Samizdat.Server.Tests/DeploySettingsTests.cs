@@ -67,8 +67,19 @@ public class DeploySettingsTests : IDisposable
             {
                 AllowAutoRedirect = false, HandleCookies = false,
             });
-            var answer = await client.PostAsync("/login", new FormUrlEncodedContent(
-                new Dictionary<string, string> { ["login"] = login, ["password"] = password }));
+            // Клиент без хранилища cookie: antiforgery-cookie со страницы входа передаём руками.
+            var page = await client.GetAsync("/login");
+            var (fieldName, fieldValue) = TestLogin.AntiforgeryToken(await page.Content.ReadAsStringAsync());
+            using var signIn = new HttpRequestMessage(HttpMethod.Post, "/login")
+            {
+                Content = new FormUrlEncodedContent(new Dictionary<string, string>
+                {
+                    ["login"] = login, ["password"] = password, [fieldName] = fieldValue,
+                }),
+            };
+            signIn.Headers.Add("Cookie", string.Join("; ",
+                page.Headers.GetValues("Set-Cookie").Select(header => header.Split(';')[0])));
+            var answer = await client.SendAsync(signIn);
             Assert.Equal(HttpStatusCode.Redirect, answer.StatusCode);
             cookie = string.Join("; ", answer.Headers.GetValues("Set-Cookie").Select(value => value.Split(';')[0]));
         }

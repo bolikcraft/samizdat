@@ -37,8 +37,7 @@ public class PublishApiTests(DatabaseFixture database) : IDisposable
     static async Task<HttpClient> LoginPageClient(WebApplicationFactory<Program> factory, string login, string password)
     {
         var client = factory.CreateClient();
-        await client.PostAsync("/login", new FormUrlEncodedContent(
-            new Dictionary<string, string> { ["login"] = login, ["password"] = password }));
+        await TestLogin.PostLogin(client, login, password);
         return client;
     }
 

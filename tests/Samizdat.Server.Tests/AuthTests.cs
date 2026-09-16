@@ -116,8 +116,7 @@ public class AuthTests : IDisposable
         AddOwner(factory, "aleks", "тайна");
         var client = factory.CreateClient();
 
-        var response = await client.PostAsync("/login", new FormUrlEncodedContent(
-            new Dictionary<string, string> { ["login"] = "aleks", ["password"] = "тайна" }));
+        var response = await TestLogin.PostLogin(client, "aleks", "тайна");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/")).StatusCode);
@@ -132,8 +131,7 @@ public class AuthTests : IDisposable
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
         client.DefaultRequestHeaders.Add("X-Forwarded-Proto", "https");
 
-        var response = await client.PostAsync("/login", new FormUrlEncodedContent(
-            new Dictionary<string, string> { ["login"] = "aleks", ["password"] = "тайна" }));
+        var response = await TestLogin.PostLogin(client, "aleks", "тайна");
 
         var cookies = response.Headers.TryGetValues("Set-Cookie", out var values) ? values : [];
         Assert.Contains(cookies, cookie => cookie.Contains("secure", StringComparison.OrdinalIgnoreCase));
@@ -146,8 +144,7 @@ public class AuthTests : IDisposable
         AddOwner(factory, "aleks", "тайна");
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
-        var response = await client.PostAsync("/login", new FormUrlEncodedContent(
-            new Dictionary<string, string> { ["login"] = "aleks", ["password"] = "тайна" }));
+        var response = await TestLogin.PostLogin(client, "aleks", "тайна");
 
         var cookies = response.Headers.TryGetValues("Set-Cookie", out var values) ? values : [];
         Assert.DoesNotContain(cookies, cookie => cookie.Contains("secure", StringComparison.OrdinalIgnoreCase));
@@ -161,11 +158,36 @@ public class AuthTests : IDisposable
         AddOwner(factory, "aleks", "тайна");
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
-        var response = await client.PostAsync("/login", new FormUrlEncodedContent(
-            new Dictionary<string, string> { ["login"] = "aleks", ["password"] = "мимо" }));
+        var response = await TestLogin.PostLogin(client, "aleks", "мимо");
 
         Assert.Contains("Wrong login or password", await response.Content.ReadAsStringAsync());
         Assert.Equal(HttpStatusCode.Found, (await client.GetAsync("/")).StatusCode);
+    }
+
+    // Login CSRF: чужой сайт отправляет форму входа за жертву и впускает её в свою учётку.
+    [Fact]
+    public async Task Login_without_antiforgery_token_is_rejected()
+    {
+        var factory = StartServer();
+        AddOwner(factory, "aleks", "тайна");
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        var fields = new FormUrlEncodedContent(
+            new Dictionary<string, string> { ["login"] = "aleks", ["password"] = "тайна" });
+
+        var response = await client.PostAsync("/login", fields);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Found, (await client.GetAsync("/")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Login_form_carries_the_antiforgery_field()
+    {
+        var html = await StartServer().CreateClient().GetStringAsync("/login");
+
+        Assert.Matches(
+            "<form class=\"login\" method=\"post\" action=\"/login\">\\s*<input type=\"hidden\" name=\"[^\"]+\" value=\"[^\"]+\">",
+            html);
     }
 
     public void Dispose() => Directory.Delete(dataRoot, recursive: true);

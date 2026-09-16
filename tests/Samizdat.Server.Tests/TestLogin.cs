@@ -32,11 +32,21 @@ public static class TestLogin
 
         // Без автоперехода: иначе клиент сам сходит по редиректу и тест не увидит его кода.
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
-        var answer = await client.PostAsync("/login", new FormUrlEncodedContent(
-            new Dictionary<string, string> { ["login"] = login, ["password"] = password }));
+        var answer = await PostLogin(client, login, password);
         if (answer.StatusCode != HttpStatusCode.Redirect)
             throw new InvalidOperationException($"Вход не удался: {answer.StatusCode}");
         return client;
+    }
+
+    /// Вход через форму, как в браузере: сначала страница входа ради antiforgery-поля и cookie.
+    // ConfigureAwait(false): часть тестов ждёт этот вызов через .Wait().
+    public static async Task<HttpResponseMessage> PostLogin(HttpClient client, string login, string password)
+    {
+        var (name, value) = AntiforgeryToken(await client.GetStringAsync("/login").ConfigureAwait(false));
+        return await client.PostAsync("/login", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["login"] = login, ["password"] = password, [name] = value,
+        })).ConfigureAwait(false);
     }
 
     // Форма достаёт свой antiforgery-токен со страницы — сервер требует его на каждом небезопасном POST.
@@ -47,7 +57,7 @@ public static class TestLogin
         return await client.PostAsync(path, new FormUrlEncodedContent(fields));
     }
 
-    static (string Name, string Value) AntiforgeryToken(string html)
+    public static (string Name, string Value) AntiforgeryToken(string html)
     {
         var match = Regex.Match(html, "<input type=\"hidden\" name=\"([^\"]+)\" value=\"([^\"]+)\">");
         if (!match.Success) throw new InvalidOperationException("Antiforgery-поле не найдено на странице");

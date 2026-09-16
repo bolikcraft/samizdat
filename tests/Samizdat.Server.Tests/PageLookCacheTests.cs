@@ -59,8 +59,7 @@ public class PageLookCacheTests : IDisposable
     {
         AddOwner(factory, "aleks", "тайна");
         var client = factory.CreateClient();
-        await client.PostAsync("/login", new FormUrlEncodedContent(
-            new Dictionary<string, string> { ["login"] = "aleks", ["password"] = "тайна" }));
+        await TestLogin.PostLogin(client, "aleks", "тайна");
         return client;
     }
 

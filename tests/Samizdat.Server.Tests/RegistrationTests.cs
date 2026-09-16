@@ -733,16 +733,14 @@ public class RegistrationTests : IDisposable
                                                     string login, string password)
     {
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
-        return await client.PostAsync("/login", new FormUrlEncodedContent(
-            new Dictionary<string, string> { ["login"] = login, ["password"] = password }));
+        return await TestLogin.PostLogin(client, login, password);
     }
 
     // Без автоперехода: иначе клиент сам сходит по редиректу и тест не увидит его кода.
     static async Task<HttpClient> Login(WebApplicationFactory<Program> factory, string login, string password)
     {
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
-        var answer = await client.PostAsync("/login", new FormUrlEncodedContent(
-            new Dictionary<string, string> { ["login"] = login, ["password"] = password }));
+        var answer = await TestLogin.PostLogin(client, login, password);
         Assert.Equal(HttpStatusCode.Redirect, answer.StatusCode);
         return client;
     }
