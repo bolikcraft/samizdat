@@ -152,7 +152,7 @@ public static class PageEndpoints
                         ["download_label"] = asZip ? ".zip" : ".md",
                     },
                     ["nav"] = Navigation(db, currentSlug: slug, isOwner),
-                    ["backlinks"] = Backlinks(db, slug, isOwner),
+                    ["backlinks"] = Backlinks(db, row, isOwner),
                     ["user"] = UserModel(user, login: LoginPlaceholder),
                     // Плейсхолдер, не настоящий токен: страница кэшируется по slug и общая для всех
                     // гостей, а токен привязан к cookie конкретной сессии — см. Replace ниже.
@@ -273,10 +273,19 @@ public static class PageEndpoints
     /// Кто ссылается на эту статью. Блок лежит внутри кэша страницы и обновляется вместе с
     /// отпечатком каталога: тот меняется при выкладке или удалении статьи, а также после reindex —
     /// у CatalogFingerprint для этого своя метка в настройках.
-    static List<Dictionary<string, object?>> Backlinks(SamizdatDbContext db, string slug, bool isOwner)
-        => db.ArticleLinks
-            .Where(link => link.ToSlug == slug && link.FromSlug != slug)
-            .Join(db.Articles, link => link.FromSlug, article => article.Slug, (_, article) => article)
+    static List<Dictionary<string, object?>> Backlinks(SamizdatDbContext db, ArticleRow target, bool isOwner)
+    {
+        // Ссылку по имени файла засчитываем, только если рендер сам привёл бы её сюда. Иначе блок
+        // показал бы источник, где эта ссылка ведёт на статью со slug, равным этому имени.
+        List<string> aliases = [target.Slug];
+        if (target.NoteName is { } name && name != target.Slug
+            && new DbArticleLookup(db, isOwner).Resolve(name) == target.Slug)
+            aliases.Add(name);
+
+        return db.Articles
+            .Where(article => article.Slug != target.Slug
+                              && db.ArticleLinks.Any(link => link.FromSlug == article.Slug
+                                                             && aliases.Contains(link.ToSlug)))
             .OrderBy(article => article.Title)
             .Select(article => new { article.Slug, article.Title, article.Visibility })
             .ToList()
@@ -288,6 +297,7 @@ public static class PageEndpoints
                 ["as_link"] = isOwner || article.Visibility == ArticleVisibility.Shared,
             })
             .ToList();
+    }
 
     internal static Dictionary<string, object?> Navigation(SamizdatDbContext db, string? currentSlug,
                                                            bool isOwner = true)

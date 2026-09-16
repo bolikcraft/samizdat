@@ -204,6 +204,59 @@ public class BacklinkTests(DatabaseFixture database) : IDisposable
         Assert.Single(Regex.Matches(section, "Дом"));
     }
 
+    // Пример из ревью: файл «Моя заметка.md», slug взят из title.
+    [Fact]
+    public async Task Link_by_the_file_name_finds_an_article_with_another_slug()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        var api = TestPublisher.ClientWithToken(factory);
+        (await TestPublisher.Push(api, "kak-nastroit-server", "---\ntitle: Как настроить сервер\n---\n\nтекст",
+                                  name: "Моя заметка")).EnsureSuccessStatusCode();
+        (await TestPublisher.Push(api, "dom", "---\ntitle: Дом\n---\n\nсм. [[Моя заметка]]", name: "Дом"))
+            .EnsureSuccessStatusCode();
+
+        var client = await TestLogin.AsOwner(factory);
+
+        Assert.Contains("<a href=\"/kak-nastroit-server\">Моя заметка</a>", await client.GetStringAsync("/dom"));
+        Assert.Contains("href=\"/dom\"", BacklinksSection(await client.GetStringAsync("/kak-nastroit-server")));
+    }
+
+    [Fact]
+    public async Task Slug_wins_over_a_file_name_with_the_same_text()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        var api = TestPublisher.ClientWithToken(factory);
+        (await TestPublisher.Push(api, "proxmox", "---\ntitle: Proxmox\n---\n\nтекст")).EnsureSuccessStatusCode();
+        (await TestPublisher.Push(api, "drugaya", "---\ntitle: Другая\n---\n\nтекст", name: "proxmox"))
+            .EnsureSuccessStatusCode();
+        (await TestPublisher.Push(api, "dom", "---\ntitle: Дом\n---\n\nстоит [[proxmox]]")).EnsureSuccessStatusCode();
+
+        var client = await TestLogin.AsOwner(factory);
+
+        Assert.Contains("<a href=\"/proxmox\">proxmox</a>", await client.GetStringAsync("/dom"));
+        Assert.Contains("href=\"/dom\"", BacklinksSection(await client.GetStringAsync("/proxmox")));
+        Assert.DoesNotContain("These articles mention it", await client.GetStringAsync("/drugaya"));
+    }
+
+    [Fact]
+    public async Task Source_linking_by_slug_and_by_file_name_appears_once()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        var api = TestPublisher.ClientWithToken(factory);
+        (await TestPublisher.Push(api, "kak-nastroit-server", "---\ntitle: Как настроить сервер\n---\n\nтекст",
+                                  name: "Моя заметка")).EnsureSuccessStatusCode();
+        (await TestPublisher.Push(api, "dom",
+            "---\ntitle: Дом\n---\n\nсм. [[kak-nastroit-server]] и [[Моя заметка]]")).EnsureSuccessStatusCode();
+
+        var client = await TestLogin.AsOwner(factory);
+        var section = BacklinksSection(await client.GetStringAsync("/kak-nastroit-server"));
+
+        Assert.Single(Regex.Matches(section, "Дом"));
+    }
+
     // Заголовок статьи-источника есть ещё и в дереве навигации — искать нужно строго в блоке.
     static string BacklinksSection(string html)
     {
