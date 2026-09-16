@@ -16,7 +16,8 @@ public static class AuthEndpoints
     {
         app.MapGet("/login", (HttpContext context, PageRenderer pages, SiteSettings settings, Translator text,
                               IAntiforgery antiforgery)
-                => LoginPage(pages, settings, text, antiforgery, context, null))
+                => LoginPage(pages, settings, text, antiforgery, context, null,
+                             LocalUrl(context.Request.Query["ReturnUrl"].ToString())))
             .AllowAnonymous();
 
         // Токен нужен и анонимной форме: без него чужой сайт впустит жертву в свою учётку (login CSRF).
@@ -27,6 +28,7 @@ public static class AuthEndpoints
             var form = await context.Request.ReadFormAsync();
             var login = form["login"].ToString();
             var password = form["password"].ToString();
+            var returnUrl = LocalUrl(form["ReturnUrl"].ToString());
 
             var user = await db.Users.FirstOrDefaultAsync(row => row.Login == login);
 
@@ -38,25 +40,31 @@ public static class AuthEndpoints
                 matches = PasswordHasher.Verify(password, user?.PasswordHash ?? PasswordHasher.Decoy);
             }
             if (user is null || !matches)
-                return LoginPage(pages, settings, text, antiforgery, context, text["login.err.bad_credentials"]);
+                return LoginPage(pages, settings, text, antiforgery, context,
+                                 text["login.err.bad_credentials"], returnUrl);
 
             // Отдельное сообщение, а не «неверный пароль»: иначе человек решит, что опечатался,
             // и будет бить в форму. То, что такой логин есть, форма регистрации и так говорит
             // вслух словом «занят».
             if (user.ApprovedAt is null)
-                return LoginPage(pages, settings, text, antiforgery, context, text["login.err.not_approved"]);
+                return LoginPage(pages, settings, text, antiforgery, context,
+                                 text["login.err.not_approved"], returnUrl);
 
             await SessionCookie.SignIn(context, user);
 
-            return Results.Redirect("/");
-        }).AllowAnonymous().RequireValidToken(context =>
+            return Results.Redirect(returnUrl ?? "/");
+        }).AllowAnonymous().RequireValidToken(async context =>
         {
             // Токен на форме сверен с личностью на момент открытия страницы: сосед-вкладка успел
             // войти или выйти, токен разошёлся с текущей учёткой. Не 400, а увести дальше без входа.
             if (context.User.Identity?.IsAuthenticated == true) return Results.Redirect("/");
 
-            var returnUrl = context.Request.Query["ReturnUrl"].ToString();
-            return Results.Redirect(string.IsNullOrEmpty(returnUrl)
+            // ReturnUrl едет скрытым полем формы, не query: страница входа шлёт POST на "/login" без него.
+            var returnUrl = LocalUrl(context.Request.Query["ReturnUrl"].ToString());
+            if (returnUrl is null && context.Request.HasFormContentType)
+                returnUrl = LocalUrl((await context.Request.ReadFormAsync())["ReturnUrl"].ToString());
+
+            return Results.Redirect(returnUrl is null
                 ? "/login"
                 : QueryHelpers.AddQueryString("/login", "ReturnUrl", returnUrl));
         }).RequireRateLimiting(AuthLimits.Policy);
@@ -68,8 +76,13 @@ public static class AuthEndpoints
         }).RequireValidToken();
     }
 
+    /// Адрес для возврата после входа. null — адреса нет или он ведёт за пределы сайта.
+    // Первый знак '/' отсекает "~/…": IsLocalUrl его пропускает, а браузер такой адрес не поймёт.
+    static string? LocalUrl(string url)
+        => url is ['/', ..] && Microsoft.AspNetCore.Http.HttpResults.RedirectHttpResult.IsLocalUrl(url) ? url : null;
+
     static IResult LoginPage(PageRenderer pages, SiteSettings settings, Translator text, IAntiforgery antiforgery,
-                             HttpContext context, string? error)
+                             HttpContext context, string? error, string? returnUrl)
         => Results.Content(
             pages.Render("login.html", new()
             {
@@ -78,6 +91,7 @@ public static class AuthEndpoints
                 ["registration_open"] = settings.OpenRegistration,
                 ["site"] = PageEndpoints.SiteModel(settings),
                 ["antiforgery"] = AntiforgeryHtml.Field(antiforgery, context),
+                ["return_url"] = returnUrl,
             }),
             "text/html; charset=utf-8");
 }

@@ -1,5 +1,6 @@
 <form class="login" method="post" action="/login">
   {{ antiforgery }}
+  {{ if return_url }}<input type="hidden" name="ReturnUrl" value="{{ return_url | html.escape }}">{{ end }}
   <h1>{{ t.login.title }}</h1>
   {{ if error }}<p class="error">{{ error | html.escape }}</p>{{ end }}
   <label>{{ t.login.login }} <input name="login" autofocus autocomplete="username"></label>

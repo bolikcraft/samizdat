@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Samizdat.Server.Auth;
@@ -271,6 +272,67 @@ public class AuthTests : IDisposable
 
         Assert.Equal(HttpStatusCode.TooManyRequests, busy.StatusCode);
         Assert.Contains("Wrong login or password", await free.Content.ReadAsStringAsync());
+    }
+
+    /// Вход так, как его делает браузер: все поля берутся со страницы формы, ReturnUrl тоже.
+    static async Task<HttpResponseMessage> LoginFrom(HttpClient client, string loginPage, string password)
+    {
+        var html = await client.GetStringAsync(loginPage);
+        var (name, value) = TestLogin.AntiforgeryToken(html);
+        var fields = new Dictionary<string, string> { ["login"] = "aleks", ["password"] = password, [name] = value };
+        var back = Regex.Match(html, "<input type=\"hidden\" name=\"ReturnUrl\" value=\"([^\"]*)\">");
+        if (back.Success) fields["ReturnUrl"] = WebUtility.HtmlDecode(back.Groups[1].Value);
+        return await client.PostAsync("/login", new FormUrlEncodedContent(fields));
+    }
+
+    [Fact]
+    public async Task Login_returns_to_the_page_that_sent_the_guest_to_it()
+    {
+        var factory = StartServer();
+        AddOwner(factory, "aleks", "тайна");
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+
+        var challenge = await client.GetAsync("/moya-statya");
+        var answer = await LoginFrom(client, challenge.Headers.Location!.PathAndQuery, "тайна");
+
+        Assert.Equal(HttpStatusCode.Redirect, answer.StatusCode);
+        Assert.Equal("/moya-statya", answer.Headers.Location?.ToString());
+    }
+
+    [Fact]
+    public async Task Wrong_password_keeps_the_return_address_in_the_form()
+    {
+        var factory = StartServer();
+        AddOwner(factory, "aleks", "тайна");
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+
+        var answer = await LoginFrom(client, "/login?ReturnUrl=%2Fmoya-statya", "мимо");
+
+        Assert.Contains("<input type=\"hidden\" name=\"ReturnUrl\" value=\"/moya-statya\">",
+                        await answer.Content.ReadAsStringAsync());
+    }
+
+    // Адрес приходит из формы, то есть от кого угодно: чужой хост сделал бы из входа открытый редирект.
+    [Theory]
+    [InlineData("https://evil.example/")]
+    [InlineData("//evil.example/")]
+    [InlineData("/\\evil.example/")]
+    [InlineData("~/settings")]
+    public async Task Login_does_not_send_to_an_address_outside_the_site(string returnUrl)
+    {
+        var factory = StartServer();
+        AddOwner(factory, "aleks", "тайна");
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        var (name, value) = TestLogin.AntiforgeryToken(await client.GetStringAsync("/login"));
+
+        var answer = await client.PostAsync("/login", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["login"] = "aleks", ["password"] = "тайна", [name] = value, ["ReturnUrl"] = returnUrl,
+        }));
+
+        Assert.Equal("/", answer.Headers.Location?.ToString());
+        Assert.DoesNotContain("name=\"ReturnUrl\"",
+                              await client.GetStringAsync("/login?ReturnUrl=" + Uri.EscapeDataString(returnUrl)));
     }
 
     public void Dispose() => Directory.Delete(dataRoot, recursive: true);
