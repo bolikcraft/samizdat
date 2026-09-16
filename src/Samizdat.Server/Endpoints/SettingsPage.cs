@@ -14,6 +14,9 @@ public static class SettingsPage
     internal const int MinPasswordLength = 8;
     internal const int MaxLoginLength = 100;
 
+    /// Равна длине столбца users.Language.
+    internal const int MaxLanguageLength = 16;
+
     /// Маршрут только для владельца. Роль стоит на маршрутах, а не на группе: читателю нужен
     /// вход в настройки ради своего пароля.
     internal static RouteHandlerBuilder OwnerOnly(this RouteHandlerBuilder builder)

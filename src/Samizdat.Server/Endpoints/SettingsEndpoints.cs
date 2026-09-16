@@ -179,7 +179,10 @@ public static class SettingsEndpoints
             if (CurrentUser(db, user) is not { } person) return LoggedOut();
 
             // Пусто — «как на сайте», это разрешено. Всё прочее должно быть живым пакетом.
-            if (wanted.Length > 0 && !catalog.Has(wanted)) return Err("bad_language");
+            // Длина сверяется со столбцом: код берётся из имени файла на диске, и длинное имя
+            // иначе роняло бы сохранение.
+            if (wanted.Length > 0 && (wanted.Length > MaxLanguageLength || !catalog.Has(wanted)))
+                return Err("bad_language");
 
             person.Language = wanted;
             db.SaveChanges();
