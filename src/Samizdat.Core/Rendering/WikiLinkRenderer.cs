@@ -12,16 +12,17 @@ public sealed class WikiLinkRenderer(string currentSlug, IArticleLookup articles
 
     protected override void Write(HtmlRenderer renderer, WikiLink link)
     {
-        // Attachments live flat in the article folder: drop any directory part of the target
-        // so an embed can't escape it (e.g. "../../secret.png").
-        var fileName = Path.GetFileName(link.Target);
-
         if (link.IsPictureEmbed)
         {
-            // Alt falls back to the file name without extension, not the technical ".png" suffix.
-            var alt = link.Label ?? Path.GetFileNameWithoutExtension(fileName);
+            var fileName = link.FileName;
+            var (alt, width, height) = EmbedSize.Parse(link.Label);
+
+            // Без подписи alt — имя файла без расширения, а не технический суффикс ".png".
             renderer.Write("<img src=\"").WriteEscapeUrl($"{this.attachmentBase}{fileName}")
-                    .Write("\" alt=\"").WriteEscape(alt).Write("\">");
+                    .Write("\" alt=\"").WriteEscape(alt ?? Path.GetFileNameWithoutExtension(fileName)).Write('"');
+            if (width is not null) renderer.Write(" width=\"").Write(width).Write('"');
+            if (height is not null) renderer.Write(" height=\"").Write(height).Write('"');
+            renderer.Write('>');
             return;
         }
 

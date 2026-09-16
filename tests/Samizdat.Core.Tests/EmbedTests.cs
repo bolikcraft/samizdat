@@ -106,4 +106,44 @@ public class EmbedTests
 
         Assert.Contains("href=\"drugaya\"", html);
     }
+
+    [Fact]
+    public void Embed_size_becomes_width()
+    {
+        var html = renderer.Render("![[shema.png|300]]", "statya", NoArticles.Instance);
+
+        Assert.Contains("""<img src="/statya/shema.png" alt="shema" width="300">""", html);
+    }
+
+    [Fact]
+    public void Embed_width_and_height_become_attributes()
+    {
+        var html = renderer.Render("![[shema.png|300x200]]", "statya", NoArticles.Instance);
+
+        Assert.Contains("""<img src="/statya/shema.png" alt="shema" width="300" height="200">""", html);
+    }
+
+    [Fact]
+    public void Embed_caption_before_size_stays_alt()
+    {
+        var html = renderer.Render("![[shema.png|Схема сети|300]]", "statya", NoArticles.Instance);
+
+        Assert.Contains("""<img src="/statya/shema.png" alt="Схема сети" width="300">""", html);
+    }
+
+    [Fact]
+    public void Embed_caption_without_size_stays_alt()
+    {
+        var html = renderer.Render("![[shema.png|Схема сети]]", "statya", NoArticles.Instance);
+
+        Assert.Contains("""<img src="/statya/shema.png" alt="Схема сети">""", html);
+    }
+
+    [Fact]
+    public void Embed_anchor_is_dropped_from_the_file_name()
+    {
+        var html = renderer.Render("![[shema.png#part]]", "statya", NoArticles.Instance);
+
+        Assert.Contains("""<img src="/statya/shema.png" alt="shema">""", html);
+    }
 }
