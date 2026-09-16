@@ -1,3 +1,4 @@
+using Samizdat.Core.Localization;
 using Samizdat.Core.Themes;
 
 namespace Samizdat.Core.Tests;
@@ -146,6 +147,30 @@ public class PageRendererTests
         // с ним — управляемая ошибка вместо зависания.
         Assert.Throws<ThemeException>(() => renderer.Render(
             "chain.html", new Dictionary<string, object?> { ["root"] = Chain(150) }));
+    }
+
+    [Fact]
+    public void Puts_translations_and_language_code_into_every_template()
+    {
+        var theme = new FakeTheme(new()
+        {
+            ["layout.html"] = "<html lang=\"{{ lang }}\">{{ content }}</html>",
+            ["page.html"] = "{{ t.nav.articles }}",
+        });
+        var text = new Translator("en", new Dictionary<string, string> { ["nav.articles"] = "Articles" });
+        var renderer = new PageRenderer(theme, text);
+
+        Assert.Equal("<html lang=\"en\">Articles</html>", renderer.Render("page.html", new()));
+    }
+
+    [Fact]
+    public void Model_field_wins_over_the_translation_of_the_same_name()
+    {
+        var theme = new FakeTheme(new() { ["layout.html"] = "{{ content }}", ["page.html"] = "{{ lang }}" });
+        var text = new Translator("en", new Dictionary<string, string>());
+        var renderer = new PageRenderer(theme, text);
+
+        Assert.Equal("ru", renderer.Render("page.html", new() { ["lang"] = "ru" }));
     }
 
     static Dictionary<string, object?> Chain(int depth)

@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using Samizdat.Core.Localization;
 using Scriban;
 using Scriban.Parsing;
 using Scriban.Runtime;
@@ -8,7 +9,7 @@ namespace Samizdat.Core.Themes;
 
 public sealed class ThemeException(string message) : Exception(message);
 
-public sealed class PageRenderer(IThemeSource theme)
+public sealed class PageRenderer(IThemeSource theme, Translator? text = null)
 {
     readonly ConcurrentDictionary<(string Path, string Version), Template> cache = new();
 
@@ -28,7 +29,9 @@ public sealed class PageRenderer(IThemeSource theme)
     {
         var template = cache.GetOrAdd((name, theme.Version), key => Parse(key.Path));
 
-        var script = ToScriptObject(model);
+        // Перевод и код языка нужны каждому шаблону, поэтому кладутся тут, а не в двадцати
+        // вызовах Render. Поле модели сильнее: страница может подставить своё значение.
+        var script = ToScriptObject(WithText(model));
         var context = new TemplateContext { MemberRenamer = member => member.Name, TemplateLoader = new IncludeLoader(theme) };
         context.PushGlobal(script);
         try
@@ -41,6 +44,15 @@ public sealed class PageRenderer(IThemeSource theme)
         {
             throw new ThemeException($"Шаблон {name}: {error.OriginalMessage}");
         }
+    }
+
+    Dictionary<string, object?> WithText(Dictionary<string, object?> model)
+    {
+        if (text is null) return model;
+
+        var full = new Dictionary<string, object?> { ["t"] = text.Model(), ["lang"] = text.Code };
+        foreach (var (field, value) in model) full[field] = value;
+        return full;
     }
 
     // Scriban читает вложенные объекты только через ScriptObject/IScriptObject,
