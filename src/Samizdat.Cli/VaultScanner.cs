@@ -40,6 +40,7 @@ public sealed partial class VaultScanner(string vaultPath)
     public IEnumerable<VaultNote> Scan()
     {
         warnings.Clear();
+        filesByName = null;
         var taken = new Dictionary<string, string>();
 
         foreach (var file in Directory.EnumerateFiles(vaultPath, "*.md", SearchOption.AllDirectories))

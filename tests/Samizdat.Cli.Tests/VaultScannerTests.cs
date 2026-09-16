@@ -233,6 +233,19 @@ public class VaultScannerTests : IDisposable
     }
 
     [Fact]
+    public void Second_scan_finds_an_attachment_added_after_the_first()
+    {
+        Note("n.md", "---\ntitle: N\npublish: true\n---\n![[pic.png]]");
+
+        var scanner = new VaultScanner(vault);
+        Assert.Empty(scanner.Scan().Single().Attachments);
+
+        Attachment("sub/pic.png", [1]);
+
+        Assert.Equal(new byte[] { 1 }, scanner.Scan().Single().Attachments.Single().Bytes);
+    }
+
+    [Fact]
     public void Scanning_twice_does_not_repeat_warnings()
     {
         Note("draft.md", "---\ntitle: {{title}}\npublish: false\n---\nx");
