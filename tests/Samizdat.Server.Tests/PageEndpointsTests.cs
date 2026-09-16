@@ -313,5 +313,19 @@ public class PageEndpointsTests : IDisposable
         Assert.DoesNotContain("markerOld", after);
     }
 
+    [Fact]
+    public async Task Article_page_does_not_carry_a_script_from_the_note()
+    {
+        WriteArticle("st", "---\ntitle: T\n---\n<img src=\"pic.png\" onerror=\"alert(1)\">\n\n[x](javascript:alert(2))\n");
+        var factory = StartFactory();
+        Register(factory, "st", "T");
+        var client = LoginClient(factory);
+
+        var html = await client.GetStringAsync("/st");
+
+        Assert.DoesNotContain("onerror", html);
+        Assert.DoesNotContain("javascript:", html);
+    }
+
     public void Dispose() => Directory.Delete(dataRoot, recursive: true);
 }

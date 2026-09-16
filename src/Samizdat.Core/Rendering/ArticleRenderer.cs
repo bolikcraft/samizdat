@@ -25,6 +25,7 @@ public sealed class ArticleRenderer
         renderer.ObjectRenderers.Insert(0, new CalloutRenderer());
         renderer.Render(document);
         writer.Flush();
-        return writer.ToString();
+        // Чистится весь html: Markdig режет строчный HTML на отдельные теги, по одному их не проверить.
+        return HtmlCleaner.Clean(writer.ToString());
     }
 }
