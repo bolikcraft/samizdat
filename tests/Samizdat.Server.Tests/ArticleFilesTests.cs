@@ -16,12 +16,16 @@ public class ArticleFilesTests : IDisposable
     [InlineData("..")]
     [InlineData(".hidden")]
     [InlineData("a/b")]
+    [InlineData("a\\b")]
+    [InlineData("..\\..\\evil")]
+    [InlineData("a\u0001b")]
     public void IsValidSlug_rejects_bad_values(string slug) => Assert.False(ArticleFiles.IsValidSlug(slug));
 
     [Theory]
     [InlineData("s")]
     [InlineData("privet-mir")]
     [InlineData("Привет")]
+    [InlineData("日本語")]
     public void IsValidSlug_accepts_normal_values(string slug) => Assert.True(ArticleFiles.IsValidSlug(slug));
 
     // Маршруты не различают регистр, поэтому "S" занимает адрес /s/ так же, как "s".

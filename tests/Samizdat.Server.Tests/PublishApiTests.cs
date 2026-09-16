@@ -356,5 +356,48 @@ public class PublishApiTests(DatabaseFixture database) : IDisposable
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
+    [Theory]
+    [InlineData("a%5Cb")]
+    [InlineData("..%5C..%5Cevil")]
+    [InlineData("a%01b")]
+    public async Task Slug_with_a_backslash_or_a_control_character_is_refused(string rawSlug)
+    {
+        var (_, client) = StartWithToken();
+
+        var response = await client.PutAsync($"/api/articles/{rawSlug}", Article("x"));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var articles = Path.Combine(dataRoot, "articles");
+        Assert.Empty(Directory.Exists(articles) ? Directory.EnumerateFileSystemEntries(articles) : []);
+    }
+
+    // Раньше длинный slug падал на имени служебного каталога с IOException и ответом 500.
+    [Theory]
+    [InlineData(201, "a")]
+    [InlineData(230, "a")]
+    [InlineData(101, "я")]
+    public async Task Slug_longer_than_200_bytes_is_refused_with_400(int count, string letter)
+    {
+        var (_, client) = StartWithToken();
+        var slug = string.Concat(Enumerable.Repeat(letter, count));
+
+        var response = await client.PutAsync($"/api/articles/{Uri.EscapeDataString(slug)}", Article("x"));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains("200", await response.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task Slug_of_exactly_200_bytes_is_accepted()
+    {
+        var (_, client) = StartWithToken();
+        var slug = new string('d', 200);
+
+        var response = await client.PutAsync($"/api/articles/{slug}", Article("x"));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.True(File.Exists(Path.Combine(dataRoot, "articles", slug, "index.md")));
+    }
+
     public void Dispose() => Directory.Delete(dataRoot, recursive: true);
 }

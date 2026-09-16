@@ -40,7 +40,7 @@ public static class ApiEndpoints
                                               ArticleFiles files, SamizdatDbContext db,
                                               ArticleIndexer indexer, ILogger<Program> logger) =>
         {
-            if (!ArticleFiles.IsValidSlug(slug)) return Results.BadRequest("Плохой slug");
+            if (SafeName.SlugProblem(slug) is { } slugProblem) return Results.BadRequest(slugProblem);
             if (ArticleFiles.IsReservedSlug(slug))
                 return Results.BadRequest($"{slug}: адрес занят служебным маршрутом, задайте другой slug");
 

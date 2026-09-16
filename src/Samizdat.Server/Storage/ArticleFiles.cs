@@ -1,3 +1,5 @@
+using Samizdat.Core;
+
 namespace Samizdat.Server.Storage;
 
 public sealed class ArticleFiles(string dataRoot)
@@ -6,9 +8,11 @@ public sealed class ArticleFiles(string dataRoot)
 
     public string Folder(string slug) => Path.Combine(ArticlesRoot, slug);
 
-    /// Без слэшей, без "..", не начинается с точки — точка отделяет служебные .tmp-/.old- каталоги.
+    /// Годится ли slug как имя каталога: без разделителей и управляющих символов, не с точки.
+    /// Точка отделяет служебные .tmp- и .old- каталоги. Длину здесь не проверяем: метод стоит и на
+    /// чтении, а статья с длинным slug могла лечь раньше, чем появился предел.
     public static bool IsValidSlug(string slug)
-        => slug.Length > 0 && slug == Path.GetFileName(slug) && !slug.StartsWith('.');
+        => SafeName.IsSegment(slug) && !slug.StartsWith('.');
 
     // Первый сегмент адресов сайта: статья с таким именем была бы недоступна за своим адресом.
     // Имя занимают и наперёд, до появления самого маршрута. Регистр не важен — маршруты его
