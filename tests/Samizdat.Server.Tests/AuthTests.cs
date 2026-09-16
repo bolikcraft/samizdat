@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
@@ -333,6 +334,55 @@ public class AuthTests : IDisposable
         Assert.Equal("/", answer.Headers.Location?.ToString());
         Assert.DoesNotContain("name=\"ReturnUrl\"",
                               await client.GetStringAsync("/login?ReturnUrl=" + Uri.EscapeDataString(returnUrl)));
+    }
+
+    // Второй ReadFormAsync на теле, которое antiforgery не смогла прочитать (лимит полей превышен),
+    // не должен падать 500-й — гость просто не сообщил, куда его вернуть.
+    [Fact]
+    public async Task Login_with_a_broken_body_and_no_token_redirects_to_login()
+    {
+        var factory = StartServer();
+        AddOwner(factory, "aleks", "тайна");
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        var body = string.Join('&', Enumerable.Range(0, 1025).Select(i => $"f{i}=1"));
+        var content = new StringContent(body, Encoding.UTF8, "application/x-www-form-urlencoded");
+
+        var response = await client.PostAsync("/login", content);
+
+        Assert.Equal(HttpStatusCode.Found, response.StatusCode);
+        Assert.Equal("/login", response.Headers.Location?.OriginalString);
+    }
+
+    // Испорченный токен (гость остаётся анонимным) — редирект на /login обязан унести ReturnUrl из формы.
+    [Fact]
+    public async Task Invalid_token_redirect_keeps_the_return_address_from_the_form()
+    {
+        var factory = StartServer();
+        AddOwner(factory, "aleks", "тайна");
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        var (name, value) = TestLogin.AntiforgeryToken(await client.GetStringAsync("/login"));
+
+        var response = await client.PostAsync("/login", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["login"] = "aleks", ["password"] = "тайна",
+            [name] = value + "мусор", ["ReturnUrl"] = "/moya-statya",
+        }));
+
+        Assert.Equal(HttpStatusCode.Found, response.StatusCode);
+        Assert.Equal("/login?ReturnUrl=%2Fmoya-statya", response.Headers.Location?.OriginalString);
+    }
+
+    [Fact]
+    public async Task Login_redirects_to_a_non_ascii_return_address()
+    {
+        var factory = StartServer();
+        AddOwner(factory, "aleks", "тайна");
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+
+        var answer = await LoginFrom(client, "/login?ReturnUrl=" + Uri.EscapeDataString("/статья"), "тайна");
+
+        Assert.True(answer.Headers.Location?.OriginalString.All(char.IsAscii));
+        Assert.Equal("/статья", Uri.UnescapeDataString(answer.Headers.Location!.OriginalString));
     }
 
     public void Dispose() => Directory.Delete(dataRoot, recursive: true);

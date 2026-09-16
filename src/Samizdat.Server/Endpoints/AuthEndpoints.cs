@@ -1,6 +1,8 @@
+using System.Text;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 using Samizdat.Core.Localization;
@@ -52,17 +54,18 @@ public static class AuthEndpoints
 
             await SessionCookie.SignIn(context, user);
 
-            return Results.Redirect(returnUrl ?? "/");
-        }).AllowAnonymous().RequireValidToken(async context =>
+            return Results.Redirect(returnUrl is null ? "/" : AsciiRedirectTarget(returnUrl));
+        }).AllowAnonymous().RequireValidToken(context =>
         {
             // Токен на форме сверен с личностью на момент открытия страницы: сосед-вкладка успел
             // войти или выйти, токен разошёлся с текущей учёткой. Не 400, а увести дальше без входа.
             if (context.User.Identity?.IsAuthenticated == true) return Results.Redirect("/");
 
             // ReturnUrl едет скрытым полем формы, не query: страница входа шлёт POST на "/login" без него.
-            var returnUrl = LocalUrl(context.Request.Query["ReturnUrl"].ToString());
-            if (returnUrl is null && context.Request.HasFormContentType)
-                returnUrl = LocalUrl((await context.Request.ReadFormAsync())["ReturnUrl"].ToString());
+            // Форму читает сама antiforgery при проверке токена — свой ReadFormAsync тут не зовём: на
+            // плохом теле (лимит полей/размера, битый multipart) он бросил бы и уронил ответ в 500.
+            var returnUrl = LocalUrl(context.Request.Query["ReturnUrl"].ToString())
+                ?? LocalUrl(context.Features.Get<IFormFeature>()?.Form?["ReturnUrl"].ToString() ?? "");
 
             return Results.Redirect(returnUrl is null
                 ? "/login"
@@ -80,6 +83,18 @@ public static class AuthEndpoints
     // Первый знак '/' отсекает "~/…": IsLocalUrl его пропускает, а браузер такой адрес не поймёт.
     static string? LocalUrl(string url)
         => url is ['/', ..] && Microsoft.AspNetCore.Http.HttpResults.RedirectHttpResult.IsLocalUrl(url) ? url : null;
+
+    // Location — HTTP-заголовок, туда идёт только ASCII. Не-ASCII байты UTF-8 кодируем в %XX,
+    // остальное (уже закодированное, знаки пути) не трогаем.
+    static string AsciiRedirectTarget(string url)
+    {
+        if (url.All(char.IsAscii)) return url;
+        var target = new StringBuilder();
+        foreach (var b in Encoding.UTF8.GetBytes(url))
+            if (b < 0x80) target.Append((char)b);
+            else target.Append('%').Append(b.ToString("X2"));
+        return target.ToString();
+    }
 
     static IResult LoginPage(PageRenderer pages, SiteSettings settings, Translator text, IAntiforgery antiforgery,
                              HttpContext context, string? error, string? returnUrl)
