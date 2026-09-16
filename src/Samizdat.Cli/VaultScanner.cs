@@ -76,7 +76,7 @@ public sealed partial class VaultScanner(string vaultPath)
             var relative = Path.GetRelativePath(vaultPath, Path.GetDirectoryName(file)!);
             var folder = relative == "." ? "" : relative.Replace(Path.DirectorySeparatorChar, '/');
 
-            yield return new VaultNote(slug, file, Encoding.UTF8.GetBytes(text), FindAttachments(text), folder,
+            yield return new VaultNote(slug, file, Encoding.UTF8.GetBytes(text), FindAttachments(text, file), folder,
                                        Path.GetFileNameWithoutExtension(file));
         }
     }
@@ -101,28 +101,70 @@ public sealed partial class VaultScanner(string vaultPath)
                .Split(Path.DirectorySeparatorChar)
                .Any(part => part.StartsWith('.'));
 
-    /// Ищем только те картинки, на которые есть ссылка в тексте; путь ищем по всему вольту.
-    IReadOnlyList<(string Name, byte[] Bytes)> FindAttachments(string text)
+    ILookup<string, string>? filesByName;
+
+    /// Ищем только те файлы, на которые есть ссылка в тексте.
+    IReadOnlyList<(string Name, byte[] Bytes)> FindAttachments(string text, string noteFile)
     {
         var found = new Dictionary<string, byte[]>();
+        var noteFolder = Path.GetDirectoryName(noteFile)!;
 
         foreach (Match match in ImageReference().Matches(text))
         {
-            var reference = match.Groups["name"].Success
+            var reference = (match.Groups["name"].Success
                 ? match.Groups["name"].Value
-                : Uri.UnescapeDataString(match.Groups["path"].Value);
+                : Uri.UnescapeDataString(match.Groups["path"].Value)).Trim();
 
             if (reference.StartsWith("http", StringComparison.OrdinalIgnoreCase)) continue;
 
-            var name = Path.GetFileName(reference.Trim());
+            // На сервере вложения лежат плоско по имени, поэтому второй файл с тем же именем не нужен.
+            var name = Path.GetFileName(reference);
             // Сервер отвергнет всю статью из-за такого имени, а index.md затёр бы её текст.
             if (!SafeName.IsAttachment(name) || found.ContainsKey(name)) continue;
 
-            var file = Directory.EnumerateFiles(vaultPath, name, SearchOption.AllDirectories)
-                                .FirstOrDefault(candidate => !IsHidden(candidate));
-            if (file is not null) found[name] = File.ReadAllBytes(file);
+            if (ResolveAttachment(reference, name, noteFolder) is { } file)
+                found[name] = File.ReadAllBytes(file);
         }
 
         return found.Select(item => (item.Key, item.Value)).ToList();
+    }
+
+    /// Порядок как в Obsidian: путь от папки заметки, путь от корня вольта, потом файл с тем же именем.
+    string? ResolveAttachment(string reference, string name, string noteFolder)
+    {
+        var relative = reference.TrimStart('/');
+        foreach (var start in new[] { noteFolder, vaultPath })
+        {
+            var candidate = Path.GetFullPath(Path.Combine(start, relative));
+            if (IsVaultFile(candidate)) return candidate;
+        }
+
+        return FilesByName()[name]
+            .OrderBy(candidate => Distance(noteFolder, candidate))
+            .ThenBy(candidate => candidate, StringComparer.Ordinal)
+            .FirstOrDefault();
+    }
+
+    bool IsVaultFile(string path)
+    {
+        // Сегмент ".." начинается с точки, поэтому IsHidden отсекает и выход за пределы вольта.
+        // Корневой путь в ответе GetRelativePath значит другой диск в Windows.
+        return !Path.IsPathRooted(Path.GetRelativePath(vaultPath, path))
+               && File.Exists(path)
+               && !IsHidden(path);
+    }
+
+    // Маска "*" нужна только для обхода; имя из ссылки сравнивается с ключом точно.
+    ILookup<string, string> FilesByName()
+        => filesByName ??= Directory.EnumerateFiles(vaultPath, "*", SearchOption.AllDirectories)
+                                    .Where(file => !IsHidden(file))
+                                    .ToLookup(file => Path.GetFileName(file), StringComparer.Ordinal);
+
+    /// Шаги по дереву папок: вверх до общего предка и вниз до папки файла.
+    static int Distance(string fromFolder, string file)
+    {
+        var steps = Path.GetRelativePath(fromFolder, Path.GetDirectoryName(file)!)
+                        .Split(Path.DirectorySeparatorChar);
+        return steps is ["."] ? 0 : steps.Length;
     }
 }

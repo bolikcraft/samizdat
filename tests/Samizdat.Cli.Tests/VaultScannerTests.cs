@@ -13,6 +13,13 @@ public class VaultScannerTests : IDisposable
         File.WriteAllText(full, text);
     }
 
+    void Attachment(string path, byte[] bytes)
+    {
+        var full = Path.Combine(vault, path);
+        Directory.CreateDirectory(Path.GetDirectoryName(full)!);
+        File.WriteAllBytes(full, bytes);
+    }
+
     [Fact]
     public void Takes_only_notes_with_publish_true()
     {
@@ -235,6 +242,82 @@ public class VaultScannerTests : IDisposable
                                            .Select(item => item.Name).Order(StringComparer.Ordinal).ToList();
 
         Assert.Equal(["doc.pdf", "photo.jpg", "scheme.png"], names);
+    }
+
+    [Fact]
+    public void Relative_path_takes_the_file_next_to_the_note()
+    {
+        Note("A/note.md", "---\ntitle: A\npublish: true\n---\n![](img/cover.png)");
+        Note("B/note.md", "---\ntitle: B\npublish: true\n---\n![](img/cover.png)");
+        Attachment("A/img/cover.png", [1]);
+        Attachment("B/img/cover.png", [2]);
+
+        var notes = new VaultScanner(vault).Scan().ToDictionary(note => note.Slug);
+
+        Assert.Equal(new byte[] { 1 }, notes["a"].Attachments.Single().Bytes);
+        Assert.Equal(new byte[] { 2 }, notes["b"].Attachments.Single().Bytes);
+    }
+
+    [Fact]
+    public void Path_from_vault_root_wins_over_a_nearer_file_with_the_same_name()
+    {
+        Note("notes/n.md", "---\ntitle: N\npublish: true\n---\n![[assets/pic.png]]");
+        Attachment("assets/pic.png", [1]);
+        Attachment("notes/deep/pic.png", [2]);
+
+        var attachment = new VaultScanner(vault).Scan().Single().Attachments.Single();
+
+        Assert.Equal("pic.png", attachment.Name);
+        Assert.Equal(new byte[] { 1 }, attachment.Bytes);
+    }
+
+    [Fact]
+    public void Name_only_link_takes_the_nearest_file()
+    {
+        Note("A/B/n.md", "---\ntitle: N\npublish: true\n---\n![[pic.png]]");
+        Attachment("C/pic.png", [2]);
+        Attachment("A/pics/pic.png", [1]);
+
+        Assert.Equal(new byte[] { 1 }, new VaultScanner(vault).Scan().Single().Attachments.Single().Bytes);
+    }
+
+    [Fact]
+    public void Files_at_equal_distance_are_chosen_by_path_order()
+    {
+        Note("n.md", "---\ntitle: N\npublish: true\n---\n![[pic.png]]");
+        Attachment("Q/pic.png", [2]);
+        Attachment("P/pic.png", [1]);
+
+        Assert.Equal(new byte[] { 1 }, new VaultScanner(vault).Scan().Single().Attachments.Single().Bytes);
+    }
+
+    [Fact]
+    public void Wildcards_in_the_name_are_plain_characters()
+    {
+        Note("n.md", "---\ntitle: N\npublish: true\n---\n![[*.png]] ![](?.pdf)");
+        Attachment("pic.png", [1]);
+        Attachment("a.pdf", [2]);
+
+        Assert.Empty(new VaultScanner(vault).Scan().Single().Attachments);
+    }
+
+    [Fact]
+    public void Relative_path_does_not_leave_the_vault()
+    {
+        var outside = Directory.CreateTempSubdirectory("samizdat-outside").FullName;
+        try
+        {
+            var secret = Path.Combine(outside, "secret.png");
+            File.WriteAllBytes(secret, [1]);
+            var reference = Path.GetRelativePath(vault, secret).Replace('\\', '/');
+            Note("n.md", $"---\ntitle: N\npublish: true\n---\n![]({reference})");
+
+            Assert.Empty(new VaultScanner(vault).Scan().Single().Attachments);
+        }
+        finally
+        {
+            Directory.Delete(outside, recursive: true);
+        }
     }
 
     public void Dispose() => Directory.Delete(vault, recursive: true);
