@@ -26,10 +26,15 @@ public static class PushCommand
         if (string.IsNullOrWhiteSpace(vault))
             throw new CliException("Не задан путь к вольту: samizdat login или --vault <путь>");
 
+        return await RunAsync(args, vault, SamizdatClient.FromConfig(config));
+    }
+
+    public static async Task<int> RunAsync(ParsedArgs args, string vault, SamizdatClient client)
+    {
         var scanner = new VaultScanner(vault);
         var notes = scanner.Scan().ToList();
         foreach (var warning in scanner.Warnings) Console.Error.WriteLine(warning);
-        var client = SamizdatClient.FromConfig(config);
+
         var state = await client.GetStateAsync();
         var plan = PushPlan.Build(notes, state, args.Has("prune"));
 
@@ -58,8 +63,16 @@ public static class PushCommand
 
         foreach (var slug in plan.Delete)
         {
-            await client.DeleteArticleAsync(slug);
-            Console.WriteLine($"удалено   {slug}");
+            try
+            {
+                await client.DeleteArticleAsync(slug);
+                Console.WriteLine($"удалено   {slug}");
+            }
+            catch (CliException error)
+            {
+                failed++;
+                Console.Error.WriteLine(error.Message);
+            }
         }
 
         return failed == 0 ? 0 : 1;
