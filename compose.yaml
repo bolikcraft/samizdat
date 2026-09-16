@@ -1,6 +1,8 @@
 services:
   db:
-    image: postgres:17-alpine
+    # Не alpine: в musl текст сортируется по кодам символов, русские названия встают не по алфавиту.
+    # Мажорную версию и вариант образа менять только через dump и restore: файлы pgdata между ними несовместимы.
+    image: postgres:17
     environment:
       POSTGRES_DB: samizdat
       POSTGRES_USER: samizdat
@@ -8,8 +10,9 @@ services:
     # Папки, а не именованные тома: docker compose down -v их не удаляет.
     volumes:
       - ./pgdata:/var/lib/postgresql/data
+    # Через TCP: при первом старте временный сервер инициализации слушает только сокет, и проверка прошла бы раньше времени.
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U samizdat -d samizdat"]
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U samizdat -d samizdat"]
       interval: 5s
       retries: 20
     restart: unless-stopped
@@ -26,5 +29,5 @@ services:
     volumes:
       - ./data:/data
     ports:
-      - "${SAMIZDAT_PORT:-8080}:8080"
+      - "${SAMIZDAT_BIND:-0.0.0.0}:${SAMIZDAT_PORT:-8080}:8080"
     restart: unless-stopped

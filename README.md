@@ -94,19 +94,34 @@ docker compose run --rm app owner set <login> <password>
 docker compose run --rm app token new laptop
 ```
 
-The site is at `http://<server>:8080`. The folders `data/` (articles, keys, background) and `pgdata/`
+The site is at `http://<server>:8080`. To change the port or the address, set `SAMIZDAT_PORT` and
+`SAMIZDAT_BIND` in `.env`. The folders `data/` (articles, keys, background) and `pgdata/`
 (the database) are in the same folder as `compose.yaml`. `docker compose down -v` does not remove them.
 
+A new database has the demo account `admin` with the password `admin`. The command `owner set` with
+a different login removes this account if its password is still `admin`.
+
+The database uses `POSTGRES_PASSWORD` only when it starts for the first time with an empty `pgdata/`.
+After that, do not change the password in `.env` only. First change it in the database, then in `.env`.
+
 To update, run `deploy/update.sh` again. Before the update, the script writes a dump of the database
-to `backups/` and keeps the last 10 dumps. Without an argument, the script updates to `origin/main`.
-To go to another version, give the script a git ref — a commit or a tag: `deploy/update.sh <ref>`.
+to `backups/` and keeps the last 10 dumps. If the database is stopped, the script starts it for the dump.
+Then the script gets the new version, builds the image and waits until the site starts (at most 5 minutes).
+Without an argument, the script updates to `origin/main`. To go to another version, give the script
+a git ref — a commit or a tag: `deploy/update.sh <ref>`. If the update fails, the script shows
+the command that goes back to the previous version.
 The database changes of each version only add data, so an earlier version works with the new database.
+
+The dump contains only the database. It does not contain `data/` (articles, keys, background).
+For a full copy, also copy the folder `data/`, or make a snapshot of the machine.
 
 To restore the database from a dump:
 
 ```bash
 docker compose stop app
-docker compose exec -T db pg_restore -U samizdat -d samizdat --clean --if-exists < backups/<file>.dump
+# pg_restore --clean does not remove tables that are not in the dump, so remove all tables first.
+docker compose exec -T db psql -U samizdat -d samizdat -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'
+docker compose exec -T db pg_restore -U samizdat -d samizdat < backups/<file>.dump
 docker compose start app
 ```
 
