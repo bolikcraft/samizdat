@@ -29,16 +29,15 @@ public static class AuthEndpoints
             var password = form["password"].ToString();
 
             var user = await db.Users.FirstOrDefaultAsync(row => row.Login == login);
-            if (user is null)
-                return LoginPage(pages, settings, text, antiforgery, context, text["login.err.bad_credentials"]);
 
             bool matches;
             using (var lease = await gate.Enter(context.RequestAborted))
             {
                 if (!lease.IsAcquired) return PasswordGate.Busy();
-                matches = PasswordHasher.Verify(password, user.PasswordHash);
+                // Неизвестный логин тоже платит за Argon2id: иначе ответ по времени выдаёт, что логина нет.
+                matches = PasswordHasher.Verify(password, user?.PasswordHash ?? PasswordHasher.Decoy);
             }
-            if (!matches)
+            if (user is null || !matches)
                 return LoginPage(pages, settings, text, antiforgery, context, text["login.err.bad_credentials"]);
 
             // Отдельное сообщение, а не «неверный пароль»: иначе человек решит, что опечатался,

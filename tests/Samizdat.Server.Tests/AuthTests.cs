@@ -255,5 +255,23 @@ public class AuthTests : IDisposable
         Assert.Equal(HttpStatusCode.Redirect, free.StatusCode);
     }
 
-    public void Dispose() =>Directory.Delete(dataRoot, recursive: true);
+    // Без расчёта хэша неизвестный логин ответил бы сразу и выдал бы по времени, что его нет.
+    [Fact]
+    public async Task Unknown_login_also_waits_for_a_password_hash_slot()
+    {
+        var factory = StartServer(("Samizdat:Auth:ParallelHashes", "1"), ("Samizdat:Auth:HashQueue", "0"));
+        AddOwner(factory, "aleks", "тайна");
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        var held = await factory.Services.GetRequiredService<PasswordGate>().Enter(CancellationToken.None);
+        Assert.True(held.IsAcquired);
+
+        var busy = await TestLogin.PostLogin(client, "nikto", "мимо");
+        held.Dispose();
+        var free = await TestLogin.PostLogin(client, "nikto", "мимо");
+
+        Assert.Equal(HttpStatusCode.TooManyRequests, busy.StatusCode);
+        Assert.Contains("Wrong login or password", await free.Content.ReadAsStringAsync());
+    }
+
+    public void Dispose() => Directory.Delete(dataRoot, recursive: true);
 }
