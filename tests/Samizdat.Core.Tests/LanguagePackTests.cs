@@ -30,8 +30,8 @@ public class LanguagePackTests
     {
         var theme = new EmbeddedThemeSource();
         foreach (var name in new[] { "layout.html", "index.html", "article.html", "search.html",
-                                     "login.html", "register.html", "register-sent.html",
-                                     "share-panel.html", "share-expired.html",
+                                     "login.html", "register.html", "register-sent.html", "settings.html",
+                                     "settings-nav.html", "share-panel.html", "share-expired.html",
                                      "nav-node.html", "403.html", "404.html", "500.html" })
         {
             // Комментарии шаблона ({{~## ... ##~}}) остаются по-русски: их читает тот, кто правит тему.

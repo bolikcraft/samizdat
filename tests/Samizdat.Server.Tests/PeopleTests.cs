@@ -68,9 +68,9 @@ public class PeopleTests : IDisposable
         Assert.Contains("/settings/password", html);
         Assert.Contains("/settings/people", html);
         Assert.Contains("/settings/appearance", html);
-        Assert.Contains("Пользователи", html);
+        Assert.Contains("Users", html);
         Assert.Contains("/settings/invites", html);
-        Assert.Contains("Регистрация", html);
+        Assert.Contains("Registration", html);
     }
 
     [Fact]
