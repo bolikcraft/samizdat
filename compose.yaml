@@ -1,0 +1,29 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: samizdat
+      POSTGRES_USER: samizdat
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    # Папки, а не именованные тома: docker compose down -v их не удаляет.
+    volumes:
+      - ./pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U samizdat -d samizdat"]
+      interval: 5s
+      retries: 20
+    restart: unless-stopped
+
+  app:
+    build: .
+    image: samizdat:local
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ConnectionStrings__Postgres: Host=db;Database=samizdat;Username=samizdat;Password=${POSTGRES_PASSWORD}
+    volumes:
+      - ./data:/data
+    ports:
+      - "${SAMIZDAT_PORT:-8080}:8080"
+    restart: unless-stopped

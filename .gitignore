@@ -22,6 +22,8 @@ appsettings.Local.json
 # Данные запуска: заметки, вложения, дампы
 data/
 *.db
+pgdata/
+backups/
 
 # Спеки и планы остаются на диске, в историю не идут
 docs/superpowers/
