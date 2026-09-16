@@ -18,7 +18,8 @@ public sealed record VaultNote(
 
 public sealed partial class VaultScanner(string vaultPath)
 {
-    [GeneratedRegex(@"!\[\[(?<name>[^\]|#]+)\]\]|!\[[^\]]*\]\((?<path>[^)]+)\)")]
+    // После имени в эмбеде Obsidian бывает "|300", "|подпись" или "#якорь" — имя файла это не меняет.
+    [GeneratedRegex(@"!\[\[(?<name>[^\]|#]+)(?:[|#][^\]]*)?\]\]|!\[[^\]]*\]\((?<path>[^)]+)\)")]
     private static partial Regex ImageReference();
 
     [GeneratedRegex(@"\A﻿?---[ \t]*\r?\n(?<yaml>.*?)^---[ \t]*\r?$", RegexOptions.Singleline | RegexOptions.Multiline)]

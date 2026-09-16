@@ -223,5 +223,19 @@ public class VaultScannerTests : IDisposable
         Assert.Throws<CliException>(() => new VaultScanner(vault).Scan().ToList());
     }
 
+    [Fact]
+    public void Embed_with_size_or_anchor_is_attached()
+    {
+        Note("a.md", "---\ntitle: A\npublish: true\n---\n![[scheme.png|300]] ![[photo.jpg|300x200]] ![[doc.pdf#page=2]]");
+        File.WriteAllBytes(Path.Combine(vault, "scheme.png"), [1]);
+        File.WriteAllBytes(Path.Combine(vault, "photo.jpg"), [2]);
+        File.WriteAllBytes(Path.Combine(vault, "doc.pdf"), [3]);
+
+        var names = new VaultScanner(vault).Scan().Single().Attachments
+                                           .Select(item => item.Name).Order(StringComparer.Ordinal).ToList();
+
+        Assert.Equal(["doc.pdf", "photo.jpg", "scheme.png"], names);
+    }
+
     public void Dispose() => Directory.Delete(vault, recursive: true);
 }
