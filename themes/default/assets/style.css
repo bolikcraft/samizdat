@@ -299,6 +299,7 @@ body {
   font-size: 0.95rem;
 }
 .settings-nav a {
+  display: flex; align-items: center; gap: 0.5rem;
   padding: 0.4rem 0.6rem;
   border-radius: 6px;
   color: var(--fg);
@@ -312,7 +313,6 @@ body {
   font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted);
 }
 .settings-group:first-child { margin-top: 0; }
-.settings-nav a { display: flex; align-items: center; gap: 0.5rem; }
 .nav-badge {
   margin-left: auto; min-width: 1.25rem; padding: 0 0.4rem; border-radius: 999px;
   background: var(--accent); color: var(--bg); font-size: 0.75rem; font-weight: 600; text-align: center;
@@ -474,7 +474,7 @@ button.is-busy::after {
 }
 
 /* Настройки занимают окно целиком. Раньше высота страницы шла за высотой раздела, и выбор
-   «Токены» вместо «Внешний вид» дёргал всё вверх-вниз. Теперь столбцы всегда во всю высоту,
+   «Доступ к API» вместо «Оформление» дёргал всё вверх-вниз. Теперь столбцы всегда во всю высоту,
    прокрутка у каждого своя: длинный список разделов не двигает содержимое, длинное
    содержимое не двигает список. Якорь раздела тоже больше ничего не прокручивает —
    раздел и так стоит в начале своей области. */
@@ -530,6 +530,8 @@ button.is-busy::after {
 
 .settings-pane h2 { margin: 0 0 0.4rem; font-size: 1.25rem; }
 .settings-pane h3 { margin: 0 0 0.4rem; font-size: 1rem; }
+/* Подсказки и таблицы настроек — тем же шрифтом, что подписи полей. Засечки остаются у статей. */
+.settings-panes { font-family: system-ui, sans-serif; }
 .settings-pane .hint { margin: 0 0 1rem; color: var(--muted); font-size: 0.9rem; }
 
 /* Смысловые куски раздела: между ними линия, перед первым её нет. */
@@ -731,18 +733,47 @@ table.pending .row-actions { display: flex; gap: 0.4rem; justify-content: flex-e
 
 /* Кнопки в таблицах настроек — «Отозвать» и «Скопировать» — стоят рядом и должны быть одного
    размера. Цвет разный: отзыв необратим, копирование — нет. */
-.settings-table .inline-form button, .copy-link { background: none; }
-.settings-table .inline-form button {
+.danger-form button, .copy-link { background: none; }
+.danger-form button {
   color: var(--danger); border: 1px solid var(--danger); --busy-ink: var(--danger);
 }
-.settings-table .inline-form button:hover { background: var(--danger); color: var(--bg); }
+.danger-form button:hover { background: var(--danger); color: var(--bg); }
 .copy-link { color: var(--accent); border: 1px solid var(--accent); }
 .copy-link:hover { background: var(--accent); color: var(--bg); }
-/* Сохранение заметки ничего не ломает, поэтому кнопка не красная, как отзыв, а акцентная. */
-.settings-table .note-form button { color: var(--accent); border-color: var(--accent); }
-.settings-table .note-form button:hover { background: var(--accent); color: var(--bg); }
-.settings-table .approve-form button { color: var(--accent); border-color: var(--accent); }
+.settings-table .approve-form button { background: none; color: var(--accent); border: 1px solid var(--accent); }
 .settings-table .approve-form button:hover { background: var(--accent); color: var(--bg); }
+
+/* Форма добавления свёрнута в кнопку. Маркер details не нужен: кнопка и так читается кнопкой. */
+.add-form { margin: 0 0 1rem; }
+.add-form > summary {
+  display: inline-flex; align-items: center; min-height: 2.125rem; padding: 0 1rem;
+  border-radius: 8px; background: var(--accent); color: var(--bg);
+  font-size: 0.875rem; font-weight: 600; cursor: pointer; list-style: none;
+}
+.add-form > summary::-webkit-details-marker { display: none; }
+.add-form[open] > summary { margin-bottom: 0.75rem; background: none; color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+
+/* Меню «⋯» раскрывается внутри ячейки, а не поверх страницы: таблица лежит в обёртке
+   с прокруткой, и всплывающий блок обрезался бы ею. */
+.row-menu { display: inline-block; text-align: left; }
+.row-menu > summary {
+  display: inline-grid; place-items: center; width: 2.125rem; height: 2.125rem;
+  border-radius: 8px; color: var(--muted); font-size: 1.1rem; cursor: pointer; list-style: none;
+}
+.row-menu > summary::-webkit-details-marker { display: none; }
+.row-menu > summary:hover, .row-menu[open] > summary { background: var(--callout); color: var(--fg); }
+.row-menu-body {
+  display: grid; gap: 0.6rem; justify-items: end; min-width: min(16rem, 70vw);
+  margin-top: 0.4rem; padding: 0.75rem; border: 1px solid var(--line); border-radius: 8px; background: var(--bg);
+}
+.row-menu-body .settings-form { width: 100%; }
+.settings-table .row-actions { vertical-align: top; }
+
+/* Неработающие ссылки и приглашения скрыты, пока галка снята. */
+.dead-filter:has(.show-dead:not(:checked)) .gone { display: none; }
+.show-dead-label { display: flex; gap: 0.5rem; align-items: center; margin: 0 0 0.5rem; font-size: 0.9rem; color: var(--muted); cursor: pointer; }
+.show-dead { accent-color: var(--accent); }
+.muted { color: var(--muted); }
 
 .visibility-form { display: flex; align-items: center; gap: 0.75rem; margin: 1rem 0 0; }
 .visibility-state { font-family: system-ui, sans-serif; font-size: 0.9rem; color: var(--muted); }
@@ -846,15 +877,6 @@ table.pending .row-actions { display: flex; gap: 0.4rem; justify-content: flex-e
 }
 .new-token p { margin: 0; font-family: system-ui, sans-serif; font-size: 0.9rem; }
 .new-token .new-token-value { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; color: var(--fg); }
-.new-token-form { margin: 0 0 1.25rem; }
-
-/* Заметка правится прямо в строке таблицы, поэтому поле и кнопка стоят рядом. */
-.note-form { display: flex; gap: 0.4rem; align-items: center; }
-.note-form input {
-  min-width: 8rem; min-height: 2.125rem; padding: 0 0.5rem;
-  font: inherit; font-size: 0.85rem; color: var(--fg);
-  background: var(--bg); border: 1px solid var(--line); border-radius: 8px;
-}
 
 .backlinks { margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--line); }
 .backlinks h2 { margin: 0 0 0.5rem; font-size: 1rem; color: var(--muted); }

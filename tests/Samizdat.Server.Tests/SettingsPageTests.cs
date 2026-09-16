@@ -932,4 +932,57 @@ public class SettingsPageTests : IDisposable
 
         Assert.Equal(location, response.Headers.Location?.OriginalString);
     }
+
+    [Fact]
+    public async Task Row_actions_live_in_a_menu_and_add_forms_are_folded()
+    {
+        var factory = StartFactory();
+        AddOwner(factory, "aleks", "тайна");
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+            db.Users.Add(new UserRow
+            {
+                Login = "ivan", PasswordHash = PasswordHasher.Hash("пароль-ивана"), Role = UserRole.Reader,
+                CreatedAt = DateTimeOffset.UtcNow, ApprovedAt = DateTimeOffset.UtcNow,
+            });
+            db.SaveChanges();
+        }
+        var client = await LoginClient(factory, "aleks", "тайна");
+
+        var html = await client.GetStringAsync("/settings");
+        var users = Regex.Match(html, "id=\"users\".*?</section>", RegexOptions.Singleline).Value;
+
+        // Строка владельца действий не имеет, строка читателя — одно меню.
+        Assert.Single(Regex.Matches(users, "<details class=\"row-menu\""));
+        Assert.Contains("action=\"/settings/people/", users);
+        Assert.Matches("<details class=\"add-form\">\\s*<summary>", users);
+        Assert.DoesNotContain("<details class=\"add-form\" open>", users);
+    }
+
+    [Fact]
+    public async Task The_add_form_stays_open_after_its_error()
+    {
+        var factory = StartFactory();
+        AddOwner(factory, "aleks", "тайна");
+        var client = await LoginClient(factory, "aleks", "тайна");
+
+        var html = await client.GetStringAsync("/settings?err=login_taken");
+        var users = Regex.Match(html, "id=\"users\".*?</section>", RegexOptions.Singleline).Value;
+
+        Assert.Contains("<details class=\"add-form\" open>", users);
+    }
+
+    [Fact]
+    public async Task Links_and_invitations_have_a_switch_for_the_dead_rows()
+    {
+        var factory = StartFactory();
+        AddOwner(factory, "aleks", "тайна");
+        var client = await LoginClient(factory, "aleks", "тайна");
+
+        var html = await client.GetStringAsync("/settings");
+
+        // Переключатель есть и без строк: он часть блока, а не таблицы.
+        Assert.Equal(2, Regex.Matches(html, "class=\"show-dead\"").Count);
+    }
 }

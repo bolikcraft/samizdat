@@ -193,7 +193,7 @@
             {{ antiforgery }}
             <button type="submit">{{ t.settings.signup.approve }}</button>
           </form>
-          <form method="post" action="/settings/signup/{{ person.id }}/reject" class="inline-form">
+          <form method="post" action="/settings/signup/{{ person.id }}/reject" class="inline-form danger-form">
             {{ antiforgery }}
             <button type="submit">{{ t.settings.signup.reject }}</button>
           </form>
@@ -208,38 +208,43 @@
 
   <div class="settings-block">
     <p class="hint">{{ t.settings.people.hint }}</p>
-    <form method="post" action="/settings/people" class="settings-form">
-      {{ antiforgery }}
-      <label>{{ t.settings.login }} <input type="text" name="login" maxlength="100" autocomplete="off" required></label>
-      <label>{{ t.settings.people.password }} <input type="password" name="password" autocomplete="new-password"
-                           minlength="8" required></label>
-      <button type="submit">{{ t.settings.people.add }}</button>
-    </form>
+    {{~## Форма свёрнута в кнопку. После ошибки этой формы она открыта: видно, что исправить. ##~}}
+    <details class="add-form"{{ if error_code == "login_taken" || error_code == "bad_person" || error_code == "person_short_password" }} open{{ end }}>
+      <summary>{{ t.settings.people.add }}</summary>
+      <form method="post" action="/settings/people" class="settings-form">
+        {{ antiforgery }}
+        <label>{{ t.settings.login }} <input type="text" name="login" maxlength="100" autocomplete="off" required></label>
+        <label>{{ t.settings.people.password }} <input type="password" name="password" autocomplete="new-password"
+                             minlength="8" required></label>
+        <button type="submit">{{ t.settings.people.add }}</button>
+      </form>
+    </details>
     <div class="table-scroll">
     <table class="people settings-table">
-      <thead><tr><th>{{ t.settings.login }}</th><th>{{ t.settings.people.role }}</th><th>{{ t.settings.people.created }}</th><th>{{ t.settings.people.new_password }}</th><th></th></tr></thead>
+      <thead><tr><th>{{ t.settings.login }}</th><th>{{ t.settings.people.role }}</th><th>{{ t.settings.people.created }}</th><th></th></tr></thead>
       <tbody>
       {{ for person in people }}
       <tr>
         <td>{{ person.login | html.escape }}</td>
         <td>{{ person.role | html.escape }}</td>
         <td>{{ person.created_at | html.escape }}</td>
-        <td>
-          {{~ if person.can_change ~}}
-          <form method="post" action="/settings/people/{{ person.id }}/password" class="inline-form note-form">
-            {{ antiforgery }}
-            <input type="password" name="password" autocomplete="new-password"
-                   placeholder="{{ t.settings.people.new_password_hint }}" aria-label="{{ t.settings.people.new_password }}" minlength="8" required>
-            <button type="submit">{{ t.settings.people.change }}</button>
-          </form>
-          {{~ else ~}}—{{~ end ~}}
-        </td>
         <td class="row-actions">
           {{~ if person.can_change ~}}
-          <form method="post" action="/settings/people/{{ person.id }}/delete" class="inline-form">
-            {{ antiforgery }}
-            <button type="submit">{{ t.settings.people.delete }}</button>
-          </form>
+          <details class="row-menu">
+            <summary aria-label="{{ t.settings.actions }}">⋯</summary>
+            <div class="row-menu-body">
+              <form method="post" action="/settings/people/{{ person.id }}/password" class="settings-form">
+                {{ antiforgery }}
+                <label>{{ t.settings.people.new_password }}
+                  <input type="password" name="password" autocomplete="new-password" minlength="8" required></label>
+                <button type="submit">{{ t.settings.people.change_password }}</button>
+              </form>
+              <form method="post" action="/settings/people/{{ person.id }}/delete" class="inline-form danger-form">
+                {{ antiforgery }}
+                <button type="submit">{{ t.settings.people.delete }}</button>
+              </form>
+            </div>
+          </details>
           {{~ end ~}}
         </td>
       </tr>
@@ -252,59 +257,71 @@
   <div class="settings-block">
     <h3>{{ t.settings.signup.invites }}</h3>
     <p class="hint">{{ t.settings.signup.invites_hint }}</p>
-    <form method="post" action="/settings/invites" class="settings-form">
-      {{ antiforgery }}
-      <label>{{ t.settings.signup.term }}
-        <select name="days">
-          <option value="1">{{ t.settings.signup.day }}</option>
-          <option value="7" selected>{{ t.settings.signup.week }}</option>
-          <option value="30">{{ t.settings.signup.month }}</option>
-          <option value="0">{{ t.settings.signup.no_term }}</option>
-        </select>
-      </label>
-      <label>{{ t.settings.who }} <input type="text" name="note" maxlength="200" autocomplete="off"
-                         placeholder="{{ t.settings.signup.who_hint }}"></label>
-      <button type="submit">{{ t.settings.signup.create }}</button>
-    </form>
-    {{ if signup.invites.size > 0 }}
-    <div class="table-scroll">
-    <table class="invites settings-table">
-      <thead><tr><th>{{ t.settings.link }}</th><th>{{ t.settings.who }}</th><th>{{ t.settings.signup.state }}</th><th></th></tr></thead>
-      <tbody>
-      {{ for invite in signup.invites }}
-      <tr{{ if !invite.alive && !invite.used_at }} class="dead-link"{{ end }}>
-        <td>
-          <div class="link-cell">
-            <input class="link-url" type="text" readonly value="{{ invite.url | html.escape }}">
-            <button type="button" class="copy-link" data-url="{{ invite.url | html.escape }}" data-copied="{{ t.common.copied }}">{{ t.common.copy }}</button>
-          </div>
-        </td>
-        <td>{{ if invite.note }}{{ invite.note | html.escape }}{{ else }}—{{ end }}</td>
-        <td>
-          {{~ if invite.used_at ~}}
-          {{ t.settings.signup.used | string.replace "{0}" (invite.used_by | html.escape) | string.replace "{1}" (invite.used_at | html.escape) }}
-          {{~ else if invite.alive ~}}
-          {{ if invite.expires_at }}{{ t.settings.state.until | string.replace "{0}" (invite.expires_at | html.escape) }}{{ else }}{{ t.settings.state.no_term }}{{ end }}
-          {{~ else ~}}
-          {{ t.settings.state.dead }}
-          {{~ end ~}}
-        </td>
-        <td class="row-actions">
-          {{ if invite.alive }}
-          <form method="post" action="/settings/invites/{{ invite.id }}/revoke" class="inline-form">
-            {{ antiforgery }}
-            <button type="submit">{{ t.settings.revoke }}</button>
-          </form>
-          {{ end }}
-        </td>
-      </tr>
+    <details class="add-form"{{ if error_code == "invite_note" || error_code == "invite_term" }} open{{ end }}>
+      <summary>{{ t.settings.signup.create }}</summary>
+      <form method="post" action="/settings/invites" class="settings-form">
+        {{ antiforgery }}
+        <label>{{ t.settings.signup.term }}
+          <select name="days">
+            <option value="1">{{ t.settings.signup.day }}</option>
+            <option value="7" selected>{{ t.settings.signup.week }}</option>
+            <option value="30">{{ t.settings.signup.month }}</option>
+            <option value="0">{{ t.settings.signup.no_term }}</option>
+          </select>
+        </label>
+        <label>{{ t.settings.who }} <input type="text" name="note" maxlength="200" autocomplete="off"
+                           placeholder="{{ t.settings.signup.who_hint }}"></label>
+        <button type="submit">{{ t.settings.signup.create }}</button>
+      </form>
+    </details>
+    {{~## Неработающие строки скрыты, пока галка снята. Это правило стилей, на сервер ничего не уходит. ##~}}
+    <div class="dead-filter">
+      <label class="check show-dead-label"><input type="checkbox" class="show-dead"> {{ t.settings.show_dead }}</label>
+      {{ if signup.invites.size > 0 }}
+      <div class="table-scroll">
+      <table class="invites settings-table">
+        <thead><tr><th>{{ t.settings.link }}</th><th>{{ t.settings.who }}</th><th>{{ t.settings.signup.state }}</th><th></th></tr></thead>
+        <tbody>
+        {{ for invite in signup.invites }}
+        <tr class="{{ if !invite.alive }}gone{{ end }}{{ if !invite.alive && !invite.used_at }} dead-link{{ end }}">
+          <td>
+            <div class="link-cell">
+              <input class="link-url" type="text" readonly value="{{ invite.url | html.escape }}">
+              <button type="button" class="copy-link" data-url="{{ invite.url | html.escape }}" data-copied="{{ t.common.copied }}">{{ t.common.copy }}</button>
+            </div>
+          </td>
+          <td>{{ if invite.note }}{{ invite.note | html.escape }}{{ else }}—{{ end }}</td>
+          <td>
+            {{~ if invite.used_at ~}}
+            {{ t.settings.signup.used | string.replace "{0}" (invite.used_by | html.escape) | string.replace "{1}" (invite.used_at | html.escape) }}
+            {{~ else if invite.alive ~}}
+            {{ if invite.expires_at }}{{ t.settings.state.until | string.replace "{0}" (invite.expires_at | html.escape) }}{{ else }}{{ t.settings.state.no_term }}{{ end }}
+            {{~ else ~}}
+            {{ t.settings.state.dead }}
+            {{~ end ~}}
+          </td>
+          <td class="row-actions">
+            {{~ if invite.alive ~}}
+            <details class="row-menu">
+              <summary aria-label="{{ t.settings.actions }}">⋯</summary>
+              <div class="row-menu-body">
+                <form method="post" action="/settings/invites/{{ invite.id }}/revoke" class="inline-form danger-form">
+                  {{ antiforgery }}
+                  <button type="submit">{{ t.settings.revoke }}</button>
+                </form>
+              </div>
+            </details>
+            {{~ end ~}}
+          </td>
+        </tr>
+        {{ end }}
+        </tbody>
+      </table>
+      </div>
+      {{ else }}
+      <p class="empty">{{ t.settings.signup.no_invites }}</p>
       {{ end }}
-      </tbody>
-    </table>
     </div>
-    {{ else }}
-    <p class="empty">{{ t.settings.signup.no_invites }}</p>
-    {{ end }}
   </div>
 
   <div class="settings-block">
@@ -338,39 +355,47 @@
   <div class="settings-block">
     <h3>{{ t.settings.links.title }}</h3>
     <p class="hint">{{ t.settings.links.hint }}</p>
-    {{ if links.size > 0 }}
-    <div class="table-scroll">
-    <table class="links settings-table">
-      <thead><tr><th>{{ t.settings.links.article }}</th><th>{{ t.settings.link }}</th><th>{{ t.settings.who }}</th><th>{{ t.settings.links.term }}</th><th>{{ t.settings.links.opens }}</th><th></th></tr></thead>
-      <tbody>
-      {{ for link in links }}
-      <tr id="link-{{ link.id }}"{{ if !link.alive }} class="dead-link"{{ end }}>
-        <td><a href="/{{ link.slug | html.escape }}">{{ link.title | html.escape }}</a></td>
-        <td>
-          <div class="link-cell">
-            <input class="link-url" type="text" readonly value="{{ link.url | html.escape }}">
-            <button type="button" class="copy-link" data-url="{{ link.url | html.escape }}" data-copied="{{ t.common.copied }}">{{ t.common.copy }}</button>
-          </div>
-        </td>
-        <td>{{ if link.note }}{{ link.note | html.escape }}{{ else }}—{{ end }}</td>
-        <td>{{ if link.alive }}{{ if link.expires_at }}{{ t.settings.state.until | string.replace "{0}" (link.expires_at | html.escape) }}{{ else }}{{ t.settings.state.no_term }}{{ end }}{{ else }}{{ t.settings.state.dead }}{{ end }}</td>
-        <td>{{ link.opened_count }}{{ if link.last_opened_at }}, {{ link.last_opened_at | html.escape }}{{ end }}</td>
-        <td class="row-actions">
-          {{ if link.alive }}
-          <form method="post" action="/settings/links/{{ link.id }}/revoke" class="inline-form">
-            {{ antiforgery }}
-            <button type="submit">{{ t.settings.revoke }}</button>
-          </form>
-          {{ end }}
-        </td>
-      </tr>
+    <div class="dead-filter">
+      <label class="check show-dead-label"><input type="checkbox" class="show-dead"> {{ t.settings.show_dead }}</label>
+      {{ if links.size > 0 }}
+      <div class="table-scroll">
+      <table class="links settings-table">
+        <thead><tr><th>{{ t.settings.links.article }}</th><th>{{ t.settings.link }}</th><th>{{ t.settings.who }}</th><th>{{ t.settings.links.term }}</th><th>{{ t.settings.links.opens }}</th><th></th></tr></thead>
+        <tbody>
+        {{ for link in links }}
+        <tr id="link-{{ link.id }}"{{ if !link.alive }} class="gone dead-link"{{ end }}>
+          <td><a href="/{{ link.slug | html.escape }}">{{ link.title | html.escape }}</a></td>
+          <td>
+            <div class="link-cell">
+              <input class="link-url" type="text" readonly value="{{ link.url | html.escape }}">
+              <button type="button" class="copy-link" data-url="{{ link.url | html.escape }}" data-copied="{{ t.common.copied }}">{{ t.common.copy }}</button>
+            </div>
+          </td>
+          <td>{{ if link.note }}{{ link.note | html.escape }}{{ else }}—{{ end }}</td>
+          <td>{{ if link.alive }}{{ if link.expires_at }}{{ t.settings.state.until | string.replace "{0}" (link.expires_at | html.escape) }}{{ else }}{{ t.settings.state.no_term }}{{ end }}{{ else }}{{ t.settings.state.dead }}{{ end }}</td>
+          <td>{{ link.opened_count }}{{ if link.last_opened_at }}, {{ link.last_opened_at | html.escape }}{{ end }}</td>
+          <td class="row-actions">
+            {{~ if link.alive ~}}
+            <details class="row-menu">
+              <summary aria-label="{{ t.settings.actions }}">⋯</summary>
+              <div class="row-menu-body">
+                <form method="post" action="/settings/links/{{ link.id }}/revoke" class="inline-form danger-form">
+                  {{ antiforgery }}
+                  <button type="submit">{{ t.settings.revoke }}</button>
+                </form>
+              </div>
+            </details>
+            {{~ end ~}}
+          </td>
+        </tr>
+        {{ end }}
+        </tbody>
+      </table>
+      </div>
+      {{ else }}
+      <p class="empty">{{ t.settings.links.no_links }}</p>
       {{ end }}
-      </tbody>
-    </table>
     </div>
-    {{ else }}
-    <p class="empty">{{ t.settings.links.no_links }}</p>
-    {{ end }}
   </div>
 </section>
 
@@ -386,11 +411,14 @@
     </div>
   </div>
   {{ end }}
-  <form method="post" action="/settings/tokens" class="settings-form new-token-form">
-    {{ antiforgery }}
-    <label>{{ t.settings.tokens.note }} <input type="text" name="note" placeholder="{{ t.settings.tokens.note_hint }}"></label>
-    <button type="submit">{{ t.settings.tokens.create }}</button>
-  </form>
+  <details class="add-form">
+    <summary>{{ t.settings.tokens.create }}</summary>
+    <form method="post" action="/settings/tokens" class="settings-form">
+      {{ antiforgery }}
+      <label>{{ t.settings.tokens.note }} <input type="text" name="note" placeholder="{{ t.settings.tokens.note_hint }}"></label>
+      <button type="submit">{{ t.settings.tokens.create }}</button>
+    </form>
+  </details>
   {{ if tokens.size > 0 }}
   <div class="table-scroll">
   <table class="tokens settings-table">
@@ -398,21 +426,25 @@
     <tbody>
     {{ for token in tokens }}
     <tr>
-      <td>
-        <form method="post" action="/settings/tokens/{{ token.id }}/note" class="inline-form note-form">
-          {{ antiforgery }}
-          <input type="text" name="note" value="{{ token.note | html.escape }}"
-                 placeholder="{{ t.settings.tokens.no_note }}" aria-label="{{ t.settings.tokens.note }}">
-          <button type="submit">{{ t.settings.save }}</button>
-        </form>
-      </td>
+      <td>{{ if token.note }}{{ token.note | html.escape }}{{ else }}<span class="muted">{{ t.settings.tokens.no_note }}</span>{{ end }}</td>
       <td>{{ token.created_at | html.escape }}</td>
       <td>{{ if token.last_used_at }}{{ token.last_used_at | html.escape }}{{ else }}{{ t.settings.tokens.never_used }}{{ end }}</td>
       <td class="row-actions">
-        <form method="post" action="/settings/tokens/{{ token.id }}/revoke" class="inline-form">
-          {{ antiforgery }}
-          <button type="submit">{{ t.settings.revoke }}</button>
-        </form>
+        <details class="row-menu">
+          <summary aria-label="{{ t.settings.actions }}">⋯</summary>
+          <div class="row-menu-body">
+            <form method="post" action="/settings/tokens/{{ token.id }}/note" class="settings-form">
+              {{ antiforgery }}
+              <label>{{ t.settings.tokens.edit_note }}
+                <input type="text" name="note" value="{{ token.note | html.escape }}" placeholder="{{ t.settings.tokens.no_note }}"></label>
+              <button type="submit">{{ t.settings.save }}</button>
+            </form>
+            <form method="post" action="/settings/tokens/{{ token.id }}/revoke" class="inline-form danger-form">
+              {{ antiforgery }}
+              <button type="submit">{{ t.settings.revoke }}</button>
+            </form>
+          </div>
+        </details>
       </td>
     </tr>
     {{ end }}
