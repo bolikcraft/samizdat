@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using Samizdat.Server.Auth;
 using Samizdat.Server.Commands;
 using Samizdat.Server.Data;
 
@@ -71,6 +72,74 @@ public class ServerCommandsTests(DatabaseFixture database) : IDisposable
         Assert.Equal(UserRole.Owner, user.Role);
         // Пароль сменили с консоли — выданные cookie должны погаснуть, как и при смене из настроек.
         Assert.NotEqual(first.SessionStamp, user.SessionStamp);
+    }
+
+    // ResetDatabase очищает users, поэтому сид admin/admin тесты заводят сами.
+    async Task AddAdmin(WebApplicationFactory<Program> factory, string password)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+        db.Users.Add(new UserRow
+        {
+            Login = "admin", PasswordHash = PasswordHasher.Hash(password), Role = UserRole.Owner,
+            CreatedAt = DateTimeOffset.UtcNow,
+        });
+        await db.SaveChangesAsync();
+    }
+
+    [Fact]
+    public async Task Owner_set_with_a_new_login_removes_admin_with_the_default_password()
+    {
+        database.ResetDatabase();
+        var factory = StartServer();
+        await AddAdmin(factory, "admin");
+
+        await ServerCommands.TryRun(["owner", "set", "aleks", "тайна"], factory.Services);
+
+        Assert.Null(FindUser(factory, "admin"));
+        Assert.NotNull(FindUser(factory, "aleks"));
+    }
+
+    [Fact]
+    public async Task Owner_set_with_a_new_login_keeps_admin_with_a_changed_password()
+    {
+        database.ResetDatabase();
+        var factory = StartServer();
+        await AddAdmin(factory, "другой");
+
+        await ServerCommands.TryRun(["owner", "set", "aleks", "тайна"], factory.Services);
+
+        Assert.NotNull(FindUser(factory, "admin"));
+        Assert.NotNull(FindUser(factory, "aleks"));
+    }
+
+    [Fact]
+    public async Task Owner_set_for_admin_changes_only_the_password()
+    {
+        database.ResetDatabase();
+        var factory = StartServer();
+        await AddAdmin(factory, "admin");
+
+        await ServerCommands.TryRun(["owner", "set", "admin", "новый"], factory.Services);
+
+        var admin = FindUser(factory, "admin");
+        Assert.NotNull(admin);
+        Assert.True(PasswordHasher.Verify("новый", admin.PasswordHash));
+    }
+
+    [Fact]
+    public async Task Token_new_goes_to_the_first_owner()
+    {
+        database.ResetDatabase();
+        var factory = StartServer();
+        await AddAdmin(factory, "другой");
+        await ServerCommands.TryRun(["owner", "set", "aleks", "тайна"], factory.Services);
+
+        await ServerCommands.TryRun(["token", "new", "laptop"], factory.Services);
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+        Assert.Equal(FindUser(factory, "admin")!.Id, db.ApiTokens.Single().UserId);
     }
 
     [Fact]

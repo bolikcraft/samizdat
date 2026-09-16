@@ -27,13 +27,14 @@ public static class ServerCommands
             var user = await db.Users.FirstOrDefaultAsync(row => row.Login == login);
             if (user is null)
             {
-                db.Users.Add(new UserRow
+                user = new UserRow
                 {
                     Login = login,
                     PasswordHash = PasswordHasher.Hash(password),
                     Role = UserRole.Owner,
                     CreatedAt = DateTimeOffset.UtcNow,
-                });
+                };
+                db.Users.Add(user);
             }
             else
             {
@@ -41,8 +42,16 @@ public static class ServerCommands
                 user.SessionStamp = UserRow.NewSessionStamp();
             }
 
+            // Сид миграции Init — admin/admin. Пока пароль не сменили, это открытая дверь на сайт.
+            var demo = await db.Users.FirstOrDefaultAsync(row => row.Login == "admin");
+            var demoRemoved = demo is not null && demo != user && PasswordHasher.Verify("admin", demo.PasswordHash);
+            if (demoRemoved)
+                db.Users.Remove(demo!);
+
             await db.SaveChangesAsync();
             Console.WriteLine($"Владелец {login} записан.");
+            if (demoRemoved)
+                Console.WriteLine("Демо-учётка admin с паролем admin удалена.");
             return true;
         }
 
@@ -52,7 +61,7 @@ public static class ServerCommands
             var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
             await db.Database.MigrateAsync();
 
-            var owner = await db.Users.FirstOrDefaultAsync(user => user.Role == UserRole.Owner);
+            var owner = await db.Users.OrderBy(user => user.Id).FirstOrDefaultAsync(user => user.Role == UserRole.Owner);
             if (owner is null)
             {
                 Console.Error.WriteLine("Сначала заведите владельца: owner set <логин> <пароль>");

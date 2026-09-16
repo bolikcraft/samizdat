@@ -65,7 +65,7 @@ public static class Startup
         builder.Services.AddScoped<ArticleIndexer>();
         builder.Services.AddScoped<ArticleSearch>();
 
-        // Апач-прокси стоит в соседнем контейнере, не на loopback — доверяем заголовку без ограничения по сети.
+        // Адрес прокси заранее неизвестен (он на другой машине или в другом контейнере) — доверяем заголовку с любого адреса.
         builder.Services.Configure<ForwardedHeadersOptions>(options =>
         {
             options.ForwardedHeaders = ForwardedHeaders.XForwardedProto;
