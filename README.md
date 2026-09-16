@@ -5,6 +5,10 @@ article its own link that expires.
 
 **Status: it works. You build it from the source. There is no package yet.**
 
+<p>
+  <img src="docs/media/obsidian.gif" alt="Publish a note from Obsidian" width="49%"><img src="docs/media/demo.gif" alt="Read an article on the site and share it" width="49%">
+</p>
+
 ## What it does
 
 You write notes in Obsidian. You mark a note with `publish: true`. One command sends the note to
