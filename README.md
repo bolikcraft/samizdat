@@ -36,6 +36,9 @@ the people you allow.
 - **Backlinks.** Each article shows the articles that mention it.
 - **Look.** Two color schemes, a gallery of backgrounds, and your own picture as the background.
   The themes are files, so you can add your own directory.
+- **Language.** The interface speaks English or Russian. The owner sets the language of the site,
+  and each user can set a different language for their own pages. A language is a file, so you can
+  add one more.
 
 Not there yet: Docker Compose, the installation manual, and the packages. See "How to run it".
 
@@ -66,6 +69,10 @@ in their editor.
 - **Search is in the database.** PostgreSQL makes the search vectors from the title, the
   description and the text. The rights are part of the query, so a reader cannot find the text of
   a private article.
+- **A language is a file.** `en` and `ru` are in the program. Put a file `<code>.json` into
+  `<data root>/lang/` and that language comes into the list in the settings. A file with a code
+  that the program knows replaces only the lines that it contains; the other lines stay. A line
+  that no file gives comes from `en`.
 
 ## How to run it
 
