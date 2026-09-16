@@ -113,6 +113,7 @@ public static class Startup
         }
 
         app.UseForwardedHeaders();
+        app.UseSecurityHeaders();
         app.MapErrorHandling();
         app.UseAuthentication();
         app.UseAuthorization();

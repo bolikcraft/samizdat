@@ -419,6 +419,21 @@ public class ShareLinkTests : IDisposable
     }
 
     [Fact]
+    public async Task Guest_page_sends_the_content_security_policy()
+    {
+        using var factory = StartFactory();
+        WriteArticle("statya", "Текст статьи.");
+        RegisterArticle(factory, "statya", "Про ежей");
+        var token = AddLink(factory, "statya");
+
+        var response = await factory.CreateClient().GetAsync($"/s/{token}");
+
+        var policy = string.Join(";", response.Headers.GetValues("Content-Security-Policy"));
+        Assert.Contains("script-src 'self'", policy);
+        Assert.Contains("object-src 'none'", policy);
+    }
+
+    [Fact]
     public async Task Link_of_one_article_does_not_open_files_of_another()
     {
         using var factory = StartFactory();

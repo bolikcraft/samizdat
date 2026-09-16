@@ -327,5 +327,42 @@ public class PageEndpointsTests : IDisposable
         Assert.DoesNotContain("javascript:", html);
     }
 
+    [Fact]
+    public async Task Html_pages_send_the_content_security_policy()
+    {
+        WriteArticle("st", "---\ntitle: T\n---\nтекст\n");
+        var factory = StartFactory();
+        Register(factory, "st", "T");
+        var client = LoginClient(factory);
+
+        var article = await client.GetAsync("/st");
+        var missing = await client.GetAsync("/net-takoy");
+        var login = await factory.CreateClient().GetAsync("/login");
+
+        foreach (var response in new[] { article, missing, login })
+        {
+            var policy = string.Join(";", response.Headers.GetValues("Content-Security-Policy"));
+            Assert.Contains("script-src 'self'", policy);
+            Assert.Contains("object-src 'none'", policy);
+            Assert.Contains("frame-ancestors 'none'", policy);
+            Assert.Equal("nosniff", Assert.Single(response.Headers.GetValues("X-Content-Type-Options")));
+        }
+    }
+
+    [Fact]
+    public async Task Error_page_also_sends_the_content_security_policy()
+    {
+        // Фигурные скобки YAML читает как словарь: разбор шапки бросает исключение, и отвечает страница 500.
+        WriteArticle("slomana", "---\ntitle: {{title}}\n---\nтекст\n");
+        var factory = StartFactory();
+        Register(factory, "slomana", "T");
+        var client = LoginClient(factory);
+
+        var response = await client.GetAsync("/slomana");
+
+        Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
+        Assert.Contains("script-src 'self'", string.Join(";", response.Headers.GetValues("Content-Security-Policy")));
+    }
+
     public void Dispose() => Directory.Delete(dataRoot, recursive: true);
 }
