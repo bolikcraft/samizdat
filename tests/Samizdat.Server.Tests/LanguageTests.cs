@@ -69,6 +69,29 @@ public class LanguageTests : IDisposable
         return await LoginClient(factory, login);
     }
 
+    static async Task<HttpClient> LoginAsReader(WebApplicationFactory<Program> factory, string login, string language)
+    {
+        AddUser(factory, login, UserRole.Reader);
+        SetUserLanguage(factory, login, language);
+        return await LoginClient(factory, login);
+    }
+
+    async Task AddArticle(WebApplicationFactory<Program> factory, string slug)
+    {
+        var folder = Path.Combine(dataRoot, "articles", slug);
+        Directory.CreateDirectory(folder);
+        await File.WriteAllTextAsync(Path.Combine(folder, "index.md"), "---\ntitle: Ёж\n---\n\nТекст.\n");
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+        db.Articles.Add(new ArticleRow
+        {
+            Slug = slug, Title = "Ёж", ContentHash = $"hash-{slug}",
+            Visibility = ArticleVisibility.Shared, UpdatedAt = DateTimeOffset.UtcNow,
+        });
+        await db.SaveChangesAsync();
+    }
+
     public void Dispose() => Directory.Delete(dataRoot, recursive: true);
 
     [Fact]
@@ -206,5 +229,47 @@ public class LanguageTests : IDisposable
         var client = await LoginAsOwner(factory);
 
         Assert.Contains("lang=\"de\"", await client.GetStringAsync("/"));
+    }
+
+    [Fact]
+    public async Task Cached_article_does_not_leak_into_another_language()
+    {
+        var factory = StartFactory();
+        await AddArticle(factory, "ezh");
+        var english = await LoginAsReader(factory, "reader-en", "en");
+        var russian = await LoginAsReader(factory, "reader-ru", "ru");
+
+        var first = await english.GetStringAsync("/ezh");
+        var second = await russian.GetStringAsync("/ezh");
+
+        Assert.Contains("lang=\"en\"", first);
+        Assert.Contains("lang=\"ru\"", second);
+    }
+
+    [Fact]
+    public async Task Owner_and_reader_each_get_the_article_in_his_own_language()
+    {
+        var factory = StartFactory();
+        await AddArticle(factory, "ezh");
+        AddUser(factory, "aleks", UserRole.Owner);
+        SetUserLanguage(factory, "aleks", "ru");
+        var owner = await LoginClient(factory, "aleks");
+        var reader = await LoginAsReader(factory, "reader-en", "en");
+
+        Assert.Contains("lang=\"ru\"", await owner.GetStringAsync("/ezh"));
+        Assert.Contains("lang=\"en\"", await reader.GetStringAsync("/ezh"));
+    }
+
+    [Fact]
+    public async Task Article_is_drawn_again_after_the_person_changes_his_language()
+    {
+        var factory = StartFactory();
+        await AddArticle(factory, "ezh");
+        var reader = await LoginAsReader(factory, "reader", "en");
+        Assert.Contains("lang=\"en\"", await reader.GetStringAsync("/ezh"));
+
+        SetUserLanguage(factory, "reader", "ru");
+
+        Assert.Contains("lang=\"ru\"", await reader.GetStringAsync("/ezh"));
     }
 }
