@@ -100,6 +100,7 @@ The site is at `http://<server>:8080`. To change the port or the address, set `S
 
 A new database has the demo account `admin` with the password `admin`. The command `owner set` with
 a different login removes this account if its password is still `admin`.
+If a person with the login exists, `owner set` gives this person the new password and makes this person an owner.
 
 The database uses `POSTGRES_PASSWORD` only when it starts for the first time with an empty `pgdata/`.
 After that, do not change the password in `.env` only. First change it in the database, then in `.env`.

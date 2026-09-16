@@ -87,6 +87,18 @@ public class ServerCommandsTests(DatabaseFixture database) : IDisposable
         await db.SaveChangesAsync();
     }
 
+    async Task AddReader(WebApplicationFactory<Program> factory, string login, DateTimeOffset? approvedAt)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+        db.Users.Add(new UserRow
+        {
+            Login = login, PasswordHash = PasswordHasher.Hash("parol-chitatelya"), Role = UserRole.Reader,
+            CreatedAt = DateTimeOffset.UtcNow, ApprovedAt = approvedAt,
+        });
+        await db.SaveChangesAsync();
+    }
+
     [Fact]
     public async Task Owner_set_with_a_new_login_removes_admin_with_the_default_password()
     {
@@ -125,6 +137,45 @@ public class ServerCommandsTests(DatabaseFixture database) : IDisposable
         var admin = FindUser(factory, "admin");
         Assert.NotNull(admin);
         Assert.True(PasswordHasher.Verify("новый", admin.PasswordHash));
+    }
+
+    // Сценарий из ревью: admin/admin удаляется, и читатель обязан стать владельцем, иначе
+    // владельцев в базе не остаётся.
+    [Fact]
+    public async Task Owner_set_for_a_waiting_reader_makes_an_approved_owner()
+    {
+        database.ResetDatabase();
+        var factory = StartServer();
+        await AddAdmin(factory, "admin");
+        await AddReader(factory, "alex", approvedAt: null);
+
+        await ServerCommands.TryRun(["owner", "set", "alex", "тайна"], factory.Services);
+        await ServerCommands.TryRun(["token", "new", "laptop"], factory.Services);
+
+        var alex = FindUser(factory, "alex");
+        Assert.NotNull(alex);
+        Assert.Equal(UserRole.Owner, alex.Role);
+        Assert.NotNull(alex.ApprovedAt);
+        Assert.Null(FindUser(factory, "admin"));
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+        Assert.Equal(alex.Id, db.ApiTokens.Single().UserId);
+    }
+
+    [Fact]
+    public async Task Owner_set_keeps_the_approval_date_of_an_approved_reader()
+    {
+        database.ResetDatabase();
+        var factory = StartServer();
+        var approvedAt = new DateTimeOffset(2026, 9, 1, 12, 0, 0, TimeSpan.Zero);
+        await AddReader(factory, "alex", approvedAt);
+
+        await ServerCommands.TryRun(["owner", "set", "alex", "тайна"], factory.Services);
+
+        var alex = FindUser(factory, "alex");
+        Assert.NotNull(alex);
+        Assert.Equal(UserRole.Owner, alex.Role);
+        Assert.Equal(approvedAt, alex.ApprovedAt);
     }
 
     [Fact]

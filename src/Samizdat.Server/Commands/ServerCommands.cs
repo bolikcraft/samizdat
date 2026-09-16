@@ -40,6 +40,9 @@ public static class ServerCommands
             {
                 user.PasswordHash = PasswordHasher.Hash(password);
                 user.SessionStamp = UserRow.NewSessionStamp();
+                // Команда обещает владельца. Без повышения admin ниже удалится, и владельцев не останется.
+                user.Role = UserRole.Owner;
+                user.ApprovedAt ??= DateTimeOffset.UtcNow;
             }
 
             // Сид миграции Init — admin/admin. Пока пароль не сменили, это открытая дверь на сайт.
