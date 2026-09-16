@@ -11,6 +11,7 @@ public sealed class LanguageCatalog(ILanguageSource source)
     public const string Fallback = "en";
 
     readonly ConcurrentDictionary<(string Code, string Version), Translator> cache = new();
+    readonly ConcurrentDictionary<string, HashSet<string>> known = new();
 
     public Translator For(string? code)
     {
@@ -25,7 +26,11 @@ public sealed class LanguageCatalog(ILanguageSource source)
             .OrderBy(language => language.Code, StringComparer.Ordinal)
             .ToList();
 
-    public bool Has(string? code) => code is { Length: > 0 } && source.Read(code) is not null;
+    /// Спрашивается на каждом запросе, поэтому список кодов лежит в кэше: иначе сюда попадали бы
+    /// чтение и разбор файла пакета.
+    public bool Has(string? code)
+        => code is { Length: > 0 }
+           && known.GetOrAdd(source.Version, _ => [.. source.Codes()]).Contains(code);
 
     Translator Build(string code)
     {
