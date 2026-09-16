@@ -21,6 +21,21 @@ public sealed partial class VaultScanner(string vaultPath)
     [GeneratedRegex(@"!\[\[(?<name>[^\]|#]+)\]\]|!\[[^\]]*\]\((?<path>[^)]+)\)")]
     private static partial Regex ImageReference();
 
+    [GeneratedRegex(@"\A﻿?---[ \t]*\r?\n(?<yaml>.*?)^---[ \t]*\r?$", RegexOptions.Singleline | RegexOptions.Multiline)]
+    private static partial Regex FrontMatterBlock();
+
+    [GeneratedRegex(@"^publish[ \t]*:(?<value>[^\r\n]*)", RegexOptions.Multiline)]
+    private static partial Regex PublishLine();
+
+    // Те же истинные значения, что понимает YamlDotNet; хвост "# ..." — комментарий YAML.
+    [GeneratedRegex(@"\A[""']?(true|yes|on|y)[""']?[ \t]*(#.*)?\z", RegexOptions.IgnoreCase)]
+    private static partial Regex TrueValue();
+
+    readonly List<string> warnings = [];
+
+    /// Заметки, пропущенные из-за битой шапки. Заполняется по ходу перечисления Scan.
+    public IReadOnlyList<string> Warnings => warnings;
+
     public IEnumerable<VaultNote> Scan()
     {
         var taken = new Dictionary<string, string>();
@@ -37,7 +52,14 @@ public sealed partial class VaultScanner(string vaultPath)
             }
             catch (FrontMatterException error)
             {
-                throw new CliException($"{file}: {error.Message}");
+                // Шаблоны Obsidian с {{title}} не разбираются как YAML, из-за них push стоять не должен.
+                // Заметку, которую явно просят выложить, молча не теряем.
+                var publish = RawPublishValue(text);
+                if (publish is not null && TrueValue().IsMatch(publish))
+                    throw new CliException($"{file}: {error.Message}");
+                if (publish is not null)
+                    warnings.Add($"{file}: заметка пропущена. {error.Message}");
+                continue;
             }
 
             if (!parsed.FrontMatter.Publish) continue;
@@ -62,6 +84,16 @@ public sealed partial class VaultScanner(string vaultPath)
     /// сервер отвергнет, CLI должен остановить до выкладки.
     static string ValidateSlug(string slug, string file)
         => SafeName.SlugProblem(slug) is { } problem ? throw new CliException($"{file}: {problem}") : slug;
+
+    /// Значение publish из сырой шапки, когда YAML целиком не разбирается. null — ключа нет.
+    static string? RawPublishValue(string text)
+    {
+        var block = FrontMatterBlock().Match(text);
+        if (!block.Success) return null;
+
+        var line = PublishLine().Match(block.Groups["yaml"].Value);
+        return line.Success ? line.Groups["value"].Value.Trim() : null;
+    }
 
     bool IsHidden(string file)
         => Path.GetRelativePath(vaultPath, file)

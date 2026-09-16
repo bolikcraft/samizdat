@@ -179,5 +179,49 @@ public class VaultScannerTests : IDisposable
         Assert.NotEqual(before, new VaultScanner(vault).Scan().Single().Hash);
     }
 
+    [Fact]
+    public void Broken_front_matter_without_publish_is_skipped_silently()
+    {
+        Note("Templates/Note.md", "---\ntitle: {{title}}\ndate: {{date}}\n---\n");
+        Note("a.md", "---\ntitle: A\npublish: true\n---\nx");
+
+        var scanner = new VaultScanner(vault);
+
+        Assert.Equal("a", scanner.Scan().Single().Slug);
+        Assert.Empty(scanner.Warnings);
+    }
+
+    [Fact]
+    public void Broken_front_matter_with_publish_false_is_skipped_with_a_warning()
+    {
+        Note("draft.md", "---\ntitle: {{title}}\npublish: false\n---\nx");
+
+        var scanner = new VaultScanner(vault);
+
+        Assert.Empty(scanner.Scan().ToList());
+        Assert.Contains(Path.Combine(vault, "draft.md"), Assert.Single(scanner.Warnings));
+    }
+
+    [Theory]
+    [InlineData("true")]
+    [InlineData("True")]
+    [InlineData("\"true\"")]
+    [InlineData("yes # в работе")]
+    public void Broken_front_matter_with_publish_true_stops_scanning(string value)
+    {
+        Note("a.md", $"---\ntitle: {{{{title}}}}\npublish: {value}\n---\nx");
+
+        var error = Assert.Throws<CliException>(() => new VaultScanner(vault).Scan().ToList());
+        Assert.Contains(Path.Combine(vault, "a.md"), error.Message);
+    }
+
+    [Fact]
+    public void Broken_front_matter_with_publish_true_stops_scanning_with_windows_line_ends()
+    {
+        Note("a.md", "---\r\ntitle: {{title}}\r\npublish: true\r\n---\r\nx");
+
+        Assert.Throws<CliException>(() => new VaultScanner(vault).Scan().ToList());
+    }
+
     public void Dispose() => Directory.Delete(vault, recursive: true);
 }

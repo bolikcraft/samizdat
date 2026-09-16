@@ -26,7 +26,9 @@ public static class PushCommand
         if (string.IsNullOrWhiteSpace(vault))
             throw new CliException("Не задан путь к вольту: samizdat login или --vault <путь>");
 
-        var notes = new VaultScanner(vault).Scan().ToList();
+        var scanner = new VaultScanner(vault);
+        var notes = scanner.Scan().ToList();
+        foreach (var warning in scanner.Warnings) Console.Error.WriteLine(warning);
         var client = SamizdatClient.FromConfig(config);
         var state = await client.GetStateAsync();
         var plan = PushPlan.Build(notes, state, args.Has("prune"));
