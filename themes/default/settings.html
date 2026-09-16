@@ -283,7 +283,7 @@
         <thead><tr><th>{{ t.settings.link }}</th><th>{{ t.settings.who }}</th><th>{{ t.settings.signup.state }}</th><th></th></tr></thead>
         <tbody>
         {{ for invite in signup.invites }}
-        <tr class="{{ if !invite.alive }}gone{{ end }}{{ if !invite.alive && !invite.used_at }} dead-link{{ end }}">
+        <tr{{ if !invite.alive }} class="gone{{ if !invite.used_at }} dead-link{{ end }}"{{ end }}>
           <td>
             <div class="link-cell">
               <input class="link-url" type="text" readonly value="{{ invite.url | html.escape }}">
@@ -459,40 +459,4 @@
 
 </div>
 
-<script>
-  var sectionLinks = document.querySelectorAll('.settings-nav a');
-  var navSwitch = document.querySelector('.sidebar .nav-switch');
-
-  {{~## Комментарии скрипта — шаблонными скобками: в самом файле проверка запрещает кириллицу,
-  а Scriban убирает такой комментарий ещё до браузера.
-
-  Подсветка выбранного раздела: :target показывает панель, но до ссылки в боковике не дотягивается. ##~}}
-  function markSection() {
-    var current = location.hash || sectionLinks[0].getAttribute('href');
-    sectionLinks.forEach(function (link) {
-      if (link.getAttribute('href') === current) link.setAttribute('aria-current', 'page');
-      else link.removeAttribute('aria-current');
-    });
-  }
-
-  markSection();
-  window.addEventListener('hashchange', markSection);
-
-  {{~## Выбранный файл отправляется сам. Кнопка «Загрузить» рядом остаётся для страницы без
-  скриптов, поэтому её убирает сам скрипт, а не стили. ##~}}
-  var upload = document.querySelector('.bg-upload');
-  if (upload) {
-    upload.querySelector('.bg-upload-go').hidden = true;
-    upload.querySelector('input[type=file]').addEventListener('change', function () {
-      if (this.files.length > 0) upload.submit();
-    });
-  }
-
-  {{~## На узком экране список разделов свёрнут переключателем: после выбора закрываем его,
-  иначе выбранный раздел остаётся ниже экрана. ##~}}
-  sectionLinks.forEach(function (link) {
-    link.addEventListener('click', function () {
-      if (navSwitch) navSwitch.open = false;
-    });
-  });
-</script>
+<script src="/assets/settings.js" defer></script>

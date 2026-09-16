@@ -985,4 +985,18 @@ public class SettingsPageTests : IDisposable
         // Переключатель есть и без строк: он часть блока, а не таблицы.
         Assert.Equal(2, Regex.Matches(html, "class=\"show-dead\"").Count);
     }
+
+    [Fact]
+    public async Task The_settings_page_loads_its_script_from_the_theme()
+    {
+        var factory = StartFactory();
+        AddOwner(factory, "aleks", "тайна");
+        var client = await LoginClient(factory, "aleks", "тайна");
+
+        var html = await client.GetStringAsync("/settings");
+        var script = await client.GetAsync("/assets/settings.js");
+
+        Assert.Contains("<script src=\"/assets/settings.js\" defer></script>", html);
+        Assert.Equal(HttpStatusCode.OK, script.StatusCode);
+    }
 }

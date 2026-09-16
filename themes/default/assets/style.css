@@ -743,6 +743,9 @@ table.pending .row-actions { display: flex; gap: 0.4rem; justify-content: flex-e
 .settings-table .approve-form button { background: none; color: var(--accent); border: 1px solid var(--accent); }
 .settings-table .approve-form button:hover { background: var(--accent); color: var(--bg); }
 
+/* Пока галка сохраняется, форма бледнеет и не принимает второй щелчок. */
+form.is-saving { opacity: 0.6; pointer-events: none; }
+
 /* Форма добавления свёрнута в кнопку. Маркер details не нужен: кнопка и так читается кнопкой. */
 .add-form { margin: 0 0 1rem; }
 .add-form > summary {
@@ -754,8 +757,8 @@ table.pending .row-actions { display: flex; gap: 0.4rem; justify-content: flex-e
 .add-form[open] > summary { margin-bottom: 0.75rem; background: none; color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
 
 /* Меню «⋯» раскрывается внутри ячейки, а не поверх страницы: таблица лежит в обёртке
-   с прокруткой, и всплывающий блок обрезался бы ею. */
-.row-menu { display: inline-block; text-align: left; }
+   с прокруткой, и всплывающий блок обрезался бы ею. Кнопка «⋯» и при открытом меню у правого края. */
+.row-menu { display: inline-block; text-align: right; }
 .row-menu > summary {
   display: inline-grid; place-items: center; width: 2.125rem; height: 2.125rem;
   border-radius: 8px; color: var(--muted); font-size: 1.1rem; cursor: pointer; list-style: none;
@@ -763,7 +766,7 @@ table.pending .row-actions { display: flex; gap: 0.4rem; justify-content: flex-e
 .row-menu > summary::-webkit-details-marker { display: none; }
 .row-menu > summary:hover, .row-menu[open] > summary { background: var(--callout); color: var(--fg); }
 .row-menu-body {
-  display: grid; gap: 0.6rem; justify-items: end; min-width: min(16rem, 70vw);
+  display: grid; gap: 0.6rem; justify-items: end; min-width: min(16rem, 70vw); text-align: left;
   margin-top: 0.4rem; padding: 0.75rem; border: 1px solid var(--line); border-radius: 8px; background: var(--bg);
 }
 .row-menu-body .settings-form { width: 100%; }
