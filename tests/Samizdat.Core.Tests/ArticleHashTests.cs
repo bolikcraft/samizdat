@@ -42,4 +42,20 @@ public class ArticleHashTests
     public void Same_folder_keeps_hash()
         => Assert.Equal(ArticleHash.Compute(Bytes("a"), [], "Заметки"),
                         ArticleHash.Compute(Bytes("a"), [], "Заметки"));
+
+    // Эталон — SHA-256 от «a»: на эту формулу опираются старый CLI и плагин Obsidian.
+    [Fact]
+    public void Hash_without_a_name_stays_as_it_was()
+        => Assert.Equal("ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb",
+                        ArticleHash.Compute(Bytes("a"), [], "", name: null));
+
+    [Fact]
+    public void Name_changes_hash()
+        => Assert.NotEqual(ArticleHash.Compute(Bytes("a"), [], ""),
+                           ArticleHash.Compute(Bytes("a"), [], "", "Моя заметка"));
+
+    [Fact]
+    public void Renamed_file_changes_hash()
+        => Assert.NotEqual(ArticleHash.Compute(Bytes("a"), [], "", "Старое имя"),
+                           ArticleHash.Compute(Bytes("a"), [], "", "Новое имя"));
 }
