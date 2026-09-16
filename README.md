@@ -44,7 +44,7 @@ the people you allow.
   and each user can set a different language for their own pages. A language is a file, so you can
   add one more.
 
-Not there yet: Docker Compose, the installation manual, and the packages. See "How to run it".
+Not there yet: a ready image in a registry and the packages. See "How to run it".
 
 ## Why
 
@@ -79,6 +79,41 @@ in their editor.
   that no file gives comes from `en`.
 
 ## How to run it
+
+### With Docker
+
+You need Docker with the Compose plugin and git. The image is built on your server from the source code.
+
+```bash
+git clone https://github.com/bolikcraft/samizdat.git /opt/samizdat
+cd /opt/samizdat
+cp .env.example .env        # then set POSTGRES_PASSWORD in .env
+deploy/update.sh            # builds the image and starts the site and the database
+
+docker compose run --rm app owner set <login> <password>
+docker compose run --rm app token new laptop
+```
+
+The site is at `http://<server>:8080`. The folders `data/` (articles, keys, background) and `pgdata/`
+(the database) are in the same folder as `compose.yaml`. `docker compose down -v` does not remove them.
+
+To update, run `deploy/update.sh` again. Before the update, the script writes a dump of the database
+to `backups/` and keeps the last 10 dumps. Without an argument, the script updates to `origin/main`.
+To go to another version, give the script a git ref — a commit or a tag: `deploy/update.sh <ref>`.
+The database changes of each version only add data, so an earlier version works with the new database.
+
+To restore the database from a dump:
+
+```bash
+docker compose stop app
+docker compose exec -T db pg_restore -U samizdat -d samizdat --clean --if-exists < backups/<file>.dump
+docker compose start app
+```
+
+Behind a reverse proxy with HTTPS, the proxy must send the header `X-Forwarded-Proto: https`.
+Without it, the login cookie does not get the `Secure` flag.
+
+### From the source code
 
 You need the .NET 10 SDK and a PostgreSQL server (version 14 or later).
 
