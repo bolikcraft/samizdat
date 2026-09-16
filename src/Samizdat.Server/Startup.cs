@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration.Json;
@@ -23,6 +24,12 @@ public static class Startup
         UseXmlSettings(builder);
 
         var dataRoot = builder.Configuration["Samizdat:DataRoot"] ?? "data";
+
+        // Ключи подписывают cookie входа и antiforgery. В домашнем каталоге контейнера они
+        // пропадали бы при каждом обновлении образа — и всех бы разлогинило.
+        builder.Services.AddDataProtection()
+            .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(dataRoot, "keys")))
+            .SetApplicationName("Samizdat");
 
         builder.Services.AddSingleton(new ArticleFiles(dataRoot));
         builder.Services.AddSingleton(new BackgroundFile(dataRoot));
