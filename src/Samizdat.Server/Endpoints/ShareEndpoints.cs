@@ -37,9 +37,11 @@ public static class ShareEndpoints
             // странице нет списка статей. View нужен здесь так же, как на странице владельца:
             // см. SiteSettings.ViewFingerprint.
             // Разделитель "/" в slug запрещён, поэтому ключ гостя не может совпасть с ключом статьи.
+            // Язык — в имени ячейки, не в PageKey: как и на странице владельца (см. PageEndpoints),
+            // иначе первый гость с личным языком застревает в кэше для всех остальных.
             var key = new PageKey(Content: row.ContentHash, Theme: theme.Version,
                                   Catalog: "", View: settings.ViewFingerprint);
-            var html = cache.GetOrBuild($"share/{link.Slug}", key, () =>
+            var html = cache.GetOrBuild($"share/{text.Code}/{link.Slug}", key, () =>
             {
                 var text = files.ReadMarkdown(link.Slug)!;
                 var parsed = FrontMatterParser.Parse(text);

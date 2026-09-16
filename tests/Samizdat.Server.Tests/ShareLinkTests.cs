@@ -156,6 +156,20 @@ public class ShareLinkTests : IDisposable
         return scope.ServiceProvider.GetRequiredService<SamizdatDbContext>().ShareLinks.ToList();
     }
 
+    static void SetSiteLanguage(WebApplicationFactory<Program> factory, string code)
+    {
+        using var scope = factory.Services.CreateScope();
+        scope.ServiceProvider.GetRequiredService<SiteSettings>().Set("site.language", code);
+    }
+
+    static void SetUserLanguage(WebApplicationFactory<Program> factory, int userId, string code)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+        db.Users.Find(userId)!.Language = code;
+        db.SaveChanges();
+    }
+
     static void Expire(WebApplicationFactory<Program> factory, int id)
     {
         using var scope = factory.Services.CreateScope();
@@ -347,6 +361,25 @@ public class ShareLinkTests : IDisposable
         Assert.DoesNotContain("Текст для гостя.", ownerPage);
         Assert.Contains("Текст для гостя.", guestPage);
         Assert.DoesNotContain("Текст для владельца.", guestPage);
+    }
+
+    [Fact]
+    public async Task Guest_page_does_not_keep_the_language_of_whoever_opened_the_link_first()
+    {
+        using var factory = StartFactory();
+        SetSiteLanguage(factory, "en");
+        WriteArticle("statya", "Текст статьи.");
+        RegisterArticle(factory, "statya", "Про ежей", ArticleVisibility.Shared);
+        var token = AddLink(factory, "statya");
+        // Личный язык принадлежит пользователю сайта, а не гостю по ссылке — но Translator
+        // берёт его и на анонимном маршруте, если запрос пришёл с cookie входа.
+        var (withPersonalLanguage, userId) = await LoginWithId(factory, UserRole.Reader);
+        SetUserLanguage(factory, userId, "ru");
+        await withPersonalLanguage.GetAsync($"/s/{token}");
+
+        var guest = await factory.CreateClient().GetStringAsync($"/s/{token}");
+
+        Assert.Contains("lang=\"en\"", guest);
     }
 
     [Fact]
