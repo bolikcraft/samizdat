@@ -9,24 +9,24 @@
   <input type="hidden" name="slug" value="{{ article.slug | html.escape }}">
   {{ if article.is_shared }}
   <input type="hidden" name="visibility" value="private">
-  <span class="visibility-state">Видна пользователям</span>
-  <button type="submit">Закрыть</button>
+  <span class="visibility-state">{{ t.article.visible }}</span>
+  <button type="submit">{{ t.article.close }}</button>
   {{ else }}
   <input type="hidden" name="visibility" value="shared">
-  <span class="visibility-state">Только моя</span>
-  <button type="submit">Открыть пользователям</button>
+  <span class="visibility-state">{{ t.article.private }}</span>
+  <button type="submit">{{ t.article.open }}</button>
   {{ end }}
 </form>
 {{ end }}
 {{ if article.download_url }}
 <p class="download">
-  <a class="download-link" href="{{ article.download_url | html.escape }}" download>Скачать {{ article.download_label }}</a>
+  <a class="download-link" href="{{ article.download_url | html.escape }}" download>{{ t.article.download | string.replace "{0}" article.download_label }}</a>
 </p>
 {{ end }}
 {{~## У гостевой страницы ключа backlinks в модели нет вовсе — проверка нужна, иначе рендер упадёт. ##~}}
 {{ if backlinks && (backlinks | array.size) > 0 }}
 <section class="backlinks">
-  <h2>Упоминается в</h2>
+  <h2>{{ t.article.backlinks }}</h2>
   <ul>
   {{ for link in backlinks }}
     <li>{{ if link.as_link }}<a href="/{{ link.slug | html.escape }}">{{ link.title | html.escape }}</a>{{ else }}<span class="nav-closed">{{ link.title | html.escape }}</span>{{ end }}</li>

@@ -2,14 +2,14 @@
 и в заметке приглашения над полями. ##~}}
 <form class="login" method="post" action="{{ action | html.escape }}">
   {{ antiforgery }}
-  <h1>Регистрация</h1>
-  {{ if note }}<p class="invite-note">Приглашение: {{ note | html.escape }}</p>{{ end }}
+  <h1>{{ t.register.title }}</h1>
+  {{ if note }}<p class="invite-note">{{ t.register.invite | string.replace "{0}" (note | html.escape) }}</p>{{ end }}
   {{ if error }}<p class="error">{{ error | html.escape }}</p>{{ end }}
-  <label>Логин <input name="login" value="{{ login | html.escape }}" maxlength="100" autofocus
+  <label>{{ t.register.login }} <input name="login" value="{{ login | html.escape }}" maxlength="100" autofocus
                       autocomplete="username" required></label>
-  <label>Пароль <input type="password" name="password" autocomplete="new-password"
+  <label>{{ t.register.password }} <input type="password" name="password" autocomplete="new-password"
                        minlength="8" required></label>
-  <label>Повтор <input type="password" name="repeat" autocomplete="new-password"
+  <label>{{ t.register.repeat }} <input type="password" name="repeat" autocomplete="new-password"
                        minlength="8" required></label>
-  <button type="submit">Завести учётку</button>
+  <button type="submit">{{ t.register.submit }}</button>
 </form>

@@ -36,7 +36,7 @@ public class BacklinkTests(DatabaseFixture database) : IDisposable
         var client = await TestLogin.AsOwner(factory);
         var html = await client.GetStringAsync("/proxmox");
 
-        Assert.Contains("Упоминается в", html);
+        Assert.Contains("These articles mention it", html);
         Assert.Contains("href=\"/dom\"", html);
     }
 
@@ -51,7 +51,7 @@ public class BacklinkTests(DatabaseFixture database) : IDisposable
         var client = await TestLogin.AsOwner(factory);
         var html = await client.GetStringAsync("/odna");
 
-        Assert.DoesNotContain("Упоминается в", html);
+        Assert.DoesNotContain("These articles mention it", html);
     }
 
     [Fact]
@@ -63,7 +63,7 @@ public class BacklinkTests(DatabaseFixture database) : IDisposable
         (await TestPublisher.Push(api, "proxmox", "---\ntitle: Proxmox\n---\n\nтекст")).EnsureSuccessStatusCode();
 
         var client = await TestLogin.AsOwner(factory);
-        Assert.DoesNotContain("Упоминается в", await client.GetStringAsync("/proxmox"));
+        Assert.DoesNotContain("These articles mention it", await client.GetStringAsync("/proxmox"));
 
         (await TestPublisher.Push(api, "dom", "---\ntitle: Дом\n---\n\nстоит [[proxmox]]")).EnsureSuccessStatusCode();
 
@@ -84,7 +84,7 @@ public class BacklinkTests(DatabaseFixture database) : IDisposable
 
         (await api.DeleteAsync("/api/articles/dom")).EnsureSuccessStatusCode();
 
-        Assert.DoesNotContain("Упоминается в", await client.GetStringAsync("/proxmox"));
+        Assert.DoesNotContain("These articles mention it", await client.GetStringAsync("/proxmox"));
     }
 
     [Fact]
@@ -155,7 +155,7 @@ public class BacklinkTests(DatabaseFixture database) : IDisposable
 
         var html = await factory.CreateClient().GetStringAsync($"/s/{token}");
 
-        Assert.DoesNotContain("Упоминается в", html);
+        Assert.DoesNotContain("These articles mention it", html);
     }
 
     [Fact]
@@ -168,7 +168,7 @@ public class BacklinkTests(DatabaseFixture database) : IDisposable
         (await TestPublisher.Push(api, "dom", "---\ntitle: Дом\n---\n\nстоит [[proxmox]]")).EnsureSuccessStatusCode();
 
         var client = await TestLogin.AsOwner(factory);
-        Assert.Contains("Упоминается в", await client.GetStringAsync("/proxmox"));
+        Assert.Contains("These articles mention it", await client.GetStringAsync("/proxmox"));
 
         // Правка мимо PUT: ContentHash в базе не трогаем, поэтому без force reindex её не заметит.
         var file = Path.Combine(dataRoot, "articles", "dom", "index.md");
@@ -181,7 +181,7 @@ public class BacklinkTests(DatabaseFixture database) : IDisposable
             IndexBackfill.Run(factory.Services, files, logger, force: true);
         }
 
-        Assert.DoesNotContain("Упоминается в", await client.GetStringAsync("/proxmox"));
+        Assert.DoesNotContain("These articles mention it", await client.GetStringAsync("/proxmox"));
     }
 
     [Fact]

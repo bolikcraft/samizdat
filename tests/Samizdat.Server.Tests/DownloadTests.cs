@@ -412,7 +412,7 @@ public class DownloadTests : IDisposable
         var html = await client.GetStringAsync("/tayna");
 
         Assert.Contains("href=\"/download/tayna\"", html);
-        Assert.Contains("Скачать .md", html);
+        Assert.Contains("Download .md", html);
     }
 
     [Fact]
@@ -426,7 +426,7 @@ public class DownloadTests : IDisposable
         var client = await Login(factory, "hozyain", "parol");
         var html = await client.GetStringAsync("/tayna");
 
-        Assert.Contains("Скачать .zip", html);
+        Assert.Contains("Download .zip", html);
     }
 
     [Fact]

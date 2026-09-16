@@ -378,7 +378,7 @@ public class RegistrationTests : IDisposable
         var answer = await client.PostAsync("/register", await RegisterFields(client, "ivan", "parol-ivana"));
 
         Assert.Equal(HttpStatusCode.OK, answer.StatusCode);
-        Assert.Contains("Заявка отправлена", await answer.Content.ReadAsStringAsync());
+        Assert.Contains("Your request goes to the owner", await answer.Content.ReadAsStringAsync());
 
         var person = Users(factory).Single();
         Assert.Null(person.ApprovedAt);
@@ -468,7 +468,7 @@ public class RegistrationTests : IDisposable
         var answer = await client.PostAsync("/register", await RegisterFields(client, "ivan", "parol-ivana"));
 
         Assert.Equal(HttpStatusCode.OK, answer.StatusCode);
-        Assert.Contains("Заявка отправлена", await answer.Content.ReadAsStringAsync());
+        Assert.Contains("Your request goes to the owner", await answer.Content.ReadAsStringAsync());
         Assert.Equal(51, Users(factory).Count);
     }
 

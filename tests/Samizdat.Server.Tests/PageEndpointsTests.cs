@@ -139,7 +139,7 @@ public class PageEndpointsTests : IDisposable
         var response = await client.GetAsync("/нет-такой");
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-        Assert.Contains("Нет такой страницы", await response.Content.ReadAsStringAsync());
+        Assert.Contains("This page does not exist", await response.Content.ReadAsStringAsync());
     }
 
     [Fact]

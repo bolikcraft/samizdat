@@ -356,7 +356,7 @@ public class ShareLinkTests : IDisposable
 
         Assert.Equal(HttpStatusCode.Gone, first.StatusCode);
         Assert.Equal(HttpStatusCode.Gone, second.StatusCode);
-        Assert.Contains("больше не работает", await first.Content.ReadAsStringAsync());
+        Assert.Contains("does not work", await first.Content.ReadAsStringAsync());
     }
 
     [Fact]
@@ -817,7 +817,7 @@ public class ShareLinkTests : IDisposable
 
         Assert.Contains($"/s/{token}", html);
         Assert.Contains("/share/revoke", html);
-        Assert.DoesNotContain("Создать ссылку", html);
+        Assert.DoesNotContain("Make a link", html);
     }
 
     [Fact]
@@ -829,7 +829,7 @@ public class ShareLinkTests : IDisposable
         var client = await LoginClient(factory);
 
         var before = await client.GetStringAsync("/statya");
-        Assert.Contains("Создать ссылку", before);
+        Assert.Contains("Make a link", before);
 
         await PostShare(client, "statya", "7");
         var after = await client.GetStringAsync("/statya");

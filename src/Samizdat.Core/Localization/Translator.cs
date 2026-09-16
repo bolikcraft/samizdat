@@ -23,7 +23,7 @@ public sealed class Translator(string code, IReadOnlyDictionary<string, string> 
     Dictionary<string, object?> BuildModel()
     {
         var root = new Dictionary<string, object?>(StringComparer.Ordinal);
-        foreach (var (key, value) in pack.OrderBy(pair => pair.Key, StringComparer.Ordinal))
+        foreach (var (key, value) in Full().OrderBy(pair => pair.Key, StringComparer.Ordinal))
         {
             var parts = key.Split('.');
             var node = root;
@@ -41,5 +41,16 @@ public sealed class Translator(string code, IReadOnlyDictionary<string, string> 
             node[last] = value;
         }
         return root;
+    }
+
+    /// Неполный пакет добивается английским: иначе шаблон читает t.nav.articles у пустой ветки
+    /// nav и страница падает целиком.
+    IEnumerable<KeyValuePair<string, string>> Full()
+    {
+        if (english is null) return pack;
+
+        var merged = new Dictionary<string, string>(english, StringComparer.Ordinal);
+        foreach (var (key, value) in pack) merged[key] = value;
+        return merged;
     }
 }

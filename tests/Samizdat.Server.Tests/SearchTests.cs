@@ -503,7 +503,7 @@ public class SearchPageTests(DatabaseFixture database) : IDisposable
 
         var html = await client.GetStringAsync("/search?q=мамонт");
 
-        Assert.Contains("Ничего не нашлось", html);
+        Assert.Contains("The search finds nothing.", html);
     }
 
     [Fact]
@@ -518,7 +518,7 @@ public class SearchPageTests(DatabaseFixture database) : IDisposable
         var client = await TestLogin.AsOwner(factory);
         var html = await client.GetStringAsync("/search?q=proxmoks");
 
-        Assert.Contains("Возможно, вы искали", html);
+        Assert.Contains("Possibly you look for these", html);
         Assert.Contains("href=\"/proxmox\"", html);
     }
 

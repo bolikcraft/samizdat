@@ -20,15 +20,15 @@
   {{ if user }}
   <form class="search" action="/search" method="get" role="search">
     <input type="search" name="q" value="{{ if search_query }}{{ search_query | html.escape }}{{ end }}"
-           placeholder="Поиск" autocomplete="off" aria-label="Поиск по статьям">
+           placeholder="{{ t.layout.search }}" autocomplete="off" aria-label="{{ t.layout.search_hint }}">
   </form>
   {{ end }}
   {{ if user }}
   <details class="user-menu">
     <summary>{{ user.login | html.escape }}</summary>
     <ul>
-      <li><a href="/settings">Настройки</a></li>
-      <li><form method="post" action="/logout">{{ antiforgery }}<button type="submit">Выход</button></form></li>
+      <li><a href="/settings">{{ t.layout.settings }}</a></li>
+      <li><form method="post" action="/logout">{{ antiforgery }}<button type="submit">{{ t.layout.logout }}</button></form></li>
     </ul>
   </details>
   {{ end }}
@@ -41,9 +41,9 @@
     {{~## На узком экране дерево должно быть свёрнуто, иначе читатель прокручивает весь вольт
     до статьи. Переключатель — <details> без open, а дерево лежит рядом с ним, а не внутри:
     так на широком экране, где переключатель скрыт, дерево видно в любом браузере. ##~}}
-    <details class="nav-switch"><summary>Статьи</summary></details>
+    <details class="nav-switch"><summary>{{ t.nav.articles }}</summary></details>
     <div class="sidebar-body">
-      <input type="search" id="nav-filter" placeholder="Фильтр по заголовку" autocomplete="off">
+      <input type="search" id="nav-filter" placeholder="{{ t.nav.filter }}" autocomplete="off">
       <nav id="nav-tree">{{ include 'nav-node' node: nav }}</nav>
     </div>
   </aside>{{ else if side_nav }}

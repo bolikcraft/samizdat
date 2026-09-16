@@ -1,15 +1,15 @@
-<h1>Поиск</h1>
+<h1>{{ t.search.title }}</h1>
 <form class="search-page" action="/search" method="get" role="search">
   <input type="search" name="q" value="{{ if search_query }}{{ search_query | html.escape }}{{ end }}"
-         placeholder="Слово или фраза" autocomplete="off" autofocus>
-  <button type="submit">Найти</button>
+         placeholder="{{ t.search.field }}" autocomplete="off" autofocus>
+  <button type="submit">{{ t.search.submit }}</button>
 </form>
 {{ if search_query }}
   {{ if (hits | array.size) == 0 }}
-  <p class="search-note">Ничего не нашлось.</p>
+  <p class="search-note">{{ t.search.nothing }}</p>
   {{ else }}
-  {{ if is_guess }}<p class="search-note">Точных совпадений нет. Возможно, вы искали:</p>{{ end }}
-  {{ if capped }}<p class="search-note">Показаны первые {{ hits | array.size }} находок.</p>{{ end }}
+  {{ if is_guess }}<p class="search-note">{{ t.search.guess }}</p>{{ end }}
+  {{ if capped }}<p class="search-note">{{ t.search.capped | string.replace "{0}" (hits | array.size) }}</p>{{ end }}
   <ul class="articles">
   {{ for hit in hits }}
     <li>

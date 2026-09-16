@@ -10,7 +10,7 @@
     if (!button) return;
 
     navigator.clipboard.writeText(button.dataset.url).then(function () {
-      button.textContent = "Скопировано";
+      button.textContent = button.dataset.copied || "Copied";
     });
   });
 

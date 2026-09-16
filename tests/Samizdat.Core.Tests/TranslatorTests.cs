@@ -12,12 +12,13 @@ public class TranslatorTests : IDisposable
     [Fact]
     public void Missing_key_falls_back_to_english_then_to_the_key_itself()
     {
-        File.WriteAllText(Path.Combine(folder, "en.json"), """{"nav.articles": "Articles"}""");
+        // Ключ выдуман: во встроенных пакетах его нет, иначе русский взял бы строку оттуда.
+        File.WriteAllText(Path.Combine(folder, "en.json"), """{"tale.only_english": "Articles"}""");
         File.WriteAllText(Path.Combine(folder, "ru.json"), """{"language.name": "Русский"}""");
 
         var text = Catalog().For("ru");
 
-        Assert.Equal("Articles", text["nav.articles"]);
+        Assert.Equal("Articles", text["tale.only_english"]);
         Assert.Equal("нет.такого", text["нет.такого"]);
     }
 

@@ -1,10 +1,10 @@
 <form class="login" method="post" action="/login">
-  <h1>Вход</h1>
+  <h1>{{ t.login.title }}</h1>
   {{ if error }}<p class="error">{{ error | html.escape }}</p>{{ end }}
-  <label>Логин <input name="login" autofocus autocomplete="username"></label>
-  <label>Пароль <input type="password" name="password" autocomplete="current-password"></label>
-  <button type="submit">Войти</button>
+  <label>{{ t.login.login }} <input name="login" autofocus autocomplete="username"></label>
+  <label>{{ t.login.password }} <input type="password" name="password" autocomplete="current-password"></label>
+  <button type="submit">{{ t.login.submit }}</button>
 </form>
 {{ if registration_open }}
-<p class="login-register"><a href="/register">Зарегистрироваться</a></p>
+<p class="login-register"><a href="/register">{{ t.login.register }}</a></p>
 {{ end }}
