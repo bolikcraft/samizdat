@@ -184,6 +184,22 @@ public class VisibilityTests : IDisposable
         Assert.NotNull(row.VisibilityChangedAt);
     }
 
+    // Kestrel не пропускает не-ASCII в заголовке и отвечает 500. TestServer этого не проверяет,
+    // поэтому сверяем сам заголовок.
+    [Fact]
+    public async Task Redirect_back_to_a_non_latin_slug_is_percent_encoded()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        await AddArticle(factory, "日本語", ArticleVisibility.Private);
+
+        var client = await TestLogin.AsOwner(factory);
+        var answer = await TestLogin.Post(client, "/visibility", new() { ["slug"] = "日本語", ["visibility"] = "shared" });
+
+        Assert.Equal(HttpStatusCode.Redirect, answer.StatusCode);
+        Assert.Equal("/%E6%97%A5%E6%9C%AC%E8%AA%9E", answer.Headers.Location?.OriginalString);
+    }
+
     [Fact]
     public async Task Reader_does_not_switch_visibility()
     {

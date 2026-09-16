@@ -1,4 +1,3 @@
-using System.Text;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -54,7 +53,7 @@ public static class AuthEndpoints
 
             await SessionCookie.SignIn(context, user);
 
-            return Results.Redirect(returnUrl is null ? "/" : AsciiRedirectTarget(returnUrl));
+            return Results.Redirect(returnUrl is null ? "/" : AsciiRedirect.Target(returnUrl));
         }).AllowAnonymous().RequireValidToken(context =>
         {
             // Токен на форме сверен с личностью на момент открытия страницы: сосед-вкладка успел
@@ -83,18 +82,6 @@ public static class AuthEndpoints
     // Первый знак '/' отсекает "~/…": IsLocalUrl его пропускает, а браузер такой адрес не поймёт.
     static string? LocalUrl(string url)
         => url is ['/', ..] && Microsoft.AspNetCore.Http.HttpResults.RedirectHttpResult.IsLocalUrl(url) ? url : null;
-
-    // Location — HTTP-заголовок, туда идёт только ASCII. Не-ASCII байты UTF-8 кодируем в %XX,
-    // остальное (уже закодированное, знаки пути) не трогаем.
-    static string AsciiRedirectTarget(string url)
-    {
-        if (url.All(char.IsAscii)) return url;
-        var target = new StringBuilder();
-        foreach (var b in Encoding.UTF8.GetBytes(url))
-            if (b < 0x80) target.Append((char)b);
-            else target.Append('%').Append(b.ToString("X2"));
-        return target.ToString();
-    }
 
     static IResult LoginPage(PageRenderer pages, SiteSettings settings, Translator text, IAntiforgery antiforgery,
                              HttpContext context, string? error, string? returnUrl)

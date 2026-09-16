@@ -420,5 +420,26 @@ public class PublishApiTests(DatabaseFixture database) : IDisposable
         Assert.True(File.Exists(Path.Combine(dataRoot, "articles", slug, "index.md")));
     }
 
+    [Fact]
+    public async Task Non_latin_slug_opens_as_a_page_and_downloads()
+    {
+        var (factory, api, login, password) = StartWithTokenAndOwner();
+        var pages = await LoginPageClient(factory, login, password);
+        const string slug = "日本語";
+
+        var put = await api.PutAsync($"/api/articles/{Uri.EscapeDataString(slug)}",
+                                     Article("---\ntitle: 日本語\n---\nテキスト\n"));
+        Assert.Equal(HttpStatusCode.OK, put.StatusCode);
+
+        var page = await pages.GetAsync($"/{Uri.EscapeDataString(slug)}");
+        Assert.Equal(HttpStatusCode.OK, page.StatusCode);
+        var html = await page.Content.ReadAsStringAsync();
+        Assert.Contains("テキスト", html);
+        Assert.Contains($"href=\"/{slug}\"", html);
+
+        var download = await pages.GetAsync($"/download/{Uri.EscapeDataString(slug)}");
+        Assert.Equal(HttpStatusCode.OK, download.StatusCode);
+    }
+
     public void Dispose() => Directory.Delete(dataRoot, recursive: true);
 }

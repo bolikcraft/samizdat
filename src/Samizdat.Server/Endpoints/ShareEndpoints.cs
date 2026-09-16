@@ -147,7 +147,7 @@ public static class ShareEndpoints
                 if (note.Length > 0) live.Note = note;
                 await db.SaveChangesAsync();
                 await transaction.CommitAsync();
-                return Results.Redirect($"/{slug}");
+                return BackToArticle(slug);
             }
 
             db.ShareLinks.Add(new ShareLinkRow
@@ -163,7 +163,7 @@ public static class ShareEndpoints
             await transaction.CommitAsync();
 
             // Ссылка видна прямо на статье, в блоке «Поделиться» — возвращаемся туда.
-            return Results.Redirect($"/{slug}");
+            return BackToArticle(slug);
         }).RequireAuthorization().RequireValidToken();
 
         app.MapPost("/share/revoke", async (HttpContext context, SamizdatDbContext db, ClaimsPrincipal user) =>
@@ -205,7 +205,7 @@ public static class ShareEndpoints
                 .ExecuteUpdateAsync(set => set.SetProperty(link => link.RevokedAt, (DateTimeOffset?)now));
             await transaction.CommitAsync();
 
-            return Results.Redirect($"/{slug}");
+            return BackToArticle(slug);
         }).RequireAuthorization().RequireValidToken();
 
         // Действие над статьёй, а не над её адресом: slug приходит полем формы — тем же приёмом,
@@ -230,9 +230,12 @@ public static class ShareEndpoints
             row.VisibilityChangedAt = DateTimeOffset.UtcNow;
             await db.SaveChangesAsync();
 
-            return Results.Redirect($"/{slug}");
+            return BackToArticle(slug);
         }).RequireValidToken();
     }
+
+    // Kestrel не пишет не-ASCII в заголовок Location и отвечает 500: slug кодируем сами.
+    static IResult BackToArticle(string slug) => Results.Redirect($"/{AsciiRedirect.Target(slug)}");
 
     // День, неделя, месяц, год и «без срока»: другие значения формой не выдаются и не принимаются.
     static readonly int[] AllowedDays = [0, 1, 7, 30, 365];
