@@ -26,6 +26,7 @@ services:
     environment:
       # Без GSS Npgsql ищет libgssapi_krb5, которой нет в chiseled-образе, и пишет ошибку в лог.
       ConnectionStrings__Postgres: Host=db;Database=samizdat;Username=samizdat;Password=${POSTGRES_PASSWORD};GSS Encryption Mode=Disable
+      Samizdat__Auth__AttemptsPerMinute: ${SAMIZDAT_LOGIN_ATTEMPTS:-10}
     volumes:
       - ./data:/data
     ports:

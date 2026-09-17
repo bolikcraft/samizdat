@@ -131,8 +131,7 @@ Without it, the login cookie does not get the `Secure` flag.
 
 The server limits the attempts to sign in and to register. The default limit is 10 attempts in one minute
 from one IP address. When a client sends more attempts, the server sends the status 429.
-To change the limit, set `Samizdat__Auth__AttemptsPerMinute` in the `environment` part of the service `app`
-in `compose.yaml`. The value `0` removes the limit.
+To change the limit, set `SAMIZDAT_LOGIN_ATTEMPTS` in `.env`. The value `0` removes the limit.
 The server does not use the header `X-Forwarded-For`. Behind a reverse proxy, all clients have the address
 of the proxy and share one limit.
 Each password hash uses 64 MB of memory. The server calculates at most 2 hashes at the same time
