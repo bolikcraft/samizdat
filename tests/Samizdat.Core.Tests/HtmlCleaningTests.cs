@@ -27,6 +27,48 @@ public class HtmlCleaningTests
     }
 
     [Fact]
+    public void Drawn_diagram_stays_whole()
+    {
+        var html = Render(
+            "<svg style=\"width:100%;height:auto\" viewBox=\"0 0 200 100\" role=\"img\" aria-label=\"Схема\">"
+            + "<defs><marker id=\"a1\" markerWidth=\"9\" markerHeight=\"9\" refX=\"8\" refY=\"3\" orient=\"auto\">"
+            + "<path d=\"M0,0 L8,3 L0,6 z\" fill=\"var(--text-faint)\"/></marker></defs>"
+            + "<rect x=\"4\" y=\"4\" width=\"80\" height=\"40\" rx=\"9\" stroke-width=\"1.5\"/>"
+            + "<path d=\"M90,24 L140,24\" marker-end=\"url(#a1)\"/>"
+            + "<text x=\"44\" y=\"28\" font-size=\"14\" text-anchor=\"middle\">Браузер</text></svg>");
+
+        Assert.Contains("<svg style=\"width: 100%; height: auto\" viewBox=\"0 0 200 100\" role=\"img\"", html);
+        Assert.Contains("<marker id=\"a1\" markerWidth=\"9\" markerHeight=\"9\" refX=\"8\" refY=\"3\" orient=\"auto\">", html);
+        Assert.Contains("<path d=\"M0,0 L8,3 L0,6 z\" fill=\"var(--text-faint)\">", html);
+        Assert.Contains("rx=\"9\"", html);
+        Assert.Contains("marker-end=\"url(#a1)\"", html);
+        Assert.Contains("<text x=\"44\" y=\"28\" font-size=\"14\" text-anchor=\"middle\">Браузер</text>", html);
+        Assert.Contains("aria-label=\"Схема\"", html);
+    }
+
+    [Theory]
+    [InlineData("<svg><foreignObject><img src=\"x\" onerror=\"alert(1)\"></foreignObject></svg>", "foreignObject")]
+    [InlineData("<svg><use href=\"https://evil.example/x.svg#a\"></use></svg>", "use")]
+    [InlineData("<svg><a href=\"#x\"><animate attributeName=\"href\" to=\"javascript:alert(1)\"></animate></a></svg>", "animate")]
+    public void Dangerous_svg_tag_is_removed(string markdown, string tag)
+    {
+        var html = Render(markdown);
+
+        Assert.DoesNotContain("<" + tag, html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("alert", html);
+        Assert.DoesNotContain("evil.example", html);
+    }
+
+    [Fact]
+    public void Event_handler_inside_svg_is_removed()
+    {
+        var html = Render("<svg><rect width=\"10\" height=\"10\" onclick=\"alert(1)\"/></svg>");
+
+        Assert.Contains("<rect width=\"10\" height=\"10\">", html);
+        Assert.DoesNotContain("onclick", html);
+    }
+
+    [Fact]
     public void Event_handler_attribute_is_removed_but_the_tag_stays()
     {
         var html = Render("до <img src=\"pic.png\" onerror=\"alert(1)\"> после");
