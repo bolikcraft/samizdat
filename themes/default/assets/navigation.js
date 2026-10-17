@@ -15,6 +15,9 @@
   // Прокрутка каждой записи истории для «назад» и «вперёд». На широком экране прокручивается
   // <main>, на узком — окно.
   var scrolls = new Map();
+  // Запись истории, чья страница сейчас в <main>. При быстрых щелчках currentEntry уже указывает
+  // на запись, которая ещё грузится.
+  var shownKey = navigation.currentEntry.key;
 
   navigation.addEventListener("navigate", function (event) {
     var url = new URL(event.destination.url);
@@ -22,8 +25,7 @@
         || typeof event.downloadRequest === "string"
         || event.navigationType === "reload" || !isTreePage(url)) return;
 
-    // До intercept текущая запись ещё прежняя.
-    scrolls.set(navigation.currentEntry.key, { main: main.scrollTop, window: window.scrollY });
+    scrolls.set(shownKey, { main: main.scrollTop, window: window.scrollY });
     var saved = event.navigationType === "traverse" ? scrolls.get(event.destination.key) : null;
 
     event.intercept({
@@ -32,9 +34,9 @@
       handler: function () {
         return load(url.href, event.signal).then(function (page) {
           if (!event.signal.aborted) return show(page, url, saved);
-        }, function () {
-          // Истёк вход, ошибка сервера или обрыв связи. Адрес уже новый: перезагрузка
-          // показывает ответ сервера, как при обычном переходе.
+        }).catch(function () {
+          // Истёк вход, ошибка сервера, обрыв связи или сбой подмены. Адрес уже новый:
+          // перезагрузка показывает ответ сервера, как при обычном переходе.
           if (!event.signal.aborted) location.reload();
         });
       },
@@ -62,15 +64,21 @@
   }
 
   function show(page, url, saved) {
+    // При «назад» читатель возвращается на своё место, а поле с autofocus утянуло бы прокрутку к себе.
+    if (saved) {
+      page.querySelectorAll("main [autofocus]").forEach(function (field) { field.removeAttribute("autofocus"); });
+    }
     // Меняем детей, а не сам <main>: forms.js держит ссылку на элемент.
     main.replaceChildren.apply(main, Array.from(page.querySelector("main").childNodes));
+    shownKey = navigation.currentEntry.key;
     document.title = page.title;
     markCurrent(page);
     copySearch(page);
     // На узком экране дерево раскрывают переключателем. Обычная загрузка его сворачивает.
     var toggle = document.querySelector(".nav-switch");
     if (toggle) toggle.open = false;
-    scroll(url, saved);
+    if (saved) return imagesReady().then(function () { restore(saved); });
+    scrollToStart(url);
   }
 
   // Дерево не заменяем. Переносим только отметку текущей статьи и раскрываем папки над ней,
@@ -100,12 +108,21 @@
     if (live && fresh) live.value = fresh.value;
   }
 
-  function scroll(url, saved) {
-    if (saved) {
-      main.scrollTop = saved.main;
-      window.scrollTo(0, saved.window);
-      return;
-    }
+  // Картинка без размеров получает высоту только после декодирования. До этого текст короче,
+  // и возвращённая прокрутка встаёт не туда. Ждём картинки, но не дольше полсекунды.
+  function imagesReady() {
+    var decoded = Promise.all(Array.from(main.querySelectorAll("img"), function (img) {
+      return img.decode().catch(function () {});
+    }));
+    return Promise.race([decoded, new Promise(function (done) { setTimeout(done, 500); })]);
+  }
+
+  function restore(saved) {
+    main.scrollTop = saved.main;
+    window.scrollTo(0, saved.window);
+  }
+
+  function scrollToStart(url) {
     var target = fragment(url);
     if (target) {
       target.scrollIntoView();

@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -218,6 +219,21 @@ public class NavigationTests : IDisposable
 
         Assert.Contains("id=\"nav-tree\"", html);
         Assert.Contains("Alpha", html);
+    }
+
+    [Fact]
+    public async Task Forbidden_page_still_shows_the_tree()
+    {
+        WriteArticle("a", "---\ntitle: Alpha\n---\nтекст\n");
+        var factory = StartFactory();
+        Register(factory, "a", "Alpha");
+        var reader = await TestLogin.AsReader(factory);
+
+        var response = await reader.GetAsync("/a");
+        var html = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Contains("id=\"nav-tree\"", html);
     }
 
     [Fact]
