@@ -41,7 +41,7 @@
       scroll: "manual",
       handler: function () {
         return (take(url) || load(url.href, event.signal)).then(function (page) {
-          if (!event.signal.aborted) return show(page, url, saved);
+          if (!event.signal.aborted) return show(page, url, saved, event.signal);
         }).catch(function () {
           // Истёк вход, ошибка сервера, обрыв связи или сбой подмены. Адрес уже новый:
           // перезагрузка показывает ответ сервера, как при обычном переходе.
@@ -56,6 +56,8 @@
     var link = event.target.closest("a[href]");
     // У ссылки внутри svg href не строка.
     if (!(link instanceof HTMLAnchorElement)) return;
+    // У битого адреса origin пустой, и new URL бросил бы исключение. Чужие сайты отсекаются тут же.
+    if (link.origin !== location.origin) return;
     var url = new URL(link.href);
     if (!isTreePage(url) || pageHref(url) === pageHref(new URL(location.href))) return;
     clearTimeout(timer);
@@ -65,6 +67,9 @@
   document.addEventListener("pointerout", function (event) {
     if (event.target.closest("a[href]")) clearTimeout(timer);
   });
+
+  // Форма меняет данные, и заготовка после неё могла устареть.
+  document.addEventListener("submit", function () { prefetched = null; });
 
   function prefetch(url) {
     var href = pageHref(url);
@@ -107,13 +112,19 @@
   }
 
   // Прокрутка идёт внутри смены кадра: иначе новый текст на миг встанет на старой высоте.
-  function show(page, url, saved) {
-    var update = function () { return swap(page, url, saved); };
+  function show(page, url, saved, signal) {
+    var update = function () {
+      // Смена кадра начинается не сразу. Если за это время начался другой переход, страницу не ставим.
+      if (!signal.aborted) return swap(page, url, saved, signal);
+    };
     if (!document.startViewTransition) return update();
-    return document.startViewTransition(update).updateCallbackDone;
+    var transition = document.startViewTransition(update);
+    // Новая смена кадра пропускает прежнюю, и её ready отклоняется. Это не ошибка.
+    transition.ready.catch(function () {});
+    return transition.updateCallbackDone;
   }
 
-  function swap(page, url, saved) {
+  function swap(page, url, saved, signal) {
     // При «назад» читатель возвращается на своё место, а поле с autofocus утянуло бы прокрутку к себе.
     if (saved) {
       page.querySelectorAll("main [autofocus]").forEach(function (field) { field.removeAttribute("autofocus"); });
@@ -127,7 +138,8 @@
     // На узком экране дерево раскрывают переключателем. Обычная загрузка его сворачивает.
     var toggle = document.querySelector(".nav-switch");
     if (toggle) toggle.open = false;
-    if (saved) return imagesReady().then(function () { restore(saved); });
+    // Пока ждём картинки, читатель мог уйти дальше: тогда прокрутка этой записи уже не нужна.
+    if (saved) return imagesReady().then(function () { if (!signal.aborted) restore(saved); });
     scrollToStart(url);
   }
 
