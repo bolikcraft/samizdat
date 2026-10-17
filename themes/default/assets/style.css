@@ -898,3 +898,9 @@ form.is-saving { opacity: 0.6; pointer-events: none; }
 .backlinks h2 { margin: 0 0 0.5rem; font-size: 1rem; color: var(--muted); }
 .backlinks ul { list-style: none; margin: 0; padding: 0; }
 .backlinks li { margin: 0.2rem 0; }
+
+/* Смена страницы без перезагрузки идёт плавной сменой кадра (navigation.js). Если система
+   просит меньше движения, кадр меняется сразу. */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none; }
+}

@@ -63,7 +63,14 @@
     });
   }
 
+  // Прокрутка идёт внутри смены кадра: иначе новый текст на миг встанет на старой высоте.
   function show(page, url, saved) {
+    var update = function () { return swap(page, url, saved); };
+    if (!document.startViewTransition) return update();
+    return document.startViewTransition(update).updateCallbackDone;
+  }
+
+  function swap(page, url, saved) {
     // При «назад» читатель возвращается на своё место, а поле с autofocus утянуло бы прокрутку к себе.
     if (saved) {
       page.querySelectorAll("main [autofocus]").forEach(function (field) { field.removeAttribute("autofocus"); });
