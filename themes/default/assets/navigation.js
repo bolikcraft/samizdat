@@ -19,7 +19,15 @@
   // на запись, которая ещё грузится.
   var shownKey = navigation.currentEntry.key;
 
+  // Заготовка страницы с наведения. Старую не берём: видимость статьи могли сменить в соседней вкладке.
+  var PREFETCH_DELAY = 65;
+  var PREFETCH_TTL = 10000;
+  var prefetched = null;
+  var timer = 0;
+
   navigation.addEventListener("navigate", function (event) {
+    // Наведение перед щелчком не должно загрузить страницу второй раз после перехода.
+    clearTimeout(timer);
     var url = new URL(event.destination.url);
     if (!event.canIntercept || event.hashChange || event.formData
         || typeof event.downloadRequest === "string"
@@ -32,7 +40,7 @@
       // Браузер прокручивает только окно, а на широком экране едет <main>.
       scroll: "manual",
       handler: function () {
-        return load(url.href, event.signal).then(function (page) {
+        return (take(url) || load(url.href, event.signal)).then(function (page) {
           if (!event.signal.aborted) return show(page, url, saved);
         }).catch(function () {
           // Истёк вход, ошибка сервера, обрыв связи или сбой подмены. Адрес уже новый:
@@ -42,6 +50,41 @@
       },
     });
   });
+
+  // Курсор задержался на ссылке — начинаем загрузку. Щелчок потом берёт готовый ответ.
+  document.addEventListener("pointerover", function (event) {
+    var link = event.target.closest("a[href]");
+    // У ссылки внутри svg href не строка.
+    if (!(link instanceof HTMLAnchorElement)) return;
+    var url = new URL(link.href);
+    if (!isTreePage(url) || pageHref(url) === pageHref(new URL(location.href))) return;
+    clearTimeout(timer);
+    timer = setTimeout(function () { prefetch(url); }, PREFETCH_DELAY);
+  });
+
+  document.addEventListener("pointerout", function (event) {
+    if (event.target.closest("a[href]")) clearTimeout(timer);
+  });
+
+  function prefetch(url) {
+    var href = pageHref(url);
+    if (prefetched && prefetched.href === href && Date.now() - prefetched.at < PREFETCH_TTL) return;
+    var page = load(href);
+    // Отказ покажет сам переход. Без этой строки неиспользованный отказ попадает в консоль.
+    page.catch(function () {});
+    prefetched = { href: href, at: Date.now(), page: page };
+  }
+
+  function take(url) {
+    var entry = prefetched;
+    prefetched = null;
+    if (!entry || entry.href !== pageHref(url) || Date.now() - entry.at > PREFETCH_TTL) return null;
+    return entry.page;
+  }
+
+  function pageHref(url) {
+    return url.origin + url.pathname + url.search;
+  }
 
   function isTreePage(url) {
     var path = url.pathname.toLowerCase();
