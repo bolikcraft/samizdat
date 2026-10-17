@@ -331,6 +331,33 @@ public class NavigationTests : IDisposable
     }
 
     [Fact]
+    public async Task Soft_navigation_script_is_linked_on_the_page()
+    {
+        WriteArticle("a", "---\ntitle: Alpha\n---\nтекст\n");
+        var factory = StartFactory();
+        Register(factory, "a", "Alpha");
+        var client = LoginClient(factory);
+
+        var html = await client.GetStringAsync("/");
+
+        Assert.Contains("<script src=\"/assets/navigation.js\" defer></script>", html);
+    }
+
+    [Fact]
+    public async Task Soft_navigation_script_is_served_as_javascript()
+    {
+        WriteArticle("a", "---\ntitle: Alpha\n---\nтекст\n");
+        var factory = StartFactory();
+        Register(factory, "a", "Alpha");
+        var client = LoginClient(factory);
+
+        var response = await client.GetAsync("/assets/navigation.js");
+
+        Assert.Equal(System.Net.HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("javascript", response.Content.Headers.ContentType?.MediaType);
+    }
+
+    [Fact]
     public async Task Article_title_is_escaped_in_the_menu()
     {
         WriteArticle("a", "---\ntitle: Alpha\n---\nтекст\n");
