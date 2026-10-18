@@ -49,11 +49,11 @@ public class AuthTests : IDisposable
     [Fact]
     public void Password_hash_is_verified_and_differs_every_time()
     {
-        var first = PasswordHasher.Hash("тайна");
-        var second = PasswordHasher.Hash("тайна");
+        var first = PasswordHasher.Hash("тайна-тайна");
+        var second = PasswordHasher.Hash("тайна-тайна");
 
         Assert.NotEqual(first, second);
-        Assert.True(PasswordHasher.Verify("тайна", first));
+        Assert.True(PasswordHasher.Verify("тайна-тайна", first));
         Assert.False(PasswordHasher.Verify("не та", first));
     }
 
@@ -116,10 +116,10 @@ public class AuthTests : IDisposable
     public async Task Right_password_opens_the_site()
     {
         var factory = StartServer();
-        AddOwner(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
         var client = factory.CreateClient();
 
-        var response = await TestLogin.PostLogin(client, "aleks", "тайна");
+        var response = await TestLogin.PostLogin(client, "aleks", "тайна-тайна");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/")).StatusCode);
@@ -130,11 +130,11 @@ public class AuthTests : IDisposable
     public async Task Forwarded_https_header_marks_session_cookie_secure()
     {
         var factory = StartServer();
-        AddOwner(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
         client.DefaultRequestHeaders.Add("X-Forwarded-Proto", "https");
 
-        var response = await TestLogin.PostLogin(client, "aleks", "тайна");
+        var response = await TestLogin.PostLogin(client, "aleks", "тайна-тайна");
 
         var cookies = response.Headers.TryGetValues("Set-Cookie", out var values) ? values : [];
         Assert.Contains(cookies, cookie => cookie.Contains("secure", StringComparison.OrdinalIgnoreCase));
@@ -144,10 +144,10 @@ public class AuthTests : IDisposable
     public async Task Plain_http_request_gets_cookie_without_secure_and_login_still_works()
     {
         var factory = StartServer();
-        AddOwner(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
-        var response = await TestLogin.PostLogin(client, "aleks", "тайна");
+        var response = await TestLogin.PostLogin(client, "aleks", "тайна-тайна");
 
         var cookies = response.Headers.TryGetValues("Set-Cookie", out var values) ? values : [];
         Assert.DoesNotContain(cookies, cookie => cookie.Contains("secure", StringComparison.OrdinalIgnoreCase));
@@ -158,7 +158,7 @@ public class AuthTests : IDisposable
     public async Task Wrong_password_shows_error_and_keeps_site_closed()
     {
         var factory = StartServer();
-        AddOwner(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
         var response = await TestLogin.PostLogin(client, "aleks", "мимо");
@@ -173,10 +173,10 @@ public class AuthTests : IDisposable
     public async Task Login_without_antiforgery_token_redirects_to_login_without_signing_in()
     {
         var factory = StartServer();
-        AddOwner(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
         var fields = new FormUrlEncodedContent(
-            new Dictionary<string, string> { ["login"] = "aleks", ["password"] = "тайна" });
+            new Dictionary<string, string> { ["login"] = "aleks", ["password"] = "тайна-тайна" });
 
         var response = await client.PostAsync("/login", fields);
 
@@ -191,17 +191,17 @@ public class AuthTests : IDisposable
     public async Task Stale_token_after_signing_in_elsewhere_redirects_home_without_signing_in_again()
     {
         var factory = StartServer();
-        AddOwner(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
         // Токен снят со страницы входа до входа — форма его и держала бы, пока человек её не отправил.
         var staleToken = TestLogin.AntiforgeryToken(await client.GetStringAsync("/login"));
-        var signIn = await TestLogin.PostLogin(client, "aleks", "тайна");
+        var signIn = await TestLogin.PostLogin(client, "aleks", "тайна-тайна");
         Assert.Equal(HttpStatusCode.Found, signIn.StatusCode);
 
         var response = await client.PostAsync("/login", new FormUrlEncodedContent(new Dictionary<string, string>
         {
-            ["login"] = "aleks", ["password"] = "тайна", [staleToken.Name] = staleToken.Value,
+            ["login"] = "aleks", ["password"] = "тайна-тайна", [staleToken.Name] = staleToken.Value,
         }));
 
         Assert.Equal(HttpStatusCode.Found, response.StatusCode);
@@ -225,12 +225,12 @@ public class AuthTests : IDisposable
     public async Task Too_many_login_attempts_from_one_address_get_429()
     {
         var factory = StartServer(("Samizdat:Auth:AttemptsPerMinute", "2"));
-        AddOwner(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
         await TestLogin.PostLogin(client, "aleks", "мимо");
         await TestLogin.PostLogin(client, "aleks", "мимо");
-        var third = await TestLogin.PostLogin(client, "aleks", "тайна");
+        var third = await TestLogin.PostLogin(client, "aleks", "тайна-тайна");
 
         Assert.Equal(HttpStatusCode.TooManyRequests, third.StatusCode);
         Assert.True(third.Headers.Contains("Retry-After"));
@@ -244,14 +244,14 @@ public class AuthTests : IDisposable
     public async Task Login_waits_for_a_free_password_hash_slot()
     {
         var factory = StartServer(("Samizdat:Auth:ParallelHashes", "1"), ("Samizdat:Auth:HashQueue", "0"));
-        AddOwner(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
         var held = await factory.Services.GetRequiredService<PasswordGate>().Enter(CancellationToken.None);
         Assert.True(held.IsAcquired);
 
-        var busy = await TestLogin.PostLogin(client, "aleks", "тайна");
+        var busy = await TestLogin.PostLogin(client, "aleks", "тайна-тайна");
         held.Dispose();
-        var free = await TestLogin.PostLogin(client, "aleks", "тайна");
+        var free = await TestLogin.PostLogin(client, "aleks", "тайна-тайна");
 
         Assert.Equal(HttpStatusCode.TooManyRequests, busy.StatusCode);
         Assert.Equal(HttpStatusCode.Redirect, free.StatusCode);
@@ -262,7 +262,7 @@ public class AuthTests : IDisposable
     public async Task Unknown_login_also_waits_for_a_password_hash_slot()
     {
         var factory = StartServer(("Samizdat:Auth:ParallelHashes", "1"), ("Samizdat:Auth:HashQueue", "0"));
-        AddOwner(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
         var held = await factory.Services.GetRequiredService<PasswordGate>().Enter(CancellationToken.None);
         Assert.True(held.IsAcquired);
@@ -290,11 +290,11 @@ public class AuthTests : IDisposable
     public async Task Login_returns_to_the_page_that_sent_the_guest_to_it()
     {
         var factory = StartServer();
-        AddOwner(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
         var challenge = await client.GetAsync("/moya-statya");
-        var answer = await LoginFrom(client, challenge.Headers.Location!.PathAndQuery, "тайна");
+        var answer = await LoginFrom(client, challenge.Headers.Location!.PathAndQuery, "тайна-тайна");
 
         Assert.Equal(HttpStatusCode.Redirect, answer.StatusCode);
         Assert.Equal("/moya-statya", answer.Headers.Location?.ToString());
@@ -304,7 +304,7 @@ public class AuthTests : IDisposable
     public async Task Wrong_password_keeps_the_return_address_in_the_form()
     {
         var factory = StartServer();
-        AddOwner(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
         var answer = await LoginFrom(client, "/login?ReturnUrl=%2Fmoya-statya", "мимо");
@@ -322,13 +322,13 @@ public class AuthTests : IDisposable
     public async Task Login_does_not_send_to_an_address_outside_the_site(string returnUrl)
     {
         var factory = StartServer();
-        AddOwner(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
         var (name, value) = TestLogin.AntiforgeryToken(await client.GetStringAsync("/login"));
 
         var answer = await client.PostAsync("/login", new FormUrlEncodedContent(new Dictionary<string, string>
         {
-            ["login"] = "aleks", ["password"] = "тайна", [name] = value, ["ReturnUrl"] = returnUrl,
+            ["login"] = "aleks", ["password"] = "тайна-тайна", [name] = value, ["ReturnUrl"] = returnUrl,
         }));
 
         Assert.Equal("/", answer.Headers.Location?.ToString());
@@ -342,7 +342,7 @@ public class AuthTests : IDisposable
     public async Task Login_with_a_broken_body_and_no_token_redirects_to_login()
     {
         var factory = StartServer();
-        AddOwner(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
         var body = string.Join('&', Enumerable.Range(0, 1025).Select(i => $"f{i}=1"));
         var content = new StringContent(body, Encoding.UTF8, "application/x-www-form-urlencoded");
@@ -358,13 +358,13 @@ public class AuthTests : IDisposable
     public async Task Invalid_token_redirect_keeps_the_return_address_from_the_form()
     {
         var factory = StartServer();
-        AddOwner(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
         var (name, value) = TestLogin.AntiforgeryToken(await client.GetStringAsync("/login"));
 
         var response = await client.PostAsync("/login", new FormUrlEncodedContent(new Dictionary<string, string>
         {
-            ["login"] = "aleks", ["password"] = "тайна",
+            ["login"] = "aleks", ["password"] = "тайна-тайна",
             [name] = value + "мусор", ["ReturnUrl"] = "/moya-statya",
         }));
 
@@ -376,10 +376,10 @@ public class AuthTests : IDisposable
     public async Task Login_redirects_to_a_non_ascii_return_address()
     {
         var factory = StartServer();
-        AddOwner(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
-        var answer = await LoginFrom(client, "/login?ReturnUrl=" + Uri.EscapeDataString("/статья"), "тайна");
+        var answer = await LoginFrom(client, "/login?ReturnUrl=" + Uri.EscapeDataString("/статья"), "тайна-тайна");
 
         Assert.True(answer.Headers.Location?.OriginalString.All(char.IsAscii));
         Assert.Equal("/статья", Uri.UnescapeDataString(answer.Headers.Location!.OriginalString));

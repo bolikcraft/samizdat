@@ -9,7 +9,7 @@ namespace Samizdat.Server.Tests;
 [Collection("db")]
 public class LanguageTests : IDisposable
 {
-    const string Password = "тайна";
+    const string Password = "тайна-тайна";
 
     readonly DatabaseFixture database;
     readonly string dataRoot = Directory.CreateTempSubdirectory("samizdat-data").FullName;

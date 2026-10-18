@@ -38,7 +38,7 @@ public class ThemeRenderTests : IDisposable
             db.Users.Add(new UserRow
             {
                 Login = login,
-                PasswordHash = PasswordHasher.Hash("тайна"),
+                PasswordHash = PasswordHasher.Hash("тайна-тайна"),
                 Role = UserRole.Owner,
                 CreatedAt = DateTimeOffset.UtcNow,
             });
@@ -46,7 +46,7 @@ public class ThemeRenderTests : IDisposable
         }
 
         var client = factory.CreateClient();
-        TestLogin.PostLogin(client, login, "тайна").Wait();
+        TestLogin.PostLogin(client, login, "тайна-тайна").Wait();
         return client;
     }
 

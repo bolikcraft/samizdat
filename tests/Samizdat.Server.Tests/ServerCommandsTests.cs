@@ -35,7 +35,7 @@ public class ServerCommandsTests(DatabaseFixture database) : IDisposable
         var factory = StartServer();
 
         var handled = await ServerCommands.TryRun(
-            ["owner", "set", "aleks", "тайна", "--ConnectionStrings:Postgres=x", "--urls", "http://+:5000"],
+            ["owner", "set", "aleks", "тайна-тайна", "--ConnectionStrings:Postgres=x", "--urls", "http://+:5000"],
             factory.Services);
 
         Assert.True(handled);
@@ -106,7 +106,7 @@ public class ServerCommandsTests(DatabaseFixture database) : IDisposable
         var factory = StartServer();
         await AddAdmin(factory, "admin");
 
-        await ServerCommands.TryRun(["owner", "set", "aleks", "тайна"], factory.Services);
+        await ServerCommands.TryRun(["owner", "set", "aleks", "тайна-тайна"], factory.Services);
 
         Assert.Null(FindUser(factory, "admin"));
         Assert.NotNull(FindUser(factory, "aleks"));
@@ -119,7 +119,7 @@ public class ServerCommandsTests(DatabaseFixture database) : IDisposable
         var factory = StartServer();
         await AddAdmin(factory, "другой");
 
-        await ServerCommands.TryRun(["owner", "set", "aleks", "тайна"], factory.Services);
+        await ServerCommands.TryRun(["owner", "set", "aleks", "тайна-тайна"], factory.Services);
 
         Assert.NotNull(FindUser(factory, "admin"));
         Assert.NotNull(FindUser(factory, "aleks"));
@@ -149,7 +149,7 @@ public class ServerCommandsTests(DatabaseFixture database) : IDisposable
         await AddAdmin(factory, "admin");
         await AddReader(factory, "alex", approvedAt: null);
 
-        await ServerCommands.TryRun(["owner", "set", "alex", "тайна"], factory.Services);
+        await ServerCommands.TryRun(["owner", "set", "alex", "тайна-тайна"], factory.Services);
         await ServerCommands.TryRun(["token", "new", "laptop"], factory.Services);
 
         var alex = FindUser(factory, "alex");
@@ -170,7 +170,7 @@ public class ServerCommandsTests(DatabaseFixture database) : IDisposable
         var approvedAt = new DateTimeOffset(2026, 9, 1, 12, 0, 0, TimeSpan.Zero);
         await AddReader(factory, "alex", approvedAt);
 
-        await ServerCommands.TryRun(["owner", "set", "alex", "тайна"], factory.Services);
+        await ServerCommands.TryRun(["owner", "set", "alex", "тайна-тайна"], factory.Services);
 
         var alex = FindUser(factory, "alex");
         Assert.NotNull(alex);
@@ -184,7 +184,7 @@ public class ServerCommandsTests(DatabaseFixture database) : IDisposable
         database.ResetDatabase();
         var factory = StartServer();
         await AddAdmin(factory, "другой");
-        await ServerCommands.TryRun(["owner", "set", "aleks", "тайна"], factory.Services);
+        await ServerCommands.TryRun(["owner", "set", "aleks", "тайна-тайна"], factory.Services);
 
         await ServerCommands.TryRun(["token", "new", "laptop"], factory.Services);
 

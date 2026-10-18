@@ -57,9 +57,9 @@ public class PageLookCacheTests : IDisposable
 
     async Task<HttpClient> OwnerClient(WebApplicationFactory<Program> factory)
     {
-        AddOwner(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
         var client = factory.CreateClient();
-        await TestLogin.PostLogin(client, "aleks", "тайна");
+        await TestLogin.PostLogin(client, "aleks", "тайна-тайна");
         return client;
     }
 

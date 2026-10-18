@@ -139,9 +139,9 @@ public class ApiTokenTests(DatabaseFixture database) : IDisposable
     public async Task Owner_cookie_does_not_open_api()
     {
         var factory = StartServer();
-        AddOwner(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
         var client = factory.CreateClient();
-        await TestLogin.PostLogin(client, "aleks", "тайна");
+        await TestLogin.PostLogin(client, "aleks", "тайна-тайна");
 
         Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/state")).StatusCode);
     }

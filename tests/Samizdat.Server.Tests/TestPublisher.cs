@@ -18,7 +18,7 @@ public static class TestPublisher
         WebApplicationFactory<Program> factory)
     {
         var login = $"owner-{Guid.NewGuid():N}";
-        const string password = "x";
+        const string password = "parol-parol";
 
         string token;
         using (var scope = factory.Services.CreateScope())

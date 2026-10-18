@@ -137,11 +137,11 @@ public class BackgroundTests : IDisposable
     public async Task The_page_of_the_owner_links_to_the_background()
     {
         var factory = StartFactory();
-        AddOwner(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
         PutBackground(factory, Jpeg(), "background.jpg");
 
         var client = factory.CreateClient();
-        await TestLogin.PostLogin(client, "aleks", "тайна");
+        await TestLogin.PostLogin(client, "aleks", "тайна-тайна");
         var html = await client.GetStringAsync("/");
 
         // Вместе с соседней строкой: комментарий темы, утёкший в разметку, встанет между ними
@@ -153,10 +153,10 @@ public class BackgroundTests : IDisposable
     public async Task Without_a_background_the_page_has_no_link_to_it()
     {
         var factory = StartFactory();
-        AddOwner(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
 
         var client = factory.CreateClient();
-        await TestLogin.PostLogin(client, "aleks", "тайна");
+        await TestLogin.PostLogin(client, "aleks", "тайна-тайна");
         var html = await client.GetStringAsync("/");
 
         Assert.DoesNotContain("/background", html);
@@ -188,9 +188,9 @@ public class BackgroundTests : IDisposable
 
     async Task<HttpClient> OwnerClient(WebApplicationFactory<Program> factory)
     {
-        AddOwner(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
         var client = factory.CreateClient();
-        await TestLogin.PostLogin(client, "aleks", "тайна");
+        await TestLogin.PostLogin(client, "aleks", "тайна-тайна");
         return client;
     }
 

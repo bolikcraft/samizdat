@@ -40,7 +40,7 @@ public class ShareLinkTests : IDisposable
             db.Users.Add(new UserRow
             {
                 Login = login,
-                PasswordHash = PasswordHasher.Hash("тайна"),
+                PasswordHash = PasswordHasher.Hash("тайна-тайна"),
                 Role = role,
                 CreatedAt = DateTimeOffset.UtcNow,
             });
@@ -50,7 +50,7 @@ public class ShareLinkTests : IDisposable
         // Без автоперехода: тесты проверяют сам редирект после POST. Вход это не ломает —
         // cookie ставится уже на первом ответе.
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
-        await TestLogin.PostLogin(client, login, "тайна");
+        await TestLogin.PostLogin(client, login, "тайна-тайна");
         return client;
     }
 
@@ -71,7 +71,7 @@ public class ShareLinkTests : IDisposable
         var owner = new UserRow
         {
             Login = $"owner-{Guid.NewGuid():N}",
-            PasswordHash = PasswordHasher.Hash("тайна"),
+            PasswordHash = PasswordHasher.Hash("тайна-тайна"),
             Role = UserRole.Owner,
             CreatedAt = DateTimeOffset.UtcNow,
         };

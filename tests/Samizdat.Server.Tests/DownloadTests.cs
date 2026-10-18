@@ -56,9 +56,9 @@ public class DownloadTests : IDisposable
     {
         using var factory = CreateFactory();
         AddArticle(factory, "tayna", ArticleVisibility.Private);
-        AddPerson(factory, "hozyain", "parol", UserRole.Owner);
+        AddPerson(factory, "hozyain", "parol-parol", UserRole.Owner);
 
-        var client = await Login(factory, "hozyain", "parol");
+        var client = await Login(factory, "hozyain", "parol-parol");
         var answer = await client.GetAsync("/download/tayna");
 
         Assert.Equal(HttpStatusCode.OK, answer.StatusCode);
@@ -71,9 +71,9 @@ public class DownloadTests : IDisposable
     {
         using var factory = CreateFactory();
         AddArticle(factory, "статья", ArticleVisibility.Private);
-        AddPerson(factory, "hozyain", "parol", UserRole.Owner);
+        AddPerson(factory, "hozyain", "parol-parol", UserRole.Owner);
 
-        var client = await Login(factory, "hozyain", "parol");
+        var client = await Login(factory, "hozyain", "parol-parol");
         var answer = await client.GetAsync("/download/статья");
 
         Assert.Equal(HttpStatusCode.OK, answer.StatusCode);
@@ -86,9 +86,9 @@ public class DownloadTests : IDisposable
         using var factory = CreateFactory();
         AddArticle(factory, "tayna", ArticleVisibility.Private,
                    "---\ntitle: Тайна\ntags: [заметки]\n---\n\nТекст.\n");
-        AddPerson(factory, "hozyain", "parol", UserRole.Owner);
+        AddPerson(factory, "hozyain", "parol-parol", UserRole.Owner);
 
-        var client = await Login(factory, "hozyain", "parol");
+        var client = await Login(factory, "hozyain", "parol-parol");
         var text = await client.GetStringAsync("/download/tayna");
 
         Assert.Equal("---\ntitle: Тайна\ntags: [заметки]\n---\n\nТекст.\n", text);
@@ -99,9 +99,9 @@ public class DownloadTests : IDisposable
     {
         using var factory = CreateFactory();
         AddArticle(factory, "otkrytaya", ArticleVisibility.Shared);
-        AddPerson(factory, "ivan", "parol", UserRole.Reader);
+        AddPerson(factory, "ivan", "parol-parol", UserRole.Reader);
 
-        var client = await Login(factory, "ivan", "parol");
+        var client = await Login(factory, "ivan", "parol-parol");
 
         Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/download/otkrytaya")).StatusCode);
     }
@@ -112,10 +112,10 @@ public class DownloadTests : IDisposable
         using var factory = CreateFactory();
         AddArticle(factory, "otkrytaya", ArticleVisibility.Shared,
                    "---\ntitle: Тайна\ntags: [заметки]\npublish: true\n---\n\nТекст.\n");
-        AddPerson(factory, "ivan", "parol", UserRole.Reader);
+        AddPerson(factory, "ivan", "parol-parol", UserRole.Reader);
         SetSetting(factory, "articles.download.readers", "on");
 
-        var client = await Login(factory, "ivan", "parol");
+        var client = await Login(factory, "ivan", "parol-parol");
         var text = await client.GetStringAsync("/download/otkrytaya");
 
         Assert.Contains("title: Тайна", text);
@@ -129,10 +129,10 @@ public class DownloadTests : IDisposable
     {
         using var factory = CreateFactory();
         AddArticle(factory, "tayna", ArticleVisibility.Private);
-        AddPerson(factory, "ivan", "parol", UserRole.Reader);
+        AddPerson(factory, "ivan", "parol-parol", UserRole.Reader);
         SetSetting(factory, "articles.download.readers", "on");
 
-        var client = await Login(factory, "ivan", "parol");
+        var client = await Login(factory, "ivan", "parol-parol");
 
         Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/download/tayna")).StatusCode);
     }
@@ -156,9 +156,9 @@ public class DownloadTests : IDisposable
     public async Task An_unknown_article_is_not_found()
     {
         using var factory = CreateFactory();
-        AddPerson(factory, "hozyain", "parol", UserRole.Owner);
+        AddPerson(factory, "hozyain", "parol-parol", UserRole.Owner);
 
-        var client = await Login(factory, "hozyain", "parol");
+        var client = await Login(factory, "hozyain", "parol-parol");
 
         Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/download/net-takoy")).StatusCode);
     }
@@ -169,9 +169,9 @@ public class DownloadTests : IDisposable
         using var factory = CreateFactory();
         AddArticle(factory, "tayna", ArticleVisibility.Private);
         await File.WriteAllBytesAsync(Path.Combine(dataRoot, "articles", "tayna", "ezh.png"), [1, 2, 3]);
-        AddPerson(factory, "hozyain", "parol", UserRole.Owner);
+        AddPerson(factory, "hozyain", "parol-parol", UserRole.Owner);
 
-        var client = await Login(factory, "hozyain", "parol");
+        var client = await Login(factory, "hozyain", "parol-parol");
         var answer = await client.GetAsync("/download/tayna");
 
         Assert.Equal("application/zip", answer.Content.Headers.ContentType?.MediaType);
@@ -188,10 +188,10 @@ public class DownloadTests : IDisposable
         AddArticle(factory, "otkrytaya", ArticleVisibility.Shared,
                    "---\ntitle: Тайна\ntags: [заметки]\n---\n\nТекст.\n");
         await File.WriteAllBytesAsync(Path.Combine(dataRoot, "articles", "otkrytaya", "ezh.png"), [1, 2, 3]);
-        AddPerson(factory, "ivan", "parol", UserRole.Reader);
+        AddPerson(factory, "ivan", "parol-parol", UserRole.Reader);
         SetSetting(factory, "articles.download.readers", "on");
 
-        var client = await Login(factory, "ivan", "parol");
+        var client = await Login(factory, "ivan", "parol-parol");
         var answer = await client.GetAsync("/download/otkrytaya");
 
         using var zip = new ZipArchive(await answer.Content.ReadAsStreamAsync(), ZipArchiveMode.Read);
@@ -228,10 +228,10 @@ public class DownloadTests : IDisposable
     {
         using var factory = CreateFactory();
         AddArticle(factory, "otkrytaya", ArticleVisibility.Shared, "---\ntitle: [не закрыт\n---\n\nТекст.\n");
-        AddPerson(factory, "ivan", "parol", UserRole.Reader);
+        AddPerson(factory, "ivan", "parol-parol", UserRole.Reader);
         SetSetting(factory, "articles.download.readers", "on");
 
-        var client = await Login(factory, "ivan", "parol");
+        var client = await Login(factory, "ivan", "parol-parol");
 
         Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/download/otkrytaya")).StatusCode);
     }
@@ -242,9 +242,9 @@ public class DownloadTests : IDisposable
         using var factory = CreateFactory();
         var text = "---\ntitle: [не закрыт\n---\n\nТекст.\n";
         AddArticle(factory, "tayna", ArticleVisibility.Private, text);
-        AddPerson(factory, "hozyain", "parol", UserRole.Owner);
+        AddPerson(factory, "hozyain", "parol-parol", UserRole.Owner);
 
-        var client = await Login(factory, "hozyain", "parol");
+        var client = await Login(factory, "hozyain", "parol-parol");
         var answer = await client.GetAsync("/download/tayna");
 
         Assert.Equal(HttpStatusCode.OK, answer.StatusCode);
@@ -405,9 +405,9 @@ public class DownloadTests : IDisposable
     {
         using var factory = CreateFactory();
         AddArticle(factory, "tayna", ArticleVisibility.Private);
-        AddPerson(factory, "hozyain", "parol", UserRole.Owner);
+        AddPerson(factory, "hozyain", "parol-parol", UserRole.Owner);
 
-        var client = await Login(factory, "hozyain", "parol");
+        var client = await Login(factory, "hozyain", "parol-parol");
         var html = await client.GetStringAsync("/tayna");
 
         Assert.Contains("href=\"/download/tayna\"", html);
@@ -420,9 +420,9 @@ public class DownloadTests : IDisposable
         using var factory = CreateFactory();
         AddArticle(factory, "tayna", ArticleVisibility.Private);
         await File.WriteAllBytesAsync(Path.Combine(dataRoot, "articles", "tayna", "ezh.png"), [1, 2, 3]);
-        AddPerson(factory, "hozyain", "parol", UserRole.Owner);
+        AddPerson(factory, "hozyain", "parol-parol", UserRole.Owner);
 
-        var client = await Login(factory, "hozyain", "parol");
+        var client = await Login(factory, "hozyain", "parol-parol");
         var html = await client.GetStringAsync("/tayna");
 
         Assert.Contains("Download .zip", html);
@@ -433,15 +433,15 @@ public class DownloadTests : IDisposable
     {
         using var factory = CreateFactory();
         AddArticle(factory, "otkrytaya", ArticleVisibility.Shared);
-        AddPerson(factory, "hozyain", "parol", UserRole.Owner);
-        AddPerson(factory, "ivan", "parol", UserRole.Reader);
+        AddPerson(factory, "hozyain", "parol-parol", UserRole.Owner);
+        AddPerson(factory, "ivan", "parol-parol", UserRole.Reader);
 
         // Владелец заходит первым и кладёт в кэш свою ячейку с кнопкой — ячейки owner/reader
         // разные, и без этого захода тест прошёл бы даже при слитых ячейках.
-        var owner = await Login(factory, "hozyain", "parol");
+        var owner = await Login(factory, "hozyain", "parol-parol");
         await owner.GetStringAsync("/otkrytaya");
 
-        var client = await Login(factory, "ivan", "parol");
+        var client = await Login(factory, "ivan", "parol-parol");
         var html = await client.GetStringAsync("/otkrytaya");
 
         Assert.DoesNotContain("/download/otkrytaya", html);
@@ -452,9 +452,9 @@ public class DownloadTests : IDisposable
     {
         using var factory = CreateFactory();
         AddArticle(factory, "otkrytaya", ArticleVisibility.Shared);
-        AddPerson(factory, "ivan", "parol", UserRole.Reader);
+        AddPerson(factory, "ivan", "parol-parol", UserRole.Reader);
 
-        var client = await Login(factory, "ivan", "parol");
+        var client = await Login(factory, "ivan", "parol-parol");
         Assert.DoesNotContain("/download/otkrytaya", await client.GetStringAsync("/otkrytaya"));
 
         SetSetting(factory, "articles.download.readers", "on");
@@ -511,9 +511,9 @@ public class DownloadTests : IDisposable
     public async Task Owner_switches_downloading_on_from_the_settings_page()
     {
         using var factory = CreateFactory();
-        AddPerson(factory, "hozyain", "parol", UserRole.Owner);
+        AddPerson(factory, "hozyain", "parol-parol", UserRole.Owner);
 
-        var client = await Login(factory, "hozyain", "parol");
+        var client = await Login(factory, "hozyain", "parol-parol");
         var answer = await Post(client, "/settings/articles",
                                 new() { ["readers"] = "on", ["guests"] = "on" });
 
@@ -529,11 +529,11 @@ public class DownloadTests : IDisposable
     public async Task An_unchecked_box_switches_downloading_off()
     {
         using var factory = CreateFactory();
-        AddPerson(factory, "hozyain", "parol", UserRole.Owner);
+        AddPerson(factory, "hozyain", "parol-parol", UserRole.Owner);
         SetSetting(factory, "articles.download.readers", "on");
         SetSetting(factory, "articles.download.guests", "on");
 
-        var client = await Login(factory, "hozyain", "parol");
+        var client = await Login(factory, "hozyain", "parol-parol");
         // Снятый флажок форма не присылает вовсе — приходит пустая форма.
         await Post(client, "/settings/articles", new());
 
@@ -546,9 +546,9 @@ public class DownloadTests : IDisposable
     public async Task Reader_does_not_switch_downloading()
     {
         using var factory = CreateFactory();
-        AddPerson(factory, "ivan", "parol", UserRole.Reader);
+        AddPerson(factory, "ivan", "parol-parol", UserRole.Reader);
 
-        var client = await Login(factory, "ivan", "parol");
+        var client = await Login(factory, "ivan", "parol-parol");
         var answer = await Post(client, "/settings/articles", new() { ["readers"] = "on" });
 
         Assert.Equal(HttpStatusCode.Forbidden, answer.StatusCode);
@@ -558,10 +558,10 @@ public class DownloadTests : IDisposable
     public async Task The_settings_page_shows_the_state_of_the_switches()
     {
         using var factory = CreateFactory();
-        AddPerson(factory, "hozyain", "parol", UserRole.Owner);
+        AddPerson(factory, "hozyain", "parol-parol", UserRole.Owner);
         SetSetting(factory, "articles.download.readers", "on");
 
-        var client = await Login(factory, "hozyain", "parol");
+        var client = await Login(factory, "hozyain", "parol-parol");
         var html = await client.GetStringAsync("/settings");
 
         Assert.Contains("id=\"publishing\"", html);

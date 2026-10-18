@@ -121,8 +121,8 @@ public class SettingsPageTests : IDisposable
     public async Task Owner_sees_the_settings_form()
     {
         var factory = StartFactory();
-        AddOwner(factory, "aleks", "тайна");
-        var client = await LoginClient(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
+        var client = await LoginClient(factory, "aleks", "тайна-тайна");
 
         var response = await client.GetAsync("/settings");
         var html = await response.Content.ReadAsStringAsync();
@@ -140,8 +140,8 @@ public class SettingsPageTests : IDisposable
     public async Task The_settings_page_puts_the_section_list_where_the_article_tree_is()
     {
         var factory = StartFactory();
-        AddOwner(factory, "aleks", "тайна");
-        var client = await LoginClient(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
+        var client = await LoginClient(factory, "aleks", "тайна-тайна");
 
         var html = await client.GetStringAsync("/settings");
 
@@ -156,8 +156,8 @@ public class SettingsPageTests : IDisposable
     public async Task Every_section_of_the_list_has_its_own_pane()
     {
         var factory = StartFactory();
-        AddOwner(factory, "aleks", "тайна");
-        var client = await LoginClient(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
+        var client = await LoginClient(factory, "aleks", "тайна-тайна");
 
         var html = await client.GetStringAsync("/settings");
 
@@ -172,8 +172,8 @@ public class SettingsPageTests : IDisposable
     public async Task The_owner_sees_two_groups_and_the_settings_title_is_not_repeated()
     {
         var factory = StartFactory();
-        AddOwner(factory, "aleks", "тайна");
-        var client = await LoginClient(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
+        var client = await LoginClient(factory, "aleks", "тайна-тайна");
 
         var html = await client.GetStringAsync("/settings");
 
@@ -186,7 +186,7 @@ public class SettingsPageTests : IDisposable
     public async Task A_reader_sees_only_the_profile_and_no_group_names()
     {
         var factory = StartFactory();
-        AddOwner(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
         using (var scope = factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
@@ -210,8 +210,8 @@ public class SettingsPageTests : IDisposable
     public async Task The_users_item_shows_the_number_of_waiting_requests()
     {
         var factory = StartFactory();
-        AddOwner(factory, "aleks", "тайна");
-        var client = await LoginClient(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
+        var client = await LoginClient(factory, "aleks", "тайна-тайна");
 
         Assert.DoesNotContain("class=\"nav-badge\"", await client.GetStringAsync("/settings"));
 
@@ -235,8 +235,8 @@ public class SettingsPageTests : IDisposable
     public async Task The_general_section_saves_each_field_with_its_own_form()
     {
         var factory = StartFactory();
-        AddOwner(factory, "aleks", "тайна");
-        var client = await LoginClient(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
+        var client = await LoginClient(factory, "aleks", "тайна-тайна");
 
         var html = await client.GetStringAsync("/settings");
         var general = Regex.Match(html, "id=\"general\".*?</section>", RegexOptions.Singleline).Value;
@@ -251,9 +251,9 @@ public class SettingsPageTests : IDisposable
     public async Task A_saved_form_returns_to_its_own_section()
     {
         var factory = StartFactory();
-        AddOwner(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
-        await TestLogin.PostLogin(client, "aleks", "тайна");
+        await TestLogin.PostLogin(client, "aleks", "тайна-тайна");
         var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
 
         var appearance = await client.PostAsync("/settings/appearance", new FormUrlEncodedContent(
@@ -269,8 +269,8 @@ public class SettingsPageTests : IDisposable
     public async Task A_message_pops_up_once_over_the_sections()
     {
         var factory = StartFactory();
-        AddOwner(factory, "aleks", "тайна");
-        var client = await LoginClient(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
+        var client = await LoginClient(factory, "aleks", "тайна-тайна");
 
         // Разделы переключаются якорем, без перезагрузки. Сообщение стоит вне разделов и гаснет само,
         // поэтому не висит над чужой формой.
@@ -287,8 +287,8 @@ public class SettingsPageTests : IDisposable
     public async Task The_uploaded_picture_and_its_remove_button_appear_only_while_a_file_is_on_disk()
     {
         var factory = StartFactory();
-        AddOwner(factory, "aleks", "тайна");
-        var client = await LoginClient(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
+        var client = await LoginClient(factory, "aleks", "тайна-тайна");
 
         var before = await client.GetStringAsync("/settings");
         Assert.DoesNotContain("value=\"upload\"", before);
@@ -309,8 +309,8 @@ public class SettingsPageTests : IDisposable
     public async Task A_picture_from_the_theme_set_becomes_the_background_and_is_marked_in_the_gallery()
     {
         var factory = StartFactory();
-        AddOwner(factory, "aleks", "тайна");
-        var client = await LoginClient(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
+        var client = await LoginClient(factory, "aleks", "тайна-тайна");
         var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
 
         await client.PostAsync("/settings/background/pick", new FormUrlEncodedContent(
@@ -327,8 +327,8 @@ public class SettingsPageTests : IDisposable
     public async Task A_color_from_the_palette_paints_the_backdrop_and_the_accent()
     {
         var factory = StartFactory();
-        AddOwner(factory, "aleks", "тайна");
-        var client = await LoginClient(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
+        var client = await LoginClient(factory, "aleks", "тайна-тайна");
         var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
 
         await client.PostAsync("/settings/background/pick", new FormUrlEncodedContent(
@@ -345,8 +345,8 @@ public class SettingsPageTests : IDisposable
     public async Task A_background_outside_the_theme_set_is_refused()
     {
         var factory = StartFactory();
-        AddOwner(factory, "aleks", "тайна");
-        var client = await LoginClient(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
+        var client = await LoginClient(factory, "aleks", "тайна-тайна");
         var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
 
         foreach (var pick in new[] { "preset:../../etc/passwd", "preset:нет-такой.svg", "color:#000000", "чепуха" })
@@ -365,14 +365,14 @@ public class SettingsPageTests : IDisposable
     public async Task Correct_current_password_changes_it_and_new_password_works_next_login()
     {
         var factory = StartFactory();
-        AddOwner(factory, "aleks", "тайна");
-        var client = await LoginClient(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
+        var client = await LoginClient(factory, "aleks", "тайна-тайна");
         var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
 
         var response = await client.PostAsync("/settings/password", new FormUrlEncodedContent(
             new Dictionary<string, string>
             {
-                [name] = value, ["current"] = "тайна", ["new"] = "новыйпарольок", ["new2"] = "новыйпарольок",
+                [name] = value, ["current"] = "тайна-тайна", ["new"] = "новыйпарольок", ["new2"] = "новыйпарольок",
             }));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -387,8 +387,8 @@ public class SettingsPageTests : IDisposable
     public async Task Wrong_current_password_shows_error_and_keeps_old_password_working()
     {
         var factory = StartFactory();
-        AddOwner(factory, "aleks", "тайна");
-        var client = await LoginClient(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
+        var client = await LoginClient(factory, "aleks", "тайна-тайна");
         var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
 
         var response = await client.PostAsync("/settings/password", new FormUrlEncodedContent(
@@ -401,7 +401,7 @@ public class SettingsPageTests : IDisposable
         Assert.Contains("err=wrong_password", response.RequestMessage!.RequestUri!.ToString());
 
         var checkClient = factory.CreateClient();
-        await TestLogin.PostLogin(checkClient, "aleks", "тайна");
+        await TestLogin.PostLogin(checkClient, "aleks", "тайна-тайна");
         Assert.Equal(HttpStatusCode.OK, (await checkClient.GetAsync("/")).StatusCode);
     }
 
@@ -409,17 +409,17 @@ public class SettingsPageTests : IDisposable
     public async Task New_password_shorter_than_8_chars_is_rejected()
     {
         var factory = StartFactory();
-        AddOwner(factory, "aleks", "тайна");
-        var client = await LoginClient(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
+        var client = await LoginClient(factory, "aleks", "тайна-тайна");
         var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
 
         var response = await client.PostAsync("/settings/password", new FormUrlEncodedContent(
-            new Dictionary<string, string> { [name] = value, ["current"] = "тайна", ["new"] = "коротко", ["new2"] = "коротко" }));
+            new Dictionary<string, string> { [name] = value, ["current"] = "тайна-тайна", ["new"] = "коротко", ["new2"] = "коротко" }));
 
         Assert.Contains("err=short_password", response.RequestMessage!.RequestUri!.ToString());
 
         var checkClient = factory.CreateClient();
-        await TestLogin.PostLogin(checkClient, "aleks", "тайна");
+        await TestLogin.PostLogin(checkClient, "aleks", "тайна-тайна");
         Assert.Equal(HttpStatusCode.OK, (await checkClient.GetAsync("/")).StatusCode);
     }
 
@@ -427,20 +427,20 @@ public class SettingsPageTests : IDisposable
     public async Task Mismatched_new_passwords_are_rejected()
     {
         var factory = StartFactory();
-        AddOwner(factory, "aleks", "тайна");
-        var client = await LoginClient(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
+        var client = await LoginClient(factory, "aleks", "тайна-тайна");
         var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
 
         var response = await client.PostAsync("/settings/password", new FormUrlEncodedContent(
             new Dictionary<string, string>
             {
-                [name] = value, ["current"] = "тайна", ["new"] = "новыйпарольок", ["new2"] = "другойпароль",
+                [name] = value, ["current"] = "тайна-тайна", ["new"] = "новыйпарольок", ["new2"] = "другойпароль",
             }));
 
         Assert.Contains("err=password_mismatch", response.RequestMessage!.RequestUri!.ToString());
 
         var checkClient = factory.CreateClient();
-        await TestLogin.PostLogin(checkClient, "aleks", "тайна");
+        await TestLogin.PostLogin(checkClient, "aleks", "тайна-тайна");
         Assert.Equal(HttpStatusCode.OK, (await checkClient.GetAsync("/")).StatusCode);
     }
 
@@ -449,10 +449,10 @@ public class SettingsPageTests : IDisposable
     {
         WriteArticle("privet", "---\ntitle: Привет\n---\nтекст\n");
         var factory = StartFactory();
-        AddOwner(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
         RegisterArticle(factory, "privet", "Привет");
         WriteThemeFile("имя2", "article.html", "marker-imya2<h1>{{ article.title }}</h1>{{ article.html }}");
-        var client = await LoginClient(factory, "aleks", "тайна");
+        var client = await LoginClient(factory, "aleks", "тайна-тайна");
         var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
 
         await client.PostAsync("/settings/appearance", new FormUrlEncodedContent(
@@ -466,8 +466,8 @@ public class SettingsPageTests : IDisposable
     public async Task Choosing_color_scheme_is_reflected_in_html_attribute()
     {
         var factory = StartFactory();
-        AddOwner(factory, "aleks", "тайна");
-        var client = await LoginClient(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
+        var client = await LoginClient(factory, "aleks", "тайна-тайна");
         var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
 
         await client.PostAsync("/settings/appearance", new FormUrlEncodedContent(
@@ -481,7 +481,7 @@ public class SettingsPageTests : IDisposable
     public async Task Token_list_shows_note_and_last_used_at()
     {
         var factory = StartFactory();
-        var owner = AddOwner(factory, "aleks", "тайна");
+        var owner = AddOwner(factory, "aleks", "тайна-тайна");
         using (var scope = factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
@@ -495,7 +495,7 @@ public class SettingsPageTests : IDisposable
             });
             db.SaveChanges();
         }
-        var client = await LoginClient(factory, "aleks", "тайна");
+        var client = await LoginClient(factory, "aleks", "тайна-тайна");
 
         var html = await client.GetStringAsync("/settings");
 
@@ -507,8 +507,8 @@ public class SettingsPageTests : IDisposable
     public async Task A_token_made_in_the_browser_is_shown_once_and_opens_the_api()
     {
         var factory = StartFactory();
-        AddOwner(factory, "aleks", "тайна");
-        var client = await LoginClient(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
+        var client = await LoginClient(factory, "aleks", "тайна-тайна");
         var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
 
         var response = await client.PostAsync("/settings/tokens", new FormUrlEncodedContent(
@@ -533,8 +533,8 @@ public class SettingsPageTests : IDisposable
     public async Task A_token_made_without_a_note_gets_no_note()
     {
         var factory = StartFactory();
-        AddOwner(factory, "aleks", "тайна");
-        var client = await LoginClient(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
+        var client = await LoginClient(factory, "aleks", "тайна-тайна");
         var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
 
         await client.PostAsync("/settings/tokens", new FormUrlEncodedContent(
@@ -549,8 +549,8 @@ public class SettingsPageTests : IDisposable
     public async Task Making_a_token_without_antiforgery_token_is_rejected()
     {
         var factory = StartFactory();
-        AddOwner(factory, "aleks", "тайна");
-        var client = await LoginClient(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
+        var client = await LoginClient(factory, "aleks", "тайна-тайна");
 
         var response = await client.PostAsync("/settings/tokens", new FormUrlEncodedContent(
             new Dictionary<string, string> { ["note"] = "чужой" }));
@@ -565,7 +565,7 @@ public class SettingsPageTests : IDisposable
     public async Task A_token_note_can_be_changed_and_cleared()
     {
         var factory = StartFactory();
-        var owner = AddOwner(factory, "aleks", "тайна");
+        var owner = AddOwner(factory, "aleks", "тайна-тайна");
         int tokenId;
         using (var scope = factory.Services.CreateScope())
         {
@@ -579,7 +579,7 @@ public class SettingsPageTests : IDisposable
             db.SaveChanges();
             tokenId = row.Id;
         }
-        var client = await LoginClient(factory, "aleks", "тайна");
+        var client = await LoginClient(factory, "aleks", "тайна-тайна");
         var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
 
         await client.PostAsync($"/settings/tokens/{tokenId}/note", new FormUrlEncodedContent(
@@ -605,7 +605,7 @@ public class SettingsPageTests : IDisposable
     public async Task A_note_of_a_foreign_token_stays_as_it_was()
     {
         var factory = StartFactory();
-        AddOwner(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
         var other = AddOwner(factory, "other", "другая");
         int foreignTokenId;
         using (var scope = factory.Services.CreateScope())
@@ -620,7 +620,7 @@ public class SettingsPageTests : IDisposable
             db.SaveChanges();
             foreignTokenId = row.Id;
         }
-        var client = await LoginClient(factory, "aleks", "тайна");
+        var client = await LoginClient(factory, "aleks", "тайна-тайна");
         var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
 
         var response = await client.PostAsync($"/settings/tokens/{foreignTokenId}/note",
@@ -636,7 +636,7 @@ public class SettingsPageTests : IDisposable
     public async Task Revoking_token_closes_its_api_access()
     {
         var factory = StartFactory();
-        var owner = AddOwner(factory, "aleks", "тайна");
+        var owner = AddOwner(factory, "aleks", "тайна-тайна");
         var apiToken = ApiToken.Create();
         int tokenId;
         using (var scope = factory.Services.CreateScope())
@@ -656,7 +656,7 @@ public class SettingsPageTests : IDisposable
         apiClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiToken);
         Assert.Equal(HttpStatusCode.OK, (await apiClient.GetAsync("/api/state")).StatusCode);
 
-        var client = await LoginClient(factory, "aleks", "тайна");
+        var client = await LoginClient(factory, "aleks", "тайна-тайна");
         var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
 
         var response = await client.PostAsync($"/settings/tokens/{tokenId}/revoke", new FormUrlEncodedContent(
@@ -670,7 +670,7 @@ public class SettingsPageTests : IDisposable
     public async Task Revoking_missing_or_foreign_token_returns_404_without_details()
     {
         var factory = StartFactory();
-        AddOwner(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
         var other = AddOwner(factory, "other", "другая");
         int foreignTokenId;
         using (var scope = factory.Services.CreateScope())
@@ -685,7 +685,7 @@ public class SettingsPageTests : IDisposable
             foreignTokenId = row.Id;
         }
 
-        var client = await LoginClient(factory, "aleks", "тайна");
+        var client = await LoginClient(factory, "aleks", "тайна-тайна");
         var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
 
         var missing = await client.PostAsync("/settings/tokens/999999/revoke", new FormUrlEncodedContent(
@@ -702,11 +702,11 @@ public class SettingsPageTests : IDisposable
     public async Task Password_change_without_antiforgery_token_is_rejected()
     {
         var factory = StartFactory();
-        AddOwner(factory, "aleks", "тайна");
-        var client = await LoginClient(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
+        var client = await LoginClient(factory, "aleks", "тайна-тайна");
 
         var response = await client.PostAsync("/settings/password", new FormUrlEncodedContent(
-            new Dictionary<string, string> { ["current"] = "тайна", ["new"] = "новыйпарольок", ["new2"] = "новыйпарольок" }));
+            new Dictionary<string, string> { ["current"] = "тайна-тайна", ["new"] = "новыйпарольок", ["new2"] = "новыйпарольок" }));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
@@ -715,8 +715,8 @@ public class SettingsPageTests : IDisposable
     public async Task Logout_without_antiforgery_token_is_rejected_but_with_token_succeeds()
     {
         var factory = StartFactory();
-        AddOwner(factory, "aleks", "тайна");
-        var client = await LoginClient(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
+        var client = await LoginClient(factory, "aleks", "тайна-тайна");
 
         var withoutToken = await client.PostAsync("/logout", new FormUrlEncodedContent(
             new Dictionary<string, string>()));
@@ -734,8 +734,8 @@ public class SettingsPageTests : IDisposable
     public async Task The_site_title_out_of_the_box_is_samizdat()
     {
         var factory = StartFactory();
-        AddOwner(factory, "aleks", "тайна");
-        var client = await LoginClient(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
+        var client = await LoginClient(factory, "aleks", "тайна-тайна");
 
         var html = await client.GetStringAsync("/");
 
@@ -747,9 +747,9 @@ public class SettingsPageTests : IDisposable
     public async Task The_owner_renames_the_site_and_the_header_and_the_tab_follow()
     {
         var factory = StartFactory();
-        AddOwner(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
-        await TestLogin.PostLogin(client, "aleks", "тайна");
+        await TestLogin.PostLogin(client, "aleks", "тайна-тайна");
         var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
 
         var response = await client.PostAsync("/settings/appearance", new FormUrlEncodedContent(
@@ -771,9 +771,9 @@ public class SettingsPageTests : IDisposable
     public async Task An_empty_site_title_leaves_only_the_icon_in_the_header(string title)
     {
         var factory = StartFactory();
-        AddOwner(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
-        await TestLogin.PostLogin(client, "aleks", "тайна");
+        await TestLogin.PostLogin(client, "aleks", "тайна-тайна");
         var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
 
         var response = await client.PostAsync("/settings/appearance", new FormUrlEncodedContent(
@@ -794,9 +794,9 @@ public class SettingsPageTests : IDisposable
     public async Task A_site_title_longer_than_the_limit_is_refused()
     {
         var factory = StartFactory();
-        AddOwner(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
-        await TestLogin.PostLogin(client, "aleks", "тайна");
+        await TestLogin.PostLogin(client, "aleks", "тайна-тайна");
         var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
 
         var tooLong = await client.PostAsync("/settings/appearance", new FormUrlEncodedContent(
@@ -817,9 +817,9 @@ public class SettingsPageTests : IDisposable
     public async Task A_title_of_emoji_counts_characters_not_code_units()
     {
         var factory = StartFactory();
-        AddOwner(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
-        await TestLogin.PostLogin(client, "aleks", "тайна");
+        await TestLogin.PostLogin(client, "aleks", "тайна-тайна");
         var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
 
         // Каждый знак тут — две половинки UTF-16: по string.Length строка вдвое длиннее предела.
@@ -834,8 +834,8 @@ public class SettingsPageTests : IDisposable
     public async Task The_header_shows_the_icon_before_the_title()
     {
         var factory = StartFactory();
-        AddOwner(factory, "aleks", "тайна");
-        var client = await LoginClient(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
+        var client = await LoginClient(factory, "aleks", "тайна-тайна");
 
         var html = await client.GetStringAsync("/");
 
@@ -847,8 +847,8 @@ public class SettingsPageTests : IDisposable
     public async Task The_home_page_shows_the_site_title_out_of_the_box()
     {
         var factory = StartFactory();
-        AddOwner(factory, "aleks", "тайна");
-        var client = await LoginClient(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
+        var client = await LoginClient(factory, "aleks", "тайна-тайна");
 
         Assert.Contains("<h1>Samizdat</h1>", await client.GetStringAsync("/"));
         Assert.Contains("name=\"show_title\" value=\"on\" checked", await client.GetStringAsync("/settings"));
@@ -858,9 +858,9 @@ public class SettingsPageTests : IDisposable
     public async Task The_owner_hides_the_site_title_on_the_home_page_and_the_header_keeps_it()
     {
         var factory = StartFactory();
-        AddOwner(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
-        await TestLogin.PostLogin(client, "aleks", "тайна");
+        await TestLogin.PostLogin(client, "aleks", "тайна-тайна");
         var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
 
         await client.PostAsync("/settings/appearance", new FormUrlEncodedContent(
@@ -886,9 +886,9 @@ public class SettingsPageTests : IDisposable
     public async Task A_form_without_the_switch_mark_leaves_the_show_title_switch_alone()
     {
         var factory = StartFactory();
-        AddOwner(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
-        await TestLogin.PostLogin(client, "aleks", "тайна");
+        await TestLogin.PostLogin(client, "aleks", "тайна-тайна");
         var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
 
         // Название и схема сохраняются своими формами и флажок не трогают.
@@ -909,9 +909,9 @@ public class SettingsPageTests : IDisposable
     public async Task An_appearance_form_returns_to_the_section_of_its_fields(string field, string fieldValue, string location)
     {
         var factory = StartFactory();
-        AddOwner(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
-        await TestLogin.PostLogin(client, "aleks", "тайна");
+        await TestLogin.PostLogin(client, "aleks", "тайна-тайна");
         var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
 
         var response = await client.PostAsync("/settings/appearance", new FormUrlEncodedContent(
@@ -924,7 +924,7 @@ public class SettingsPageTests : IDisposable
     public async Task Row_actions_live_in_a_menu_and_add_forms_are_folded()
     {
         var factory = StartFactory();
-        AddOwner(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
         using (var scope = factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
@@ -935,7 +935,7 @@ public class SettingsPageTests : IDisposable
             });
             db.SaveChanges();
         }
-        var client = await LoginClient(factory, "aleks", "тайна");
+        var client = await LoginClient(factory, "aleks", "тайна-тайна");
 
         var html = await client.GetStringAsync("/settings");
         var users = Regex.Match(html, "id=\"users\".*?</section>", RegexOptions.Singleline).Value;
@@ -951,8 +951,8 @@ public class SettingsPageTests : IDisposable
     public async Task The_add_form_stays_open_after_its_error()
     {
         var factory = StartFactory();
-        AddOwner(factory, "aleks", "тайна");
-        var client = await LoginClient(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
+        var client = await LoginClient(factory, "aleks", "тайна-тайна");
 
         var html = await client.GetStringAsync("/settings?err=login_taken");
         var users = Regex.Match(html, "id=\"users\".*?</section>", RegexOptions.Singleline).Value;
@@ -964,8 +964,8 @@ public class SettingsPageTests : IDisposable
     public async Task Links_and_invitations_have_a_switch_for_the_dead_rows()
     {
         var factory = StartFactory();
-        AddOwner(factory, "aleks", "тайна");
-        var client = await LoginClient(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
+        var client = await LoginClient(factory, "aleks", "тайна-тайна");
 
         var html = await client.GetStringAsync("/settings");
 
@@ -977,8 +977,8 @@ public class SettingsPageTests : IDisposable
     public async Task The_settings_page_loads_its_script_from_the_core()
     {
         var factory = StartFactory();
-        AddOwner(factory, "aleks", "тайна");
-        var client = await LoginClient(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
+        var client = await LoginClient(factory, "aleks", "тайна-тайна");
 
         var html = await client.GetStringAsync("/settings");
         var script = await client.GetAsync("/_app/settings.js");
@@ -991,8 +991,8 @@ public class SettingsPageTests : IDisposable
     public async Task The_settings_page_links_its_style_in_the_head_and_runs_its_script_first()
     {
         var factory = StartFactory();
-        AddOwner(factory, "aleks", "тайна");
-        var client = await LoginClient(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
+        var client = await LoginClient(factory, "aleks", "тайна-тайна");
 
         var html = await client.GetStringAsync("/settings");
         var head = html[..html.IndexOf("</head>", StringComparison.Ordinal)];
@@ -1010,8 +1010,8 @@ public class SettingsPageTests : IDisposable
         WriteArticle("privet", "---\ntitle: Привет\n---\nтекст\n");
         var factory = StartFactory();
         RegisterArticle(factory, "privet", "Привет");
-        AddOwner(factory, "aleks", "тайна");
-        var client = await LoginClient(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
+        var client = await LoginClient(factory, "aleks", "тайна-тайна");
 
         foreach (var page in new[] { "/", "/privet" })
         {

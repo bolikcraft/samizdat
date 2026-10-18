@@ -42,7 +42,7 @@ public class SiteSettingsTests : IDisposable
             db.Users.Add(new UserRow
             {
                 Login = login,
-                PasswordHash = PasswordHasher.Hash("тайна"),
+                PasswordHash = PasswordHasher.Hash("тайна-тайна"),
                 Role = UserRole.Owner,
                 CreatedAt = DateTimeOffset.UtcNow,
             });
@@ -50,7 +50,7 @@ public class SiteSettingsTests : IDisposable
         }
 
         var client = factory.CreateClient();
-        TestLogin.PostLogin(client, login, "тайна").Wait();
+        TestLogin.PostLogin(client, login, "тайна-тайна").Wait();
         return client;
     }
 

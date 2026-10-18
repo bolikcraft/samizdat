@@ -23,9 +23,9 @@ public class PeopleTests : IDisposable
     {
         database.ResetDatabase();
         using var factory = CreateFactory();
-        AddPerson(factory, "hozyain", "parol", UserRole.Owner);
+        AddPerson(factory, "hozyain", "parol-parol", UserRole.Owner);
 
-        var owner = await Login(factory, "hozyain", "parol");
+        var owner = await Login(factory, "hozyain", "parol-parol");
         var answer = await Post(owner, "/settings/people",
             new() { ["login"] = "ivan", ["password"] = "parol-ivana" });
 
@@ -41,9 +41,9 @@ public class PeopleTests : IDisposable
     {
         database.ResetDatabase();
         using var factory = CreateFactory();
-        AddPerson(factory, "ivan", "parol", UserRole.Reader);
+        AddPerson(factory, "ivan", "parol-parol", UserRole.Reader);
 
-        var client = await Login(factory, "ivan", "parol");
+        var client = await Login(factory, "ivan", "parol-parol");
         var html = await client.GetStringAsync("/settings/");
 
         Assert.Contains("/settings/password", html);
@@ -60,9 +60,9 @@ public class PeopleTests : IDisposable
     {
         database.ResetDatabase();
         using var factory = CreateFactory();
-        AddPerson(factory, "hozyain", "parol", UserRole.Owner);
+        AddPerson(factory, "hozyain", "parol-parol", UserRole.Owner);
 
-        var client = await Login(factory, "hozyain", "parol");
+        var client = await Login(factory, "hozyain", "parol-parol");
         var html = await client.GetStringAsync("/settings/");
 
         Assert.Contains("/settings/password", html);
@@ -78,10 +78,10 @@ public class PeopleTests : IDisposable
     {
         database.ResetDatabase();
         using var factory = CreateFactory();
-        AddPerson(factory, "hozyain", "parol", UserRole.Owner);
+        AddPerson(factory, "hozyain", "parol-parol", UserRole.Owner);
         AddPerson(factory, "ivan", "parol-ivana", UserRole.Reader);
 
-        var owner = await Login(factory, "hozyain", "parol");
+        var owner = await Login(factory, "hozyain", "parol-parol");
         var answer = await Post(owner, "/settings/people",
             new() { ["login"] = "ivan", ["password"] = "drugoy-parol" });
 
@@ -185,10 +185,10 @@ public class PeopleTests : IDisposable
     {
         database.ResetDatabase();
         using var factory = CreateFactory();
-        AddPerson(factory, "hozyain", "parol", UserRole.Owner);
+        AddPerson(factory, "hozyain", "parol-parol", UserRole.Owner);
         var ivan = AddPerson(factory, "ivan", "staryy-parol", UserRole.Reader);
 
-        var owner = await Login(factory, "hozyain", "parol");
+        var owner = await Login(factory, "hozyain", "parol-parol");
         var answer = await Post(owner, $"/settings/people/{ivan}/password",
             new() { ["password"] = "novyy-parol" });
 
@@ -203,11 +203,11 @@ public class PeopleTests : IDisposable
     {
         database.ResetDatabase();
         using var factory = CreateFactory();
-        AddPerson(factory, "hozyain", "parol", UserRole.Owner);
+        AddPerson(factory, "hozyain", "parol-parol", UserRole.Owner);
         var ivan = AddPerson(factory, "ivan", "parol-ivana", UserRole.Reader);
         AddToken(factory, ivan);
 
-        var owner = await Login(factory, "hozyain", "parol");
+        var owner = await Login(factory, "hozyain", "parol-parol");
         var answer = await Post(owner, $"/settings/people/{ivan}/delete", []);
 
         Assert.Equal(HttpStatusCode.Redirect, answer.StatusCode);
@@ -225,10 +225,10 @@ public class PeopleTests : IDisposable
     {
         database.ResetDatabase();
         using var factory = CreateFactory();
-        AddPerson(factory, "hozyain", "parol", UserRole.Owner);
+        AddPerson(factory, "hozyain", "parol-parol", UserRole.Owner);
         var gost = AddPendingPerson(factory, "gost");
 
-        var owner = await Login(factory, "hozyain", "parol");
+        var owner = await Login(factory, "hozyain", "parol-parol");
         var answer = await Post(owner, $"/settings/people/{gost}/delete", []);
 
         Assert.Equal("/settings?err=not_pending#users", answer.Headers.Location?.ToString());
@@ -240,9 +240,9 @@ public class PeopleTests : IDisposable
     {
         database.ResetDatabase();
         using var factory = CreateFactory();
-        var owner = AddPerson(factory, "hozyain", "parol", UserRole.Owner);
+        var owner = AddPerson(factory, "hozyain", "parol-parol", UserRole.Owner);
 
-        var client = await Login(factory, "hozyain", "parol");
+        var client = await Login(factory, "hozyain", "parol-parol");
         var answer = await Post(client, $"/settings/people/{owner}/delete", []);
 
         Assert.Equal(HttpStatusCode.Redirect, answer.StatusCode);
@@ -334,13 +334,13 @@ public class PeopleTests : IDisposable
     {
         database.ResetDatabase();
         using var factory = CreateFactory();
-        AddPerson(factory, "hozyain", "parol", UserRole.Owner);
+        AddPerson(factory, "hozyain", "parol-parol", UserRole.Owner);
         var ivan = AddPerson(factory, "ivan", "parol-ivana", UserRole.Reader);
 
         var client = await Login(factory, "ivan", "parol-ivana");
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/settings/")).StatusCode);
 
-        var owner = await Login(factory, "hozyain", "parol");
+        var owner = await Login(factory, "hozyain", "parol-parol");
         await Post(owner, $"/settings/people/{ivan}/delete", []);
 
         var settings = await client.GetAsync("/settings/");
@@ -354,13 +354,13 @@ public class PeopleTests : IDisposable
     {
         database.ResetDatabase();
         using var factory = CreateFactory();
-        AddPerson(factory, "hozyain", "parol", UserRole.Owner);
+        AddPerson(factory, "hozyain", "parol-parol", UserRole.Owner);
         var ivan = AddPerson(factory, "ivan", "parol-ivana", UserRole.Reader);
 
         var client = await Login(factory, "ivan", "parol-ivana");
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/settings/")).StatusCode);
 
-        var owner = await Login(factory, "hozyain", "parol");
+        var owner = await Login(factory, "hozyain", "parol-parol");
         await Post(owner, $"/settings/people/{ivan}/password", new() { ["password"] = "novyy-parol" });
 
         var answer = await client.GetAsync("/settings/");
@@ -407,10 +407,10 @@ public class PeopleTests : IDisposable
     {
         database.ResetDatabase();
         using var factory = CreateFactory();
-        AddPerson(factory, "ivan", "parol", UserRole.Reader);
-        var other = AddPerson(factory, "hozyain", "parol", UserRole.Owner);
+        AddPerson(factory, "ivan", "parol-parol", UserRole.Reader);
+        var other = AddPerson(factory, "hozyain", "parol-parol", UserRole.Owner);
 
-        var client = await Login(factory, "ivan", "parol");
+        var client = await Login(factory, "ivan", "parol-parol");
 
         Assert.Equal(HttpStatusCode.Forbidden,
             (await Post(client, "/settings/people",

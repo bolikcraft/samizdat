@@ -17,7 +17,7 @@ public static class TestLogin
     public static async Task<HttpClient> As(WebApplicationFactory<Program> factory, UserRole role,
                                             string? login = null)
     {
-        const string password = "parol";
+        const string password = "parol-parol";
         login ??= $"{role}-{Guid.NewGuid():N}";
 
         using (var scope = factory.Services.CreateScope())
