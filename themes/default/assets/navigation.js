@@ -19,10 +19,10 @@
   // на запись, которая ещё грузится.
   var shownKey = navigation.currentEntry.key;
 
-  // Заготовка страницы с наведения. Старую не берём: видимость статьи могли сменить в соседней вкладке.
+  // Заготовки страниц с наведения по адресу. Старые не берём: видимость статьи могли сменить в соседней вкладке.
   var PREFETCH_DELAY = 65;
   var PREFETCH_TTL = 10000;
-  var prefetched = null;
+  var prefetched = new Map();
   var timer = 0;
 
   navigation.addEventListener("navigate", function (event) {
@@ -69,21 +69,34 @@
   });
 
   // Форма меняет данные, и заготовка после неё могла устареть.
-  document.addEventListener("submit", function () { prefetched = null; });
+  document.addEventListener("submit", function () { prefetched.clear(); });
 
   function prefetch(url) {
     var href = pageHref(url);
-    if (prefetched && prefetched.href === href && Date.now() - prefetched.at < PREFETCH_TTL) return;
-    var page = load(href);
-    // Отказ покажет сам переход. Без этой строки неиспользованный отказ попадает в консоль.
-    page.catch(function () {});
-    prefetched = { href: href, at: Date.now(), page: page };
+    prefetched.forEach(function (entry, key) {
+      if (Date.now() - entry.at > PREFETCH_TTL) {
+        prefetched.delete(key);
+      } else if (key !== href && !entry.done) {
+        // Курсор ушёл с ссылки, а её загрузка делит канал с той, что нужна сейчас.
+        entry.controller.abort();
+        prefetched.delete(key);
+      }
+    });
+    if (prefetched.has(href)) return;
+
+    var entry = { at: Date.now(), controller: new AbortController(), done: false };
+    entry.page = load(href, entry.controller.signal);
+    // Отказ покажет сам переход. Без обработчика неиспользованный отказ попадает в консоль.
+    entry.page.then(function () { entry.done = true; }, function () {});
+    prefetched.set(href, entry);
   }
 
+  // Документ заготовки годится один раз: show переносит его узлы в <main>.
   function take(url) {
-    var entry = prefetched;
-    prefetched = null;
-    if (!entry || entry.href !== pageHref(url) || Date.now() - entry.at > PREFETCH_TTL) return null;
+    var href = pageHref(url);
+    var entry = prefetched.get(href);
+    prefetched.delete(href);
+    if (!entry || Date.now() - entry.at > PREFETCH_TTL) return null;
     return entry.page;
   }
 
