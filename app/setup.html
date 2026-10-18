@@ -1,0 +1,20 @@
+{{~## Служебная страница ядра. Сюда ведёт вход с паролем короче нормы (демо admin/admin):
+пока пароль не сменён, остальной сайт закрыт. Поля и их имена — как у формы регистрации,
+вид даёт класс login из темы. ##~}}
+<form class="login" method="post" action="/setup">
+  {{ antiforgery }}
+  <h1>{{ t.setup.title }}</h1>
+  <p class="invite-note">{{ t.setup.hint }}</p>
+  {{ if error }}<p class="error">{{ error | html.escape }}</p>{{ end }}
+  <label>{{ t.register.login }} <input name="login" value="{{ login | html.escape }}" maxlength="100"
+                      autocomplete="username" required></label>
+  <label>{{ t.register.password }} <input type="password" name="password" autocomplete="new-password"
+                       minlength="8" maxlength="200" required autofocus></label>
+  <label>{{ t.register.repeat }} <input type="password" name="repeat" autocomplete="new-password"
+                       minlength="8" maxlength="200" required></label>
+  <button type="submit">{{ t.setup.submit }}</button>
+</form>
+<form class="login-register" method="post" action="/logout">
+  {{ antiforgery }}
+  <button type="submit">{{ t.layout.logout }}</button>
+</form>

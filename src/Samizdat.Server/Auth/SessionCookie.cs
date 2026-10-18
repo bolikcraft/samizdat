@@ -12,19 +12,25 @@ public static class SessionCookie
 {
     public const string StampClaim = "samizdat:stamp";
 
-    public static Task SignIn(HttpContext context, UserRow user)
-    {
-        var identity = new ClaimsIdentity(
-            [
-                new Claim(ClaimTypes.Name, user.Login),
-                new Claim(ClaimTypes.Role, user.Role.ToString()),
-                new Claim(StampClaim, user.SessionStamp),
-            ],
-            CookieAuthenticationDefaults.AuthenticationScheme);
+    /// Метка «пароль короче нормы». С ней открыта только форма /setup (см. SetupGate).
+    public const string SetupClaim = "samizdat:setup";
 
+    public static Task SignIn(HttpContext context, UserRow user, bool needsSetup = false)
+    {
+        List<Claim> claims =
+        [
+            new Claim(ClaimTypes.Name, user.Login),
+            new Claim(ClaimTypes.Role, user.Role.ToString()),
+            new Claim(StampClaim, user.SessionStamp),
+        ];
+        if (needsSetup) claims.Add(new Claim(SetupClaim, "1"));
+
+        var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
         return context.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme,
                                    new ClaimsPrincipal(identity));
     }
+
+    public static bool NeedsSetup(ClaimsPrincipal user) => user.HasClaim(claim => claim.Type == SetupClaim);
 
     /// Запрос к базе на каждый запрос с cookie: за него платим ради того, чтобы удалённый человек
     /// терял доступ сразу, а не доживал месяц до конца срока cookie.

@@ -121,6 +121,7 @@ public static class Startup
         app.UseRateLimiter();
         app.UseAntiforgery();
         app.MapAuth();
+        app.MapSetup();
         app.MapRegistration();
         app.MapPages().RequireAuthorization();
         app.MapShare();

@@ -51,8 +51,11 @@ public static class AuthEndpoints
                 return LoginPage(pages, settings, text, antiforgery, context,
                                  text["login.err.not_approved"], returnUrl);
 
-            await SessionCookie.SignIn(context, user);
+            // Короткий пароль — демо admin/admin или старый пароль: сайт закрыт до его смены.
+            var needsSetup = password.Length < SettingsPage.MinPasswordLength;
+            await SessionCookie.SignIn(context, user, needsSetup);
 
+            if (needsSetup) return Results.Redirect("/setup");
             return Results.Redirect(returnUrl is null ? "/" : AsciiRedirect.Target(returnUrl));
         }).AllowAnonymous().RequireValidToken(context =>
         {
