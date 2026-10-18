@@ -8,10 +8,6 @@ namespace Samizdat.Server.Endpoints;
 /// правила у них общие, разная только судьба заведённой строки.
 internal readonly record struct RegistrationForm(string Login, string Password, string Repeat)
 {
-    // Верхняя граница пароля есть у хэша: Argon2id считает по всей строке, и мегабайт пароля
-    // занял бы процессор надолго.
-    internal const int MaxPasswordLength = 200;
-
     public static async Task<RegistrationForm> Read(HttpContext context)
     {
         var form = await context.Request.ReadFormAsync();
@@ -28,8 +24,8 @@ internal readonly record struct RegistrationForm(string Login, string Password, 
             text.Format("register.err.long_login", SettingsPage.MaxLoginLength),
         { Password.Length: < SettingsPage.MinPasswordLength } =>
             text.Format("register.err.short_password", SettingsPage.MinPasswordLength),
-        { Password.Length: > MaxPasswordLength } =>
-            text.Format("register.err.long_password", MaxPasswordLength),
+        { Password.Length: > SettingsPage.MaxPasswordLength } =>
+            text.Format("register.err.long_password", SettingsPage.MaxPasswordLength),
         _ when Password != Repeat => text["register.err.mismatch"],
         _ => null,
     };

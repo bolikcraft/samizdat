@@ -146,8 +146,11 @@ public static class SettingsEndpoints
 
             if (CurrentUser(db, user) is not { } person) return LoggedOut();
 
-            if (!PasswordHasher.Verify(current, person.PasswordHash)) return Err("wrong_password");
+            // Пароль длиннее предела не подходит ни к одной учётке, хэш по нему не считаем.
+            if (current.Length > MaxPasswordLength || !PasswordHasher.Verify(current, person.PasswordHash))
+                return Err("wrong_password");
             if (next.Length < MinPasswordLength) return Err("short_password");
+            if (next.Length > MaxPasswordLength) return Err("long_password");
             if (next != repeat) return Err("password_mismatch");
 
             person.PasswordHash = PasswordHasher.Hash(next);
@@ -402,6 +405,7 @@ public static class SettingsEndpoints
 
             if (login.Length == 0 || login.Length > MaxLoginLength) return Err("bad_person");
             if (password.Length < MinPasswordLength) return Err("person_short_password");
+            if (password.Length > MaxPasswordLength) return Err("person_long_password");
 
             db.Users.Add(new UserRow
             {
@@ -441,6 +445,7 @@ public static class SettingsEndpoints
             if (person.Id == me.Id) return Err("own_password");
             if (person.Role == UserRole.Owner) return Err("other_owner");
             if (password.Length < MinPasswordLength) return Err("person_short_password");
+            if (password.Length > MaxPasswordLength) return Err("person_long_password");
 
             person.PasswordHash = PasswordHasher.Hash(password);
             person.SessionStamp = UserRow.NewSessionStamp();

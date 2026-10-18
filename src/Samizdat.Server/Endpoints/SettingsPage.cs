@@ -10,8 +10,11 @@ namespace Samizdat.Server.Endpoints;
 public static class SettingsPage
 {
     /// Меры учётной записи. Они одни на все места, где её заводят или меняют: настройки,
-    /// приглашение и открытая запись. Длина логина равна длине столбца в базе.
+    /// приглашение, открытая запись, /setup и owner set. Длина логина равна длине столбца в базе.
     internal const int MinPasswordLength = 8;
+    // Верхняя граница пароля есть у хэша: Argon2id считает по всей строке, и мегабайт пароля
+    // занял бы процессор надолго.
+    internal const int MaxPasswordLength = 200;
     internal const int MaxLoginLength = 100;
 
     /// Равна длине столбца users.Language.
@@ -39,13 +42,13 @@ public static class SettingsPage
     // Незнакомый код — это фон и оформление: у них много своих кодов.
     internal static string SectionOf(string code) => code switch
     {
-        "password" or "wrong_password" or "short_password" or "password_mismatch" => "profile",
+        "password" or "wrong_password" or "short_password" or "long_password" or "password_mismatch" => "profile",
         "language" or "bad_language" => "profile",
         "general" or "bad_title" => "general",
         "token_created" or "token_note" or "token_revoked" => "api",
         "link_revoked" or "articles" or "diagrams" => "publishing",
         "person_added" or "person_password" or "person_deleted" => "users",
-        "bad_person" or "person_short_password" or "login_taken" => "users",
+        "bad_person" or "person_short_password" or "person_long_password" or "login_taken" => "users",
         "last_owner" or "self_delete" or "other_owner" or "own_password" => "users",
         "invite_created" or "invite_revoked" or "invite_note" or "invite_term" => "users",
         "signup_open" or "signup_approved" or "signup_rejected" or "not_pending" => "users",
@@ -58,6 +61,9 @@ public static class SettingsPage
             return err switch
             {
                 "short_password" or "person_short_password" => text.Format($"settings.msg.{err}", MinPasswordLength),
+                // Своей строки нет: текст тот же, что у формы регистрации.
+                "long_password" or "person_long_password" =>
+                    text.Format("register.err.long_password", MaxPasswordLength),
                 "bad_title" => text.Format("settings.msg.bad_title", SiteSettings.MaxTitleLength),
                 _ => Known(text, err) ?? text["settings.msg.failed"],
             };

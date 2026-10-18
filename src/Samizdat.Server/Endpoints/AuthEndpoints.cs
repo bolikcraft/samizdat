@@ -34,8 +34,11 @@ public static class AuthEndpoints
             var user = await db.Users.FirstOrDefaultAsync(row => row.Login == login);
 
             bool matches;
-            using (var lease = await gate.Enter(context.RequestAborted))
+            // Пароль длиннее предела не подходит ни к одной учётке, хэш по нему не считаем.
+            if (password.Length > SettingsPage.MaxPasswordLength) matches = false;
+            else
             {
+                using var lease = await gate.Enter(context.RequestAborted);
                 if (!lease.IsAcquired) return PasswordGate.Busy();
                 // Неизвестный логин тоже платит за Argon2id: иначе ответ по времени выдаёт, что логина нет.
                 matches = PasswordHasher.Verify(password, user?.PasswordHash ?? PasswordHasher.Decoy);
