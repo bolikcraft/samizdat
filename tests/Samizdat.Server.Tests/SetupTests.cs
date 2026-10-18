@@ -33,14 +33,14 @@ public class SetupTests : IDisposable
         });
 
     static void AddPerson(WebApplicationFactory<Program> factory, string login, string password,
-                          UserRole role = UserRole.Owner)
+                          UserRole role = UserRole.Owner, bool approved = true)
     {
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
         db.Users.Add(new UserRow
         {
             Login = login, PasswordHash = PasswordHasher.Hash(password), Role = role,
-            CreatedAt = DateTimeOffset.UtcNow,
+            CreatedAt = DateTimeOffset.UtcNow, ApprovedAt = approved ? DateTimeOffset.UtcNow : null,
         });
         db.SaveChanges();
     }
@@ -82,6 +82,23 @@ public class SetupTests : IDisposable
 
         Assert.Equal(HttpStatusCode.Redirect, answer.StatusCode);
         Assert.Equal("/setup", answer.Headers.Location?.OriginalString);
+    }
+
+    // Проверка одобрения стоит раньше метки смены: короткий пароль не открывает /setup ждущему.
+    [Fact]
+    public async Task Short_password_of_a_pending_person_does_not_lead_to_setup()
+    {
+        var factory = StartServer();
+        AddPerson(factory, "ivan", "parol", UserRole.Reader, approved: false);
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+
+        var answer = await TestLogin.PostLogin(client, "ivan", "parol");
+
+        Assert.Equal(HttpStatusCode.OK, answer.StatusCode);
+        Assert.Contains("must approve your request", await answer.Content.ReadAsStringAsync());
+        var cookies = answer.Headers.TryGetValues("Set-Cookie", out var values) ? values : [];
+        Assert.DoesNotContain(cookies, cookie => cookie.StartsWith(".AspNetCore.Cookies"));
+        Assert.StartsWith("/login", (await client.GetAsync("/setup")).Headers.Location?.PathAndQuery);
     }
 
     [Fact]
