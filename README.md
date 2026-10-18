@@ -128,6 +128,9 @@ The theme gives the styles of `dialog.lightbox`.
 The markup of the settings page is in `app/settings.html`. The theme gives its styles in
 `assets/settings.css`.
 
+The markup of the page `/setup` is in `app/setup.html`. It uses the classes of the login form:
+`login`, `invite-note`, `error` and `login-register`.
+
 ## How to run it
 
 ### With Docker
@@ -140,7 +143,7 @@ cd /opt/samizdat
 cp .env.example .env        # then set POSTGRES_PASSWORD in .env
 deploy/update.sh            # builds the image and starts the site and the database
 
-docker compose run --rm app owner set <login> <password>
+docker compose run --rm app owner set <login>   # asks for the password
 docker compose run --rm app token new laptop
 ```
 
@@ -148,8 +151,15 @@ The site is at `http://<server>:8080`. To change the port or the address, set `S
 `SAMIZDAT_BIND` in `.env`. The folders `data/` (articles, keys, background) and `pgdata/`
 (the database) are in the same folder as `compose.yaml`. `docker compose down -v` does not remove them.
 
-A new database has the demo account `admin` with the password `admin`. The command `owner set` with
-a different login removes this account if its password is still `admin`.
+A new database has the demo account `admin` with the password `admin`. When a person signs in with a password
+of less than 8 characters, the site opens only the page `/setup`. On this page, the person sets a new password
+and can change the login. Then the other pages open.
+
+The command `owner set` asks for the password and does not show it on the screen. It also reads the password
+from a pipe or a file: `docker compose run -T --rm app owner set <login> < password.txt`.
+A password in the arguments also works, but the shell keeps it in its history.
+The password must have 8 to 200 characters.
+The command `owner set` with a different login removes the account `admin` if its password is still `admin`.
 If a person with the login exists, `owner set` gives this person the new password and makes this person an owner.
 
 The database uses `POSTGRES_PASSWORD` only when it starts for the first time with an empty `pgdata/`.
@@ -203,7 +213,7 @@ dotnet run --project src/Samizdat.Server --no-launch-profile -- \
   --urls http://127.0.0.1:5080 --Samizdat:DataRoot=/path/to/data
 
 # 3. Set the owner and make a token for the command line tool.
-dotnet run --project src/Samizdat.Server --no-launch-profile -- owner set <login> <password>
+dotnet run --project src/Samizdat.Server --no-launch-profile -- owner set <login>
 dotnet run --project src/Samizdat.Server --no-launch-profile -- token new laptop
 
 # 4. Tell the tool where the server and the vault are, then publish.

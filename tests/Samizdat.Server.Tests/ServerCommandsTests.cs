@@ -45,12 +45,12 @@ public class ServerCommandsTests(DatabaseFixture database) : IDisposable
     }
 
     [Fact]
-    public async Task Owner_set_without_password_writes_nothing()
+    public async Task Owner_set_with_empty_input_writes_nothing()
     {
         database.ResetDatabase();
         var factory = StartServer();
 
-        var handled = await ServerCommands.TryRun(["owner", "set", "aleks"], factory.Services);
+        var handled = await ServerCommands.TryRun(["owner", "set", "aleks"], factory.Services, () => null);
 
         Assert.True(handled);
         Assert.Null(FindUser(factory, "aleks"));
@@ -61,10 +61,10 @@ public class ServerCommandsTests(DatabaseFixture database) : IDisposable
     {
         database.ResetDatabase();
         var factory = StartServer();
-        await ServerCommands.TryRun(["owner", "set", "aleks", "первый"], factory.Services);
+        await ServerCommands.TryRun(["owner", "set", "aleks", "первый-пароль"], factory.Services);
         var first = FindUser(factory, "aleks")!;
 
-        await ServerCommands.TryRun(["owner", "set", "aleks", "второй"], factory.Services);
+        await ServerCommands.TryRun(["owner", "set", "aleks", "второй-пароль"], factory.Services);
 
         var user = FindUser(factory, "aleks");
         Assert.NotNull(user);
@@ -132,11 +132,11 @@ public class ServerCommandsTests(DatabaseFixture database) : IDisposable
         var factory = StartServer();
         await AddAdmin(factory, "admin");
 
-        await ServerCommands.TryRun(["owner", "set", "admin", "новый"], factory.Services);
+        await ServerCommands.TryRun(["owner", "set", "admin", "новый-пароль"], factory.Services);
 
         var admin = FindUser(factory, "admin");
         Assert.NotNull(admin);
-        Assert.True(PasswordHasher.Verify("новый", admin.PasswordHash));
+        Assert.True(PasswordHasher.Verify("новый-пароль", admin.PasswordHash));
     }
 
     // Сценарий из ревью: admin/admin удаляется, и читатель обязан стать владельцем, иначе
@@ -191,6 +191,47 @@ public class ServerCommandsTests(DatabaseFixture database) : IDisposable
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
         Assert.Equal(FindUser(factory, "admin")!.Id, db.ApiTokens.Single().UserId);
+    }
+
+    [Fact]
+    public async Task Owner_set_reads_the_password_from_input()
+    {
+        database.ResetDatabase();
+        var factory = StartServer();
+
+        await ServerCommands.TryRun(["owner", "set", "aleks"], factory.Services, () => "parol-iz-vvoda");
+
+        var user = FindUser(factory, "aleks");
+        Assert.NotNull(user);
+        Assert.True(PasswordHasher.Verify("parol-iz-vvoda", user.PasswordHash));
+    }
+
+    // Аргумент конфигурации после логина — не пароль: команда читает пароль из ввода.
+    [Fact]
+    public async Task Owner_set_reads_the_input_when_config_follows_the_login()
+    {
+        database.ResetDatabase();
+        var factory = StartServer();
+
+        await ServerCommands.TryRun(["owner", "set", "aleks", "--urls", "http://+:5000"], factory.Services,
+                                    () => "parol-iz-vvoda");
+
+        Assert.True(PasswordHasher.Verify("parol-iz-vvoda", FindUser(factory, "aleks")!.PasswordHash));
+    }
+
+    [Theory]
+    [InlineData(7)]
+    [InlineData(201)]
+    public async Task Owner_set_refuses_a_password_out_of_the_limits(int length)
+    {
+        database.ResetDatabase();
+        var factory = StartServer();
+
+        await ServerCommands.TryRun(["owner", "set", "aleks", new string('p', length)], factory.Services);
+        await ServerCommands.TryRun(["owner", "set", "alex"], factory.Services, () => new string('p', length));
+
+        Assert.Null(FindUser(factory, "aleks"));
+        Assert.Null(FindUser(factory, "alex"));
     }
 
     [Fact]
