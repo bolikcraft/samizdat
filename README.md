@@ -114,6 +114,9 @@ The script of the layout buttons sets attributes on `<html>`. The theme uses the
 - `data-sidebar="collapsed"`: the reader collapsed the side column. The browser keeps this choice.
 - `data-reading`: the reading mode is on. The article uses all the window, without the header and the side column.
 
+The script of the image viewer adds `dialog.lightbox` with an `<img>` in it to `<body>`. A click on an image
+in `main article` opens it. An image in a link does not open. The theme gives the look of `dialog.lightbox`.
+
 The markup of the settings page is in `app/settings.html`. The theme gives its styles in
 `assets/settings.css`.
 
