@@ -14,6 +14,7 @@
   "error.not_found.title": "このページはありません",
   "language.name": "日本語",
   "layout.logout": "ログアウト",
+  "layout.reading": "読書モード",
   "layout.search": "検索",
   "layout.search_hint": "記事を検索",
   "layout.settings": "設定",

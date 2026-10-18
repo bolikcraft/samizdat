@@ -14,6 +14,7 @@
   "error.not_found.title": "Нет такой страницы",
   "language.name": "Русский",
   "layout.logout": "Выход",
+  "layout.reading": "Режим чтения",
   "layout.search": "Поиск",
   "layout.search_hint": "Поиск по статьям",
   "layout.settings": "Настройки",

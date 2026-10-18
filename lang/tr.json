@@ -14,6 +14,7 @@
   "error.not_found.title": "Böyle bir sayfa yok",
   "language.name": "Türkçe",
   "layout.logout": "Oturumu kapat",
+  "layout.reading": "Okuma modu",
   "layout.search": "Arama",
   "layout.search_hint": "Makalelerde ara",
   "layout.settings": "Ayarlar",

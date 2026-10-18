@@ -14,6 +14,7 @@
   "error.not_found.title": "没有这个页面",
   "language.name": "简体中文",
   "layout.logout": "退出",
+  "layout.reading": "阅读模式",
   "layout.search": "搜索",
   "layout.search_hint": "搜索文章",
   "layout.settings": "设置",

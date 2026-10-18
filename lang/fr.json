@@ -14,6 +14,7 @@
   "error.not_found.title": "Cette page n’existe pas",
   "language.name": "Français",
   "layout.logout": "Se déconnecter",
+  "layout.reading": "Mode lecture",
   "layout.search": "Recherche",
   "layout.search_hint": "Rechercher dans les articles",
   "layout.settings": "Paramètres",

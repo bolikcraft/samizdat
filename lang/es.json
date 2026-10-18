@@ -14,6 +14,7 @@
   "error.not_found.title": "Esta página no existe",
   "language.name": "Español",
   "layout.logout": "Cerrar sesión",
+  "layout.reading": "Modo de lectura",
   "layout.search": "Buscar",
   "layout.search_hint": "Buscar en los artículos",
   "layout.settings": "Ajustes",

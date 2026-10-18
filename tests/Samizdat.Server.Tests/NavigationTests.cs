@@ -410,6 +410,33 @@ public class NavigationTests : IDisposable
     }
 
     [Fact]
+    public async Task Page_with_the_tree_has_the_sidebar_and_reading_buttons()
+    {
+        WriteArticle("a", "---\ntitle: Alpha\n---\nтекст\n");
+        var factory = StartFactory();
+        Register(factory, "a", "Alpha");
+        var client = LoginClient(factory);
+
+        var html = await client.GetStringAsync("/a");
+
+        Assert.Contains("id=\"sidebar-toggle\"", html);
+        Assert.Contains("id=\"reading-toggle\"", html);
+    }
+
+    [Fact]
+    public async Task Settings_page_has_no_sidebar_or_reading_button()
+    {
+        var factory = StartFactory();
+        var client = LoginClient(factory);
+
+        var html = await client.GetStringAsync("/settings");
+
+        Assert.Contains("class=\"sidebar\"", html);
+        Assert.DoesNotContain("sidebar-toggle", html);
+        Assert.DoesNotContain("reading-toggle", html);
+    }
+
+    [Fact]
     public async Task Article_title_is_escaped_in_the_menu()
     {
         WriteArticle("a", "---\ntitle: Alpha\n---\nтекст\n");

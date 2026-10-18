@@ -14,6 +14,7 @@
   "error.not_found.title": "Ez az oldal nem létezik",
   "language.name": "Magyar",
   "layout.logout": "Kilépés",
+  "layout.reading": "Olvasó mód",
   "layout.search": "Keresés",
   "layout.search_hint": "Keresés a cikkek között",
   "layout.settings": "Beállítások",
