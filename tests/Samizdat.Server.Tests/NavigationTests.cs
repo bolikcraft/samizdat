@@ -385,6 +385,30 @@ public class NavigationTests : IDisposable
     }
 
     [Fact]
+    public async Task Image_viewer_script_is_linked_on_the_article_page()
+    {
+        WriteArticle("a", "---\ntitle: Alpha\n---\nтекст\n");
+        var factory = StartFactory();
+        Register(factory, "a", "Alpha");
+        var client = LoginClient(factory);
+
+        var html = await client.GetStringAsync("/a");
+
+        Assert.Contains("<script src=\"/_app/lightbox.js\" defer></script>", html);
+    }
+
+    [Fact]
+    public async Task Image_viewer_script_is_served_to_a_guest_as_javascript()
+    {
+        var client = StartFactory().CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+
+        var response = await client.GetAsync("/_app/lightbox.js");
+
+        Assert.Equal(System.Net.HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("javascript", response.Content.Headers.ContentType?.MediaType);
+    }
+
+    [Fact]
     public async Task Layout_script_is_linked_in_the_head_without_defer()
     {
         WriteArticle("a", "---\ntitle: Alpha\n---\nтекст\n");
