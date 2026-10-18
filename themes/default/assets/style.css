@@ -241,6 +241,32 @@ body {
   border-radius: 4px;
 }
 
+/* Поле фильтра и кнопка «свернуть боковик» стоят в одной строке. */
+.sidebar-row { display: flex; gap: 0.4rem; align-items: center; }
+.sidebar-row #nav-filter { flex: 1; min-width: 0; }
+
+/* Кнопки «свернуть боковик» и «режим чтения». Без layout.js они ничего не делают, поэтому
+   видны только с его отметкой data-controls и только на широком экране (правила ниже). */
+.layout-toggle {
+  display: none;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  color: var(--muted);
+  background: var(--panel-solid);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.layout-toggle:hover, .layout-toggle:focus-visible { color: var(--accent); border-color: var(--accent); }
+.layout-toggle svg {
+  width: 1.1rem; height: 1.1rem;
+  fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+}
+
 /* Отступ панели перенесён внутрь дерева: так полоса прокрутки встаёт к правому краю панели. */
 #nav-tree {
   overflow-y: auto;
@@ -443,6 +469,29 @@ button.is-busy::after {
   body:has(.shell-full) { display: flex; flex-direction: column; }
   body:has(.shell-full) .shell-full { display: flex; flex-direction: column; flex: 1; }
   body:has(.shell-full) .shell-full main { flex: 1; }
+
+  html[data-controls] .layout-toggle { display: inline-flex; }
+
+  /* Кнопка режима чтения стоит в правом верхнем углу статьи и не уезжает с текстом. Статья —
+     правая колонка .shell, поэтому их углы совпадают. */
+  body:has(#nav-tree) .shell { position: relative; }
+  #reading-toggle { position: absolute; top: 0.6rem; right: 0.9rem; }
+  /* Место под кнопку: первые строки статьи обтекают его. Переход без перезагрузки меняет
+     только детей <main>, псевдоэлемент остаётся. */
+  html[data-controls] body:has(#nav-tree) main::before { content: ""; float: right; width: 2rem; height: 1.5rem; }
+  #reading-toggle .icon-shrink, html[data-reading] #reading-toggle .icon-expand { display: none; }
+  html[data-reading] #reading-toggle .icon-shrink { display: block; }
+
+  /* Свёрнутый боковик — полоска шириной в кнопку: 2rem кнопки, 2 × 0.5rem отступа, 2px рамки. */
+  html[data-sidebar="collapsed"] body:has(#nav-tree) .shell { grid-template-columns: calc(3rem + 2px) minmax(0, 1fr); }
+  html[data-sidebar="collapsed"] body:has(#nav-tree) .sidebar { padding: 0.5rem; }
+  html[data-sidebar="collapsed"] #nav-filter, html[data-sidebar="collapsed"] #nav-tree { display: none; }
+  html[data-sidebar="collapsed"] #sidebar-toggle svg { transform: scaleX(-1); }
+
+  /* Режим чтения: шапки и боковика нет, статья занимает окно с тем же отступом от краёв. */
+  html[data-reading] body:has(#nav-tree) .top,
+  html[data-reading] body:has(#nav-tree) .sidebar { display: none; }
+  html[data-reading] body:has(#nav-tree) .shell { grid-template-columns: minmax(0, 1fr); margin-top: 0.5rem; }
 }
 
 /* Кнопки в таблицах настроек — «Отозвать» и «Скопировать» — стоят рядом и должны быть одного
