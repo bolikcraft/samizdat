@@ -19,7 +19,7 @@ public sealed class PageRenderer(IThemeSource theme, Translator? text = null)
         <script src="/_app/navigation.js" defer></script>
         """;
 
-    // Скрипт кнопок раскладки стоит в <head> без defer: отметки на <html> он ставит до первой отрисовки.
+    // Без defer намеренно, причина — в начале app/assets/layout.js.
     const string AppHead = """<script src="/_app/layout.js"></script>""";
 
     // Файлы служебных страниц: стиль темы для <head> и скрипт ядра. Скрипт страницы идёт раньше общих:

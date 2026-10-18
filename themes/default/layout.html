@@ -47,7 +47,7 @@
     <div class="sidebar-body">
       <div class="sidebar-row">
         <input type="search" id="nav-filter" placeholder="{{ t.nav.filter }}" autocomplete="off">
-        <button type="button" id="sidebar-toggle" class="layout-toggle" aria-expanded="true" aria-controls="nav-tree"
+        <button type="button" id="sidebar-toggle" class="layout-toggle" hidden aria-expanded="true" aria-controls="nav-tree"
                 aria-label="{{ t.nav.articles }}" title="{{ t.nav.articles }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 17l-5-5 5-5M18 17l-5-5 5-5"/></svg></button>
       </div>
       <nav id="nav-tree">{{ include 'nav-node' node: nav }}</nav>
@@ -55,7 +55,7 @@
   </aside>{{ else if side_nav }}
   <aside class="sidebar">{{ include side_nav }}</aside>{{~ end }}
   {{~## Кнопка стоит вне <main>: переход без перезагрузки меняет только его детей. ##~}}
-  {{ if nav }}<button type="button" id="reading-toggle" class="layout-toggle" aria-pressed="false"
+  {{ if nav }}<button type="button" id="reading-toggle" class="layout-toggle" hidden aria-pressed="false"
           aria-label="{{ t.layout.reading }}" title="{{ t.layout.reading }}"><svg class="icon-expand" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></svg><svg class="icon-shrink" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3M16 21v-3a2 2 0 0 1 2-2h3"/></svg></button>{{ end }}
   <main>{{ content }}</main>
 </div>

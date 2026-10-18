@@ -16,12 +16,18 @@
   document.addEventListener("DOMContentLoaded", syncButtons);
 
   document.addEventListener("click", function (event) {
-    if (event.target.closest("#sidebar-toggle")) toggleSidebar();
-    else if (event.target.closest("#reading-toggle")) setReading(!root.hasAttribute("data-reading"));
+    var button = event.target.closest("#sidebar-toggle, #reading-toggle");
+    if (!button) return;
+    // Safari не ставит фокус на кнопку при щелчке, и он остался бы в скрытом поле фильтра или поиска.
+    button.focus();
+    if (button.id === "sidebar-toggle") toggleSidebar();
+    else setReading(!root.hasAttribute("data-reading"));
   });
 
   document.addEventListener("keydown", function (event) {
-    if (event.key === "Escape" && root.hasAttribute("data-reading")) setReading(false);
+    // При наборе через IME Esc отменяет набор, а не режим чтения.
+    if (event.key !== "Escape" || event.isComposing || event.defaultPrevented) return;
+    if (root.hasAttribute("data-reading")) setReading(false);
   });
 
   function toggleSidebar() {

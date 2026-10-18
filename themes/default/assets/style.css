@@ -245,10 +245,9 @@ body {
 .sidebar-row { display: flex; gap: 0.4rem; align-items: center; }
 .sidebar-row #nav-filter { flex: 1; min-width: 0; }
 
-/* Кнопки «свернуть боковик» и «режим чтения». Без layout.js они ничего не делают, поэтому
-   видны только с его отметкой data-controls и только на широком экране (правила ниже). */
+/* Кнопки «свернуть боковик» и «режим чтения» скрыты атрибутом hidden: так их не видно и в теме
+   без этих правил. Показывает их правило ниже, только с отметкой layout.js и на широком экране. */
 .layout-toggle {
-  display: none;
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
@@ -470,7 +469,7 @@ button.is-busy::after {
   body:has(.shell-full) .shell-full { display: flex; flex-direction: column; flex: 1; }
   body:has(.shell-full) .shell-full main { flex: 1; }
 
-  html[data-controls] .layout-toggle { display: inline-flex; }
+  html[data-controls] body:has(#nav-tree) .layout-toggle { display: inline-flex; }
 
   /* Кнопка режима чтения стоит в правом верхнем углу статьи и не уезжает с текстом. Статья —
      правая колонка .shell, поэтому их углы совпадают. */

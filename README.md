@@ -105,7 +105,8 @@ The scripts find these elements in the templates of the theme:
 - `form.visibility-form`, `details.share` and `form.share-form` in it: the forms of an article.
 - `.copy-link` with `data-url` and `data-copied`: the button that copies a link.
 - `#sidebar-toggle`: the button that collapses the side column. The script sets `aria-expanded` on it.
-- `#reading-toggle`: the button of the reading mode. The script sets `aria-pressed` on it.
+- `#reading-toggle`: the button of the reading mode. Put it outside `<main>`, because the scripts replace
+  the content of `<main>`. The script sets `aria-pressed` on it.
 
 The script of the layout buttons sets attributes on `<html>`. The theme uses them in its CSS:
 
