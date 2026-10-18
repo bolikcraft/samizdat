@@ -20,7 +20,7 @@ public static class SetupEndpoints
                 => SessionCookie.NeedsSetup(user)
                     ? Form(pages, settings, text, antiforgery, context, user.Identity!.Name!, error: null)
                     : Results.Redirect("/"))
-            .RequireAuthorization();
+            .RequireAuthorization().AllowDuringSetup();
 
         app.MapPost("/setup", async (HttpContext context, ClaimsPrincipal user, SamizdatDbContext db,
                                      PageRenderer pages, SiteSettings settings, Translator text,
@@ -61,7 +61,7 @@ public static class SetupEndpoints
 
             await SessionCookie.SignIn(context, person);
             return Results.Redirect("/");
-        }).RequireAuthorization().RequireValidToken();
+        }).RequireAuthorization().AllowDuringSetup().RequireValidToken();
     }
 
     static IResult Form(PageRenderer pages, SiteSettings settings, Translator text, IAntiforgery antiforgery,

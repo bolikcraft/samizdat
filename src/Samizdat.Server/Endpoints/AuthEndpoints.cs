@@ -78,7 +78,7 @@ public static class AuthEndpoints
         {
             await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
             return Results.Redirect("/login");
-        }).RequireValidToken();
+        }).RequireValidToken().AllowDuringSetup();
     }
 
     /// Адрес для возврата после входа. null — адреса нет или он ведёт за пределы сайта.

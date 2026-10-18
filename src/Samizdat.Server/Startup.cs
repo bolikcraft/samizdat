@@ -117,6 +117,7 @@ public static class Startup
         app.UseSecurityHeaders();
         app.MapErrorHandling();
         app.UseAuthentication();
+        app.UseSetupGate();
         app.UseAuthorization();
         app.UseRateLimiter();
         app.UseAntiforgery();

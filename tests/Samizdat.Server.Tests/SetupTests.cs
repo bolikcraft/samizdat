@@ -221,4 +221,70 @@ public class SetupTests : IDisposable
         Assert.Equal(HttpStatusCode.Found, answer.StatusCode);
         Assert.StartsWith("/login", answer.Headers.Location?.PathAndQuery);
     }
+
+    [Fact]
+    public async Task Pages_lead_to_setup_until_the_password_is_changed()
+    {
+        var factory = StartServer();
+        AddPerson(factory, "admin", "admin");
+        var client = await SignIn(factory, "admin", "admin");
+
+        foreach (var path in new[] { "/", "/settings", "/search?q=server", "/lyubaya-statya", "/login" })
+        {
+            var answer = await client.GetAsync(path);
+            Assert.Equal(HttpStatusCode.Redirect, answer.StatusCode);
+            Assert.Equal("/setup", answer.Headers.Location?.OriginalString);
+        }
+    }
+
+    [Fact]
+    public async Task Api_and_forms_are_refused_until_the_password_is_changed()
+    {
+        var factory = StartServer();
+        AddPerson(factory, "admin", "admin");
+        var client = await SignIn(factory, "admin", "admin");
+        var (name, value) = TestLogin.AntiforgeryToken(await client.GetStringAsync("/setup"));
+
+        var api = await client.GetAsync("/api/state");
+        var form = await client.PostAsync("/settings/password", new FormUrlEncodedContent(
+            new Dictionary<string, string>
+            {
+                [name] = value, ["current"] = "admin", ["new"] = "novyy-parol", ["new2"] = "novyy-parol",
+            }));
+
+        Assert.Equal(HttpStatusCode.Forbidden, api.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, form.StatusCode);
+        Assert.True(PasswordHasher.Verify("admin", FindUser(factory, "admin")!.PasswordHash));
+    }
+
+    [Fact]
+    public async Task Theme_files_core_scripts_background_and_logout_stay_open_during_setup()
+    {
+        var factory = StartServer();
+        AddPerson(factory, "admin", "admin");
+        var client = await SignIn(factory, "admin", "admin");
+
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/assets/style.css")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/_app/forms.js")).StatusCode);
+        // Фона нет — 404 от самого маршрута, а не 302 от ворот.
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/background")).StatusCode);
+
+        var (name, value) = TestLogin.AntiforgeryToken(await client.GetStringAsync("/setup"));
+        var logout = await client.PostAsync("/logout",
+            new FormUrlEncodedContent(new Dictionary<string, string> { [name] = value }));
+        Assert.Equal("/login", logout.Headers.Location?.OriginalString);
+    }
+
+    [Fact]
+    public async Task Pages_open_after_setup()
+    {
+        var factory = StartServer();
+        AddPerson(factory, "admin", "admin");
+        var client = await SignIn(factory, "admin", "admin");
+
+        await PostSetup(client, "aleks", "novyy-parol", "novyy-parol");
+
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/settings")).StatusCode);
+    }
 }

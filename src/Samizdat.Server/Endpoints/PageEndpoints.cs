@@ -196,10 +196,11 @@ public static class PageEndpoints
 
         // Вне группы и без авторизации: css нужен странице входа.
         app.MapGet("/assets/{*file}", (string file, IThemeSource theme) => Asset(theme, $"assets/{file}"))
-            .AllowAnonymous();
+            .AllowAnonymous().AllowDuringSetup();
 
         // Скрипты ядра берутся только из сборки: тема не может их подменить.
-        app.MapGet("/_app/{*file}", (string file) => AppAsset($"assets/{file}")).AllowAnonymous();
+        app.MapGet("/_app/{*file}", (string file) => AppAsset($"assets/{file}"))
+            .AllowAnonymous().AllowDuringSetup();
 
         // Отдельный путь, не под /assets/: там уже стоит маршрут файлов темы.
         // Гостю по share-ссылке фон тоже нужен, поэтому без пароля.
@@ -231,7 +232,7 @@ public static class PageEndpoints
                 logger.LogWarning(error, "Не удалось открыть фон {Name}", name);
                 return Results.NotFound();
             }
-        }).AllowAnonymous();
+        }).AllowAnonymous().AllowDuringSetup();
 
         return group;
     }
