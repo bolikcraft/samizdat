@@ -147,6 +147,59 @@ public class SiteSettingsTests : IDisposable
     }
 
     [Fact]
+    public async Task Theme_file_does_not_replace_the_core_script()
+    {
+        var factory = StartFactory();
+        var client = LoginClient(factory);
+        WriteThemeFile("custom", "assets/navigation.js", "marker-theme-script");
+        SetSetting(factory, "theme.name", "custom");
+
+        // Файл темы отдаётся по своему адресу: значит, тема с диска выбрана.
+        var themeFile = await client.GetStringAsync("/assets/navigation.js");
+        var core = await client.GetStringAsync("/_app/navigation.js");
+
+        Assert.Equal("marker-theme-script", themeFile);
+        Assert.DoesNotContain("marker-theme-script", core);
+        Assert.Contains("navigation.addEventListener", core);
+    }
+
+    [Fact]
+    public async Task Theme_file_does_not_replace_the_settings_page()
+    {
+        var factory = StartFactory();
+        var client = LoginClient(factory);
+        WriteThemeFile("custom", "assets/style.css", "marker-theme-style");
+        WriteThemeFile("custom", "settings.html", "marker-theme-settings");
+        WriteThemeFile("custom", "settings-nav.html", "marker-theme-nav");
+        SetSetting(factory, "theme.name", "custom");
+
+        var style = await client.GetStringAsync("/assets/style.css");
+        var html = await client.GetStringAsync("/settings");
+
+        Assert.Equal("marker-theme-style", style);
+        Assert.DoesNotContain("marker-theme-settings", html);
+        Assert.DoesNotContain("marker-theme-nav", html);
+        Assert.Contains("class=\"settings-panes\"", html);
+        Assert.Contains("class=\"settings-nav\"", html);
+    }
+
+    [Fact]
+    public async Task Theme_with_only_its_own_style_gets_the_settings_style_from_default()
+    {
+        var factory = StartFactory();
+        var client = LoginClient(factory);
+        WriteThemeFile("custom", "assets/style.css", "marker-theme-style");
+        SetSetting(factory, "theme.name", "custom");
+
+        var style = await client.GetStringAsync("/assets/style.css");
+        var response = await client.GetAsync("/assets/settings.css");
+
+        Assert.Equal("marker-theme-style", style);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains(".settings-nav", await response.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
     public async Task Owner_menu_is_shown_with_login_settings_link_and_logout_form()
     {
         WriteArticle("privet", "---\ntitle: Привет\n---\nтекст\n");

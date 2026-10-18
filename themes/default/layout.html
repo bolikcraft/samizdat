@@ -4,6 +4,7 @@
 <title>{{ page_title | html.escape }}</title>
 {{ if description }}<meta name="description" content="{{ description | html.escape }}">{{ end }}
 <link rel="stylesheet" href="/assets/style.css">
+{{~ app_head }}
 <link rel="icon" href="/assets/favicon.ico" sizes="16x16 32x32 48x48">
 <link rel="icon" href="/assets/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
@@ -51,7 +52,5 @@
   <aside class="sidebar">{{ include side_nav }}</aside>{{~ end }}
   <main>{{ content }}</main>
 </div>
-<script src="/assets/sidebar.js" defer></script>
-<script src="/assets/forms.js" defer></script>
-<script src="/assets/navigation.js" defer></script>
+{{ app_foot }}
 </body></html>

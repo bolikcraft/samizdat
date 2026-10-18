@@ -69,7 +69,7 @@ public class LanguagePackTests
     [Fact]
     public void No_template_keeps_cyrillic_text_outside_a_comment()
     {
-        var theme = new EmbeddedThemeSource();
+        var theme = new LayeredThemeSource(EmbeddedThemeSource.App, new EmbeddedThemeSource());
         foreach (var name in new[] { "layout.html", "index.html", "article.html", "search.html",
                                      "login.html", "register.html", "register-sent.html", "settings.html",
                                      "settings-nav.html", "share-panel.html", "share-expired.html",

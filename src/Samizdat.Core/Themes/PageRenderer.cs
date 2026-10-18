@@ -11,13 +11,36 @@ public sealed class ThemeException(string message) : Exception(message);
 
 public sealed class PageRenderer(IThemeSource theme, Translator? text = null)
 {
+    // Скрипты ядра. Тема ставит {{ app_foot }} перед </body>, и новый скрипт ядра попадает
+    // на страницу без правки темы.
+    const string AppFoot = """
+        <script src="/_app/sidebar.js" defer></script>
+        <script src="/_app/forms.js" defer></script>
+        <script src="/_app/navigation.js" defer></script>
+        """;
+
+    // Файлы служебных страниц: стиль темы для <head> и скрипт ядра. Скрипт страницы идёт раньше общих:
+    // defer-скрипты выполняются по порядку, а раньше он стоял в <main>.
+    static readonly Dictionary<string, (string Head, string Foot)> AppPages = new()
+    {
+        ["settings.html"] = ("""<link rel="stylesheet" href="/assets/settings.css">""",
+                             "<script src=\"/_app/settings.js\" defer></script>\n"),
+    };
+
+    // Шаблоны ядра стоят первым слоем: тема не перекрывает служебную разметку.
+    readonly IThemeSource theme = new LayeredThemeSource(EmbeddedThemeSource.App, theme);
+
     readonly ConcurrentDictionary<(string Path, string Version), Template> cache = new();
 
     public string Render(string templateName, Dictionary<string, object?> model)
     {
         var inner = RenderTemplate(templateName, model);
 
-        var layoutModel = new Dictionary<string, object?>(model) { ["content"] = inner };
+        var (head, foot) = AppPages.GetValueOrDefault(templateName, ("", ""));
+        var layoutModel = new Dictionary<string, object?>(model)
+        {
+            ["content"] = inner, ["app_head"] = head, ["app_foot"] = foot + AppFoot,
+        };
         return RenderTemplate("layout.html", layoutModel);
     }
 
@@ -78,7 +101,7 @@ public sealed class PageRenderer(IThemeSource theme, Translator? text = null)
         return template;
     }
 
-    // Отдаёт файлы темы функции include, чтобы шаблон мог звать себя же для вложенных папок
+    // Отдаёт шаблоны ядра и темы функции include, чтобы шаблон мог звать себя же для вложенных папок
     // (рекурсивное дерево). Расширение можно не указывать: сперва пробуем имя как есть.
     // Глубина ограничена Scriban'ом (TemplateContext.RecursiveLimit) — зациклиться нельзя.
     sealed class IncludeLoader(IThemeSource theme) : ITemplateLoader

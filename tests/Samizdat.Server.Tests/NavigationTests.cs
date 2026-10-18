@@ -330,7 +330,7 @@ public class NavigationTests : IDisposable
 
         var html = await client.GetStringAsync("/");
 
-        Assert.Contains("/assets/sidebar.js", html);
+        Assert.Contains("/_app/sidebar.js", html);
     }
 
     [Fact]
@@ -341,7 +341,7 @@ public class NavigationTests : IDisposable
         Register(factory, "a", "Alpha");
         var client = LoginClient(factory);
 
-        var response = await client.GetAsync("/assets/sidebar.js");
+        var response = await client.GetAsync("/_app/sidebar.js");
 
         Assert.Equal(System.Net.HttpStatusCode.OK, response.StatusCode);
     }
@@ -356,7 +356,7 @@ public class NavigationTests : IDisposable
 
         var html = await client.GetStringAsync("/");
 
-        Assert.Contains("<script src=\"/assets/navigation.js\" defer></script>", html);
+        Assert.Contains("<script src=\"/_app/navigation.js\" defer></script>", html);
     }
 
     [Fact]
@@ -367,7 +367,18 @@ public class NavigationTests : IDisposable
         Register(factory, "a", "Alpha");
         var client = LoginClient(factory);
 
-        var response = await client.GetAsync("/assets/navigation.js");
+        var response = await client.GetAsync("/_app/navigation.js");
+
+        Assert.Equal(System.Net.HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("javascript", response.Content.Headers.ContentType?.MediaType);
+    }
+
+    [Fact]
+    public async Task Core_script_is_served_to_a_guest_as_javascript()
+    {
+        var client = StartFactory().CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+
+        var response = await client.GetAsync("/_app/forms.js");
 
         Assert.Equal(System.Net.HttpStatusCode.OK, response.StatusCode);
         Assert.Contains("javascript", response.Content.Headers.ContentType?.MediaType);

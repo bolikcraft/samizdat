@@ -78,6 +78,35 @@ in their editor.
   that the program knows replaces only the lines that it contains; the other lines stay. A line
   that no file gives comes from `en`.
 
+## Themes
+
+A theme is a folder `<data root>/themes/<name>/`. You select it in the settings. If the theme does
+not have a file, the server uses the file from the built-in theme `default`.
+
+The theme sets how the site looks: the templates of the reader pages, the CSS, the images and the
+set of backgrounds. The program gives the scripts and the settings page. A theme cannot replace them.
+
+`layout.html` must have:
+
+- `{{ app_head }}` in `<head>`, after the styles of the theme. On the settings page, it adds `assets/settings.css`.
+- `{{ app_foot }}` before `</body>`. It adds the scripts.
+- `{{ include side_nav }}` in an element with the class `sidebar`, when the page sets `side_nav`.
+  The settings page puts the list of its sections there.
+
+The scripts find these elements in the templates of the theme:
+
+- `<main>`: the text of the page. The scripts replace its content when you open an article or send a form.
+- `#nav-tree`: the article tree. A folder is `details.nav-folder` with `data-path`. An article is
+  `li` in `.nav-articles`. The link to the current article has `aria-current="page"`.
+- `#nav-filter`: the filter field of the tree.
+- `.nav-switch`: the `<details>` that opens the side column on a narrow screen.
+- `.search input[name=q]`: the search field in the header.
+- `form.visibility-form`, `details.share` and `form.share-form` in it: the forms of an article.
+- `.copy-link` with `data-url` and `data-copied`: the button that copies a link.
+
+The markup of the settings page is in `app/settings.html`. The theme gives its styles in
+`assets/settings.css`.
+
 ## How to run it
 
 ### With Docker

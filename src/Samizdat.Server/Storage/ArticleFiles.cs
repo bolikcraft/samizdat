@@ -18,7 +18,7 @@ public sealed class ArticleFiles(string dataRoot)
     // Имя занимают и наперёд, до появления самого маршрута. Регистр не важен — маршруты его
     // не различают.
     static readonly HashSet<string> ReservedSlugs =
-        new(["s", "i", "login", "register", "settings", "assets", "background", "visibility",
+        new(["s", "i", "login", "register", "settings", "assets", "_app", "background", "visibility",
              "share", "download", "search"],
             StringComparer.OrdinalIgnoreCase);
 

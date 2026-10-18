@@ -7,7 +7,8 @@ COPY src/Samizdat.Core/Samizdat.Core.csproj src/Samizdat.Core/
 COPY src/Samizdat.Server/Samizdat.Server.csproj src/Samizdat.Server/
 RUN dotnet restore src/Samizdat.Server/Samizdat.Server.csproj
 
-# Тема и языковые пакеты встраиваются в Samizdat.Core из корня репозитория.
+# Файлы ядра, тема и языковые пакеты встраиваются в Samizdat.Core из корня репозитория.
+COPY app/ app/
 COPY themes/ themes/
 COPY lang/ lang/
 COPY src/Samizdat.Core/ src/Samizdat.Core/

@@ -188,14 +188,11 @@ public static class PageEndpoints
         });
 
         // Вне группы и без авторизации: css нужен странице входа.
-        app.MapGet("/assets/{*file}", (string file, IThemeSource theme) =>
-        {
-            var stream = theme.OpenRead($"assets/{file}");
-            if (stream is null) return Results.NotFound();
+        app.MapGet("/assets/{*file}", (string file, IThemeSource theme) => Asset(theme, $"assets/{file}"))
+            .AllowAnonymous();
 
-            var type = ContentTypes.TryGetContentType(file, out var found) ? found : "application/octet-stream";
-            return Results.Stream(stream, type);
-        }).AllowAnonymous();
+        // Скрипты ядра берутся только из сборки: тема не может их подменить.
+        app.MapGet("/_app/{*file}", (string file) => Asset(EmbeddedThemeSource.App, $"assets/{file}")).AllowAnonymous();
 
         // Отдельный путь, не под /assets/: там уже стоит маршрут файлов темы.
         // Гостю по share-ссылке фон тоже нужен, поэтому без пароля.
@@ -230,6 +227,15 @@ public static class PageEndpoints
         }).AllowAnonymous();
 
         return group;
+    }
+
+    static IResult Asset(IThemeSource source, string path)
+    {
+        var stream = source.OpenRead(path);
+        if (stream is null) return Results.NotFound();
+
+        var type = ContentTypes.TryGetContentType(path, out var found) ? found : "application/octet-stream";
+        return Results.Stream(stream, type);
     }
 
     static IResult NotFound(PageRenderer pages, SamizdatDbContext db, SiteSettings settings, ClaimsPrincipal user,

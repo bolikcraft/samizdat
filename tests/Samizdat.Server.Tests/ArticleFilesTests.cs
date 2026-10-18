@@ -44,6 +44,7 @@ public class ArticleFilesTests : IDisposable
     [InlineData("register")]
     [InlineData("settings")]
     [InlineData("assets")]
+    [InlineData("_app")]
     [InlineData("background")]
     [InlineData("Background")]
     public void IsReservedSlug_covers_every_literal_route(string slug) => Assert.True(ArticleFiles.IsReservedSlug(slug));

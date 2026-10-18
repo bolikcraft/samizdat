@@ -974,16 +974,52 @@ public class SettingsPageTests : IDisposable
     }
 
     [Fact]
-    public async Task The_settings_page_loads_its_script_from_the_theme()
+    public async Task The_settings_page_loads_its_script_from_the_core()
     {
         var factory = StartFactory();
         AddOwner(factory, "aleks", "тайна");
         var client = await LoginClient(factory, "aleks", "тайна");
 
         var html = await client.GetStringAsync("/settings");
-        var script = await client.GetAsync("/assets/settings.js");
+        var script = await client.GetAsync("/_app/settings.js");
 
-        Assert.Contains("<script src=\"/assets/settings.js\" defer></script>", html);
+        Assert.Contains("<script src=\"/_app/settings.js\" defer></script>", html);
         Assert.Equal(HttpStatusCode.OK, script.StatusCode);
+    }
+
+    [Fact]
+    public async Task The_settings_page_links_its_style_in_the_head_and_runs_its_script_first()
+    {
+        var factory = StartFactory();
+        AddOwner(factory, "aleks", "тайна");
+        var client = await LoginClient(factory, "aleks", "тайна");
+
+        var html = await client.GetStringAsync("/settings");
+        var head = html[..html.IndexOf("</head>", StringComparison.Ordinal)];
+
+        Assert.Contains("<link rel=\"stylesheet\" href=\"/assets/settings.css\">", head);
+        // defer-скрипты выполняются по порядку. Скрипт страницы раньше стоял в <main>, то есть до общих.
+        var settings = html.IndexOf("/_app/settings.js", StringComparison.Ordinal);
+        foreach (var common in new[] { "/_app/sidebar.js", "/_app/forms.js", "/_app/navigation.js" })
+            Assert.True(settings < html.IndexOf(common, StringComparison.Ordinal), common);
+    }
+
+    [Fact]
+    public async Task Home_and_article_do_not_link_the_settings_files()
+    {
+        WriteArticle("privet", "---\ntitle: Привет\n---\nтекст\n");
+        var factory = StartFactory();
+        RegisterArticle(factory, "privet", "Привет");
+        AddOwner(factory, "aleks", "тайна");
+        var client = await LoginClient(factory, "aleks", "тайна");
+
+        foreach (var page in new[] { "/", "/privet" })
+        {
+            var html = await client.GetStringAsync(page);
+
+            Assert.Contains("/_app/sidebar.js", html);
+            Assert.DoesNotContain("/assets/settings.css", html);
+            Assert.DoesNotContain("/_app/settings.js", html);
+        }
     }
 }
