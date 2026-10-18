@@ -137,7 +137,8 @@ public static class SettingsEndpoints
             }), "text/html; charset=utf-8");
         });
 
-        group.MapPost("/password", async (HttpContext context, SamizdatDbContext db, ClaimsPrincipal user) =>
+        group.MapPost("/password", async (HttpContext context, SamizdatDbContext db, ClaimsPrincipal user,
+                                          PasswordGate gate) =>
         {
             var form = await context.Request.ReadFormAsync();
             var current = form["current"].ToString();
@@ -146,13 +147,24 @@ public static class SettingsEndpoints
 
             if (CurrentUser(db, user) is not { } person) return LoggedOut();
 
-            if (current.Length > MaxPasswordLength || !PasswordHasher.Verify(current, person.PasswordHash))
-                return Err("wrong_password");
+            bool matches;
+            if (current.Length > MaxPasswordLength) matches = false;
+            else
+            {
+                using var lease = await gate.Enter(context.RequestAborted);
+                if (!lease.IsAcquired) return PasswordGate.Busy();
+                matches = PasswordHasher.Verify(current, person.PasswordHash);
+            }
+            if (!matches) return Err("wrong_password");
             if (next.Length < MinPasswordLength) return Err("short_password");
             if (next.Length > MaxPasswordLength) return Err("long_password");
             if (next != repeat) return Err("password_mismatch");
 
-            person.PasswordHash = PasswordHasher.Hash(next);
+            using (var lease = await gate.Enter(context.RequestAborted))
+            {
+                if (!lease.IsAcquired) return PasswordGate.Busy();
+                person.PasswordHash = PasswordHasher.Hash(next);
+            }
             // Новая метка гасит прочие сессии этого человека; свою тут же выдаём заново,
             // иначе смена своего пароля выкидывала бы со страницы настроек.
             person.SessionStamp = UserRow.NewSessionStamp();
@@ -396,7 +408,7 @@ public static class SettingsEndpoints
             return Ok("token_revoked");
         }).RequireValidToken().OwnerOnly();
 
-        group.MapPost("/people", async (HttpContext context, SamizdatDbContext db) =>
+        group.MapPost("/people", async (HttpContext context, SamizdatDbContext db, PasswordGate gate) =>
         {
             var form = await context.Request.ReadFormAsync();
             var login = form["login"].ToString().Trim();
@@ -406,10 +418,17 @@ public static class SettingsEndpoints
             if (password.Length < MinPasswordLength) return Err("person_short_password");
             if (password.Length > MaxPasswordLength) return Err("person_long_password");
 
+            string hash;
+            using (var lease = await gate.Enter(context.RequestAborted))
+            {
+                if (!lease.IsAcquired) return PasswordGate.Busy();
+                hash = PasswordHasher.Hash(password);
+            }
+
             db.Users.Add(new UserRow
             {
                 Login = login,
-                PasswordHash = PasswordHasher.Hash(password),
+                PasswordHash = hash,
                 Role = UserRole.Reader,
                 CreatedAt = DateTimeOffset.UtcNow,
             });
@@ -430,7 +449,7 @@ public static class SettingsEndpoints
         }).RequireValidToken().OwnerOnly();
 
         group.MapPost("/people/{id:int}/password", async (int id, HttpContext context, SamizdatDbContext db,
-                                                         ClaimsPrincipal user) =>
+                                                         ClaimsPrincipal user, PasswordGate gate) =>
         {
             var form = await context.Request.ReadFormAsync();
             var password = form["password"].ToString();
@@ -446,7 +465,11 @@ public static class SettingsEndpoints
             if (password.Length < MinPasswordLength) return Err("person_short_password");
             if (password.Length > MaxPasswordLength) return Err("person_long_password");
 
-            person.PasswordHash = PasswordHasher.Hash(password);
+            using (var lease = await gate.Enter(context.RequestAborted))
+            {
+                if (!lease.IsAcquired) return PasswordGate.Busy();
+                person.PasswordHash = PasswordHasher.Hash(password);
+            }
             person.SessionStamp = UserRow.NewSessionStamp();
             await db.SaveChangesAsync();
             return Ok("person_password");

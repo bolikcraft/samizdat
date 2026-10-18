@@ -2,7 +2,7 @@ using System.Threading.RateLimiting;
 
 namespace Samizdat.Server.Auth;
 
-/// Сколько Argon2id считается разом на анонимных формах. Каждый расчёт берёт 64 МБ, поэтому
+/// Сколько Argon2id считается разом во всех формах с паролем. Каждый расчёт берёт 64 МБ, поэтому
 /// залп запросов ждёт здесь, а сверх очереди получает отказ.
 public sealed class PasswordGate(int parallel, int queue) : IDisposable
 {

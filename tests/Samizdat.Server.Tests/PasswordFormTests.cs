@@ -145,4 +145,43 @@ public class PasswordFormTests : IDisposable
         Assert.Null(FindUser(factory, "petr"));
         Assert.True(PasswordHasher.Verify("parol-ivana", FindUser(factory, "ivan")!.PasswordHash));
     }
+
+    // Место под хэш одно, очереди нет: пока тест держит место, форма обязана получить 429.
+    [Fact]
+    public async Task Password_change_waits_for_a_free_hash_slot()
+    {
+        var factory = StartServer(("Samizdat:Auth:ParallelHashes", "1"), ("Samizdat:Auth:HashQueue", "0"));
+        AddPerson(factory, "aleks", "parol-aleksa");
+        var client = await SignIn(factory, "aleks", "parol-aleksa");
+        var held = await factory.Services.GetRequiredService<PasswordGate>().Enter(CancellationToken.None);
+        Assert.True(held.IsAcquired);
+
+        var busy = await ChangePassword(client, "parol-aleksa", "novyy-parol");
+        held.Dispose();
+        var free = await ChangePassword(client, "parol-aleksa", "novyy-parol");
+
+        Assert.Equal(HttpStatusCode.TooManyRequests, busy.StatusCode);
+        Assert.Equal("/settings?ok=password#profile", free.Headers.Location?.OriginalString);
+    }
+
+    [Fact]
+    public async Task Owner_forms_with_a_password_wait_for_a_free_hash_slot()
+    {
+        var factory = StartServer(("Samizdat:Auth:ParallelHashes", "1"), ("Samizdat:Auth:HashQueue", "0"));
+        AddPerson(factory, "hozyain", "parol-hozyaina");
+        var ivan = AddPerson(factory, "ivan", "parol-ivana", UserRole.Reader);
+        var owner = await SignIn(factory, "hozyain", "parol-hozyaina");
+        using var held = await factory.Services.GetRequiredService<PasswordGate>().Enter(CancellationToken.None);
+        Assert.True(held.IsAcquired);
+
+        var added = await TestLogin.Post(owner, "/settings/people",
+            new() { ["login"] = "petr", ["password"] = "parol-petra" });
+        var reset = await TestLogin.Post(owner, $"/settings/people/{ivan}/password",
+            new() { ["password"] = "novyy-parol" });
+
+        Assert.Equal(HttpStatusCode.TooManyRequests, added.StatusCode);
+        Assert.Equal(HttpStatusCode.TooManyRequests, reset.StatusCode);
+        Assert.Null(FindUser(factory, "petr"));
+        Assert.True(PasswordHasher.Verify("parol-ivana", FindUser(factory, "ivan")!.PasswordHash));
+    }
 }
