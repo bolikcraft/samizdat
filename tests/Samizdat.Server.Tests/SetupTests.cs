@@ -177,6 +177,21 @@ public class SetupTests : IDisposable
     }
 
     [Fact]
+    public async Task Setup_refuses_a_password_longer_than_200()
+    {
+        var factory = StartServer();
+        AddPerson(factory, "admin", "admin");
+        var client = await SignIn(factory, "admin", "admin");
+        var tooLong = new string('д', 201);
+
+        var answer = await PostSetup(client, "admin", tooLong, tooLong);
+
+        Assert.Equal(HttpStatusCode.OK, answer.StatusCode);
+        Assert.Contains("The password is more than 200 characters.", await answer.Content.ReadAsStringAsync());
+        Assert.True(PasswordHasher.Verify("admin", FindUser(factory, "admin")!.PasswordHash));
+    }
+
+    [Fact]
     public async Task Setup_refuses_the_login_of_another_person()
     {
         var factory = StartServer();

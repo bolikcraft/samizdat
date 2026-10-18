@@ -146,7 +146,6 @@ public static class SettingsEndpoints
 
             if (CurrentUser(db, user) is not { } person) return LoggedOut();
 
-            // Пароль длиннее предела не подходит ни к одной учётке, хэш по нему не считаем.
             if (current.Length > MaxPasswordLength || !PasswordHasher.Verify(current, person.PasswordHash))
                 return Err("wrong_password");
             if (next.Length < MinPasswordLength) return Err("short_password");
