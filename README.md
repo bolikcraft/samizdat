@@ -88,7 +88,8 @@ set of backgrounds. The program gives the scripts and the settings page. A theme
 
 `layout.html` must have:
 
-- `{{ app_head }}` in `<head>`, after the styles of the theme. On the settings page, it adds `assets/settings.css`.
+- `{{ app_head }}` in `<head>`, after the styles of the theme. It adds the script of the layout buttons.
+  On the settings page, it also adds `assets/settings.css`.
 - `{{ app_foot }}` before `</body>`. It adds the scripts.
 - `{{ include side_nav }}` in an element with the class `sidebar`, when the page sets `side_nav`.
   The settings page puts the list of its sections there.
@@ -103,6 +104,14 @@ The scripts find these elements in the templates of the theme:
 - `.search input[name=q]`: the search field in the header.
 - `form.visibility-form`, `details.share` and `form.share-form` in it: the forms of an article.
 - `.copy-link` with `data-url` and `data-copied`: the button that copies a link.
+- `#sidebar-toggle`: the button that collapses the side column. The script sets `aria-expanded` on it.
+- `#reading-toggle`: the button of the reading mode. The script sets `aria-pressed` on it.
+
+The script of the layout buttons sets attributes on `<html>`. The theme uses them in its CSS:
+
+- `data-controls`: the script runs. Show the layout buttons only with this attribute.
+- `data-sidebar="collapsed"`: the reader collapsed the side column. The browser keeps this choice.
+- `data-reading`: the reading mode is on. The article uses all the window, without the header and the side column.
 
 The markup of the settings page is in `app/settings.html`. The theme gives its styles in
 `assets/settings.css`.
