@@ -19,6 +19,9 @@ public sealed class PageRenderer(IThemeSource theme, Translator? text = null)
         <script src="/_app/navigation.js" defer></script>
         """;
 
+    // Скрипт кнопок раскладки стоит в <head> без defer: отметки на <html> он ставит до первой отрисовки.
+    const string AppHead = """<script src="/_app/layout.js"></script>""";
+
     // Файлы служебных страниц: стиль темы для <head> и скрипт ядра. Скрипт страницы идёт раньше общих:
     // defer-скрипты выполняются по порядку, а раньше он стоял в <main>.
     static readonly Dictionary<string, (string Head, string Foot)> AppPages = new()
@@ -39,7 +42,7 @@ public sealed class PageRenderer(IThemeSource theme, Translator? text = null)
         var (head, foot) = AppPages.GetValueOrDefault(templateName, ("", ""));
         var layoutModel = new Dictionary<string, object?>(model)
         {
-            ["content"] = inner, ["app_head"] = head, ["app_foot"] = foot + AppFoot,
+            ["content"] = inner, ["app_head"] = head + AppHead, ["app_foot"] = foot + AppFoot,
         };
         return RenderTemplate("layout.html", layoutModel);
     }

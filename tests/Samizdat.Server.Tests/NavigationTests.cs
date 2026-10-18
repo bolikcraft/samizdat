@@ -385,6 +385,31 @@ public class NavigationTests : IDisposable
     }
 
     [Fact]
+    public async Task Layout_script_is_linked_in_the_head_without_defer()
+    {
+        WriteArticle("a", "---\ntitle: Alpha\n---\nтекст\n");
+        var factory = StartFactory();
+        Register(factory, "a", "Alpha");
+        var client = LoginClient(factory);
+
+        var html = await client.GetStringAsync("/");
+
+        var script = html.IndexOf("<script src=\"/_app/layout.js\"></script>", StringComparison.Ordinal);
+        Assert.InRange(script, 0, html.IndexOf("</head>", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Layout_script_is_served_to_a_guest_as_javascript()
+    {
+        var client = StartFactory().CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+
+        var response = await client.GetAsync("/_app/layout.js");
+
+        Assert.Equal(System.Net.HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("javascript", response.Content.Headers.ContentType?.MediaType);
+    }
+
+    [Fact]
     public async Task Article_title_is_escaped_in_the_menu()
     {
         WriteArticle("a", "---\ntitle: Alpha\n---\nтекст\n");
