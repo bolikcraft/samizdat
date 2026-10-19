@@ -62,7 +62,8 @@ public static class ShareEndpoints
                         ["description"] = parsed.FrontMatter.Description,
                         ["date"] = parsed.FrontMatter.Date?.ToString("yyyy-MM-dd"),
                         // NoArticles: любая вики-ссылка станет текстом, чужие slug не утекают.
-                        ["html"] = markdown.Render(parsed.Body, link.Slug, NoArticles.Instance, AttachmentBase),
+                        ["html"] = markdown.Render(parsed.Body, link.Slug, NoArticles.Instance, AttachmentBase,
+                                                   diagrams: settings.Diagrams),
                         ["download_url"] = ArticleAccess.CanDownloadByShare(settings.Download)
                             ? DownloadUrl
                             : null,
