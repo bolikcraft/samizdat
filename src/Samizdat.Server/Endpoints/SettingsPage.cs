@@ -43,7 +43,7 @@ public static class SettingsPage
         "language" or "bad_language" => "profile",
         "general" or "bad_title" => "general",
         "token_created" or "token_note" or "token_revoked" => "api",
-        "link_revoked" or "articles" => "publishing",
+        "link_revoked" or "articles" or "diagrams" => "publishing",
         "person_added" or "person_password" or "person_deleted" => "users",
         "bad_person" or "person_short_password" or "login_taken" => "users",
         "last_owner" or "self_delete" or "other_owner" or "own_password" => "users",

@@ -1022,4 +1022,101 @@ public class SettingsPageTests : IDisposable
             Assert.DoesNotContain("/_app/settings.js", html);
         }
     }
+
+    [Fact]
+    public async Task The_publishing_section_has_the_diagrams_switch_above_downloading()
+    {
+        var factory = StartFactory();
+        AddOwner(factory, "aleks", "тайна");
+        var client = await LoginClient(factory, "aleks", "тайна");
+
+        var html = await client.GetStringAsync("/settings");
+        var publishing = Regex.Match(html, "id=\"publishing\".*?</section>", RegexOptions.Singleline).Value;
+
+        Assert.Contains("data-autosave=\"diagrams\"", publishing);
+        // Схемы включены, пока владелец их не выключил.
+        Assert.Contains("name=\"diagrams\" value=\"on\" checked", publishing);
+        var diagrams = publishing.IndexOf("action=\"/settings/diagrams\"", StringComparison.Ordinal);
+        Assert.InRange(diagrams, 0, publishing.IndexOf("action=\"/settings/articles\"", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task The_diagrams_switch_is_unchecked_while_diagrams_are_off()
+    {
+        var factory = StartFactory();
+        AddOwner(factory, "aleks", "тайна");
+        using (var scope = factory.Services.CreateScope())
+            scope.ServiceProvider.GetRequiredService<SiteSettings>().Set("articles.diagrams", "off");
+        var client = await LoginClient(factory, "aleks", "тайна");
+
+        var html = await client.GetStringAsync("/settings");
+
+        Assert.Contains("name=\"diagrams\" value=\"on\">", html);
+    }
+
+    [Fact]
+    public async Task The_owner_switches_diagrams_off_and_on()
+    {
+        var factory = StartFactory();
+        AddOwner(factory, "aleks", "тайна");
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        await TestLogin.PostLogin(client, "aleks", "тайна");
+        var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
+
+        // Снятый флажок форма не присылает: приходит одно поле antiforgery.
+        var off = await client.PostAsync("/settings/diagrams", new FormUrlEncodedContent(
+            new Dictionary<string, string> { [name] = value }));
+
+        Assert.Equal("/settings?ok=diagrams#publishing", off.Headers.Location?.OriginalString);
+        Assert.Equal("off", Setting(factory, "articles.diagrams"));
+
+        await client.PostAsync("/settings/diagrams", new FormUrlEncodedContent(
+            new Dictionary<string, string> { [name] = value, ["diagrams"] = "on" }));
+
+        Assert.Equal("on", Setting(factory, "articles.diagrams"));
+    }
+
+    [Fact]
+    public async Task Saving_the_diagrams_switch_shows_its_message()
+    {
+        var factory = StartFactory();
+        AddOwner(factory, "aleks", "тайна");
+        var client = await LoginClient(factory, "aleks", "тайна");
+
+        var html = await client.GetStringAsync("/settings?ok=diagrams");
+
+        Assert.Contains("<p class=\"toast toast-ok\" role=\"status\">The diagram setting is saved.</p>", html);
+    }
+
+    [Fact]
+    public async Task A_reader_cannot_switch_diagrams()
+    {
+        var factory = StartFactory();
+        var client = await TestLogin.AsReader(factory);
+
+        var response = await TestLogin.Post(client, "/settings/diagrams", new() { ["diagrams"] = "on" });
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Equal("", Setting(factory, "articles.diagrams"));
+    }
+
+    [Fact]
+    public async Task The_diagrams_switch_without_the_token_is_rejected()
+    {
+        var factory = StartFactory();
+        AddOwner(factory, "aleks", "тайна");
+        var client = await LoginClient(factory, "aleks", "тайна");
+
+        var response = await client.PostAsync("/settings/diagrams", new FormUrlEncodedContent(
+            new Dictionary<string, string> { ["diagrams"] = "on" }));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("", Setting(factory, "articles.diagrams"));
+    }
+
+    static string Setting(WebApplicationFactory<Program> factory, string key)
+    {
+        using var scope = factory.Services.CreateScope();
+        return scope.ServiceProvider.GetRequiredService<SiteSettings>().Get(key, "");
+    }
 }

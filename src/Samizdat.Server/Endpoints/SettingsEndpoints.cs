@@ -108,6 +108,7 @@ public static class SettingsEndpoints
                     ["readers"] = settings.Download.Readers,
                     ["guests"] = settings.Download.Guests,
                 },
+                ["diagrams"] = settings.Diagrams,
                 ["themes"] = themes.AvailableThemes().Select(name => new Dictionary<string, object?>
                 {
                     ["name"] = name,
@@ -216,6 +217,16 @@ public static class SettingsEndpoints
             settings.Set("articles.download.guests", form["guests"].ToString() == "on" ? "on" : "");
 
             return Ok("articles");
+        }).RequireValidToken().OwnerOnly();
+
+        group.MapPost("/diagrams", async (HttpContext context, SiteSettings settings) =>
+        {
+            var form = await context.Request.ReadFormAsync();
+
+            // Снятый флажок форма не присылает: нет поля — схемы выключены.
+            settings.Set("articles.diagrams", form.ContainsKey("diagrams") ? "on" : "off");
+
+            return Ok("diagrams");
         }).RequireValidToken().OwnerOnly();
 
         group.MapPost("/background", [RequestSizeLimit(MaxBackgroundRequestBytes)]

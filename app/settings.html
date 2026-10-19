@@ -340,6 +340,17 @@
   <h2>{{ t.settings.articles.title }}</h2>
 
   <div class="settings-block">
+    <h3>{{ t.settings.diagrams.title }}</h3>
+    <p class="hint">{{ t.settings.diagrams.hint }}</p>
+    <form method="post" action="/settings/diagrams" class="settings-form" data-autosave="diagrams">
+      {{ antiforgery }}
+      <label class="check"><input type="checkbox" name="diagrams" value="on"{{ if diagrams }} checked{{ end }}>
+        {{ t.settings.diagrams.draw }}</label>
+      <button type="submit">{{ t.settings.save }}</button>
+    </form>
+  </div>
+
+  <div class="settings-block">
     <h3>{{ t.settings.articles.download }}</h3>
     <p class="hint">{{ t.settings.articles.hint }}</p>
     <form method="post" action="/settings/articles" class="settings-form" data-autosave="download">
