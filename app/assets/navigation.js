@@ -144,6 +144,8 @@
     }
     // Меняем детей, а не сам <main>: forms.js держит ссылку на элемент.
     main.replaceChildren.apply(main, Array.from(page.querySelector("main").childNodes));
+    // Схемы в новом <main> рисует diagrams.js. Файл мог ещё не загрузиться.
+    var diagrams = window.drawDiagrams ? window.drawDiagrams() : Promise.resolve();
     shownKey = navigation.currentEntry.key;
     document.title = page.title;
     markCurrent(page);
@@ -151,8 +153,8 @@
     // На узком экране дерево раскрывают переключателем. Обычная загрузка его сворачивает.
     var toggle = document.querySelector(".nav-switch");
     if (toggle) toggle.open = false;
-    // Пока ждём картинки, читатель мог уйти дальше: тогда прокрутка этой записи уже не нужна.
-    if (saved) return imagesReady().then(function () { if (!signal.aborted) restore(saved); });
+    // Пока ждём картинки и схемы, читатель мог уйти дальше: тогда прокрутка этой записи уже не нужна.
+    if (saved) return heightsReady(diagrams).then(function () { if (!signal.aborted) restore(saved); });
     scrollToStart(url);
   }
 
@@ -183,13 +185,14 @@
     if (live && fresh) live.value = fresh.value;
   }
 
-  // Картинка без размеров получает высоту только после декодирования. До этого текст короче,
-  // и возвращённая прокрутка встаёт не туда. Ждём картинки, но не дольше полсекунды.
-  function imagesReady() {
+  // Картинка без размеров получает высоту только после декодирования, схема — после рисования.
+  // До этого высота текста другая, и возвращённая прокрутка встаёт не туда. Ждём, но не дольше полсекунды.
+  function heightsReady(diagrams) {
     var decoded = Promise.all(Array.from(main.querySelectorAll("img"), function (img) {
       return img.decode().catch(function () {});
     }));
-    return Promise.race([decoded, new Promise(function (done) { setTimeout(done, 500); })]);
+    return Promise.race([Promise.all([decoded, diagrams]),
+                         new Promise(function (done) { setTimeout(done, 500); })]);
   }
 
   function restore(saved) {

@@ -11,6 +11,7 @@
     queue = queue.then(drawAll).catch(function () {
       // mermaid не загрузился: блоки остаются кодом.
     });
+    return queue;
   }
 
   function drawAll() {
@@ -74,5 +75,6 @@
 
   run();
   // Переход без перезагрузки меняет только детей <main>, а этот файл заново не выполняется.
-  if (window.navigation) navigation.addEventListener("navigatesuccess", run);
+  // Поэтому navigation.js сам зовёт поиск после замены: при «назад» прокрутка ждёт схем.
+  window.drawDiagrams = run;
 })();
