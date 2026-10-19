@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Headers;
+using System.Security.Cryptography;
 using System.Text;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
@@ -382,6 +383,44 @@ public class NavigationTests : IDisposable
 
         Assert.Equal(System.Net.HttpStatusCode.OK, response.StatusCode);
         Assert.Contains("javascript", response.Content.Headers.ContentType?.MediaType);
+    }
+
+    [Fact]
+    public async Task Core_file_carries_the_hash_of_its_content_as_etag()
+    {
+        var client = StartFactory().CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+
+        var response = await client.GetAsync("/_app/forms.js");
+        var body = await response.Content.ReadAsByteArrayAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.False(response.Headers.ETag!.IsWeak);
+        Assert.Equal($"\"{Convert.ToHexString(SHA256.HashData(body))}\"", response.Headers.ETag!.Tag);
+    }
+
+    [Fact]
+    public async Task Core_file_with_a_matching_etag_gets_304()
+    {
+        var client = StartFactory().CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        var first = await client.GetAsync("/_app/forms.js");
+
+        var repeat = new HttpRequestMessage(HttpMethod.Get, "/_app/forms.js");
+        repeat.Headers.IfNoneMatch.Add(first.Headers.ETag!);
+        var second = await client.SendAsync(repeat);
+
+        Assert.Equal(HttpStatusCode.NotModified, second.StatusCode);
+        Assert.Equal(first.Headers.ETag, second.Headers.ETag);
+    }
+
+    [Fact]
+    public async Task Theme_file_stays_without_etag()
+    {
+        var client = StartFactory().CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+
+        var response = await client.GetAsync("/assets/style.css");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Null(response.Headers.ETag);
     }
 
     [Fact]

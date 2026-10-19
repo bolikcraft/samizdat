@@ -1,5 +1,7 @@
+using System.Collections.Concurrent;
 using System.Net;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Net.Http.Headers;
@@ -19,6 +21,10 @@ namespace Samizdat.Server.Endpoints;
 public static class PageEndpoints
 {
     static readonly FileExtensionContentTypeProvider ContentTypes = new();
+
+    // ETag файлов ядра по пути. Файлы лежат в сборке и до перезапуска не меняются, поэтому хэш
+    // считается один раз. Ключ — только путь найденного файла: чужой адрес словарь не растит.
+    static readonly ConcurrentDictionary<string, EntityTagHeaderValue> AppTags = new();
 
     // Логин в кэшированной странице: ячейка общая для всех читателей и для всех владельцев.
     const string LoginPlaceholder = "__USER_LOGIN__";
@@ -192,7 +198,7 @@ public static class PageEndpoints
             .AllowAnonymous();
 
         // Скрипты ядра берутся только из сборки: тема не может их подменить.
-        app.MapGet("/_app/{*file}", (string file) => Asset(EmbeddedThemeSource.App, $"assets/{file}")).AllowAnonymous();
+        app.MapGet("/_app/{*file}", (string file) => AppAsset($"assets/{file}")).AllowAnonymous();
 
         // Отдельный путь, не под /assets/: там уже стоит маршрут файлов темы.
         // Гостю по share-ссылке фон тоже нужен, поэтому без пароля.
@@ -236,6 +242,20 @@ public static class PageEndpoints
 
         var type = ContentTypes.TryGetContentType(path, out var found) ? found : "application/octet-stream";
         return Results.Stream(stream, type);
+    }
+
+    // ETag — хэш содержимого: версия сборки одна на все выпуски и смену файла не покажет.
+    // На совпавший If-None-Match Results.Stream сам отвечает 304.
+    static IResult AppAsset(string path)
+    {
+        var stream = EmbeddedThemeSource.App.OpenRead(path);
+        if (stream is null) return Results.NotFound();
+
+        var tag = AppTags.GetOrAdd(path,
+            _ => new EntityTagHeaderValue($"\"{Convert.ToHexString(SHA256.HashData(stream))}\""));
+        stream.Position = 0;
+        var type = ContentTypes.TryGetContentType(path, out var found) ? found : "application/octet-stream";
+        return Results.Stream(stream, type, entityTag: tag);
     }
 
     static IResult NotFound(PageRenderer pages, SamizdatDbContext db, SiteSettings settings, ClaimsPrincipal user,
