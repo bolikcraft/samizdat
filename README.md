@@ -107,6 +107,13 @@ The scripts find these elements in the templates of the theme:
 - `#sidebar-toggle`: the button that collapses the side column. The script sets `aria-expanded` on it.
 - `#reading-toggle`: the button of the reading mode. Put it outside `<main>`, because the scripts replace
   the content of `<main>`. The script sets `aria-pressed` on it.
+- `pre.mermaid` in an article: a Mermaid diagram. The server writes the text of the diagram in it. The diagram script
+  draws an `<svg>` in it and sets `data-diagram="done"`, or `data-diagram="error"` if the text has an error. The theme
+  gives the look of the block.
+
+The diagram script uses Mermaid 11.17.2: the file `dist/mermaid.min.js` from the npm package `mermaid`. It is in
+`app/assets/vendor/mermaid.min.js`, and its MIT license is in `app/assets/vendor/mermaid.LICENSE`. The script loads
+Mermaid only on a page with a diagram.
 
 The script of the layout buttons sets attributes on `<html>`. The theme uses them in its CSS:
 
