@@ -448,6 +448,19 @@ public class NavigationTests : IDisposable
     }
 
     [Fact]
+    public async Task Mermaid_is_served_from_the_core_as_javascript()
+    {
+        var client = StartFactory().CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+
+        var response = await client.GetAsync("/_app/vendor/mermaid.min.js");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("javascript", response.Content.Headers.ContentType?.MediaType);
+        // Сборка IIFE сама ставит window.mermaid: diagrams.js грузит её обычным тегом <script>.
+        Assert.Contains("globalThis[\"mermaid\"] =", await response.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
     public async Task Layout_script_is_linked_in_the_head_without_defer()
     {
         WriteArticle("a", "---\ntitle: Alpha\n---\nтекст\n");
