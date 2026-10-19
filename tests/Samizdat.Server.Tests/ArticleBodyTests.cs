@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Samizdat.Server.Auth;
@@ -85,6 +86,46 @@ public class ArticleBodyTests : IDisposable
 
         Assert.DoesNotContain("class=\"mermaid\"", html);
         Assert.Contains("<pre><code class=\"language-mermaid\">flowchart LR", html);
+    }
+
+    [Fact]
+    public async Task The_article_page_shows_a_repeated_title_once()
+    {
+        using var factory = CreateFactory();
+        AddArticle(factory, "tema", "---\ntitle: Тема\n---\n# Тема\n\nтекст\n");
+        var client = await TestLogin.AsOwner(factory);
+
+        var html = await client.GetStringAsync("/tema");
+
+        Assert.Single(Regex.Matches(html, "<h1"));
+        Assert.Contains("<h1>Тема</h1>", html);
+        Assert.Contains("<p>текст</p>", html);
+    }
+
+    [Fact]
+    public async Task The_guest_page_shows_a_repeated_title_once()
+    {
+        using var factory = CreateFactory();
+        AddArticle(factory, "tema", "---\ntitle: Тема\n---\n# Тема\n\nтекст\n");
+        var token = AddLink(factory, "tema");
+
+        var html = await factory.CreateClient().GetStringAsync($"/s/{token}");
+
+        Assert.Single(Regex.Matches(html, "<h1"));
+        Assert.Contains("<h1>Тема</h1>", html);
+    }
+
+    [Fact]
+    public async Task Without_a_title_in_the_note_the_slug_is_the_title()
+    {
+        using var factory = CreateFactory();
+        AddArticle(factory, "tema", "# tema\n\nтекст\n");
+        var client = await TestLogin.AsOwner(factory);
+
+        var html = await client.GetStringAsync("/tema");
+
+        Assert.Single(Regex.Matches(html, "<h1"));
+        Assert.Contains("<h1>tema</h1>", html);
     }
 
     WebApplicationFactory<Program> CreateFactory() =>

@@ -133,7 +133,8 @@ public static class PageEndpoints
                 var parsed = FrontMatterParser.Parse(text);
                 // Заголовок и описание идут в <title> и <h1> как есть.
                 parsed.FrontMatter.RemoveControlCharacters();
-                var body = markdown.Render(parsed.Body, slug, articles, diagrams: settings.Diagrams);
+                var body = markdown.Render(parsed.Body, slug, articles, diagrams: settings.Diagrams,
+                                           title: parsed.FrontMatter.Title ?? slug);
 
                 // Формат считается тут же, внутри сборки страницы: ключ кэша — ContentHash, а он
                 // уже считается по вложениям. Добавили картинку — надпись поедет следом.
