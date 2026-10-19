@@ -461,6 +461,30 @@ public class NavigationTests : IDisposable
     }
 
     [Fact]
+    public async Task Diagram_script_is_linked_on_the_article_page()
+    {
+        WriteArticle("a", "---\ntitle: Alpha\n---\nтекст\n");
+        var factory = StartFactory();
+        Register(factory, "a", "Alpha");
+        var client = LoginClient(factory);
+
+        var html = await client.GetStringAsync("/a");
+
+        Assert.Contains("<script src=\"/_app/diagrams.js\" defer></script>", html);
+    }
+
+    [Fact]
+    public async Task Diagram_script_is_served_to_a_guest_as_javascript()
+    {
+        var client = StartFactory().CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+
+        var response = await client.GetAsync("/_app/diagrams.js");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("javascript", response.Content.Headers.ContentType?.MediaType);
+    }
+
+    [Fact]
     public async Task Layout_script_is_linked_in_the_head_without_defer()
     {
         WriteArticle("a", "---\ntitle: Alpha\n---\nтекст\n");

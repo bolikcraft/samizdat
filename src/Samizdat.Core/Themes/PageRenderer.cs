@@ -18,6 +18,7 @@ public sealed class PageRenderer(IThemeSource theme, Translator? text = null)
         <script src="/_app/forms.js" defer></script>
         <script src="/_app/navigation.js" defer></script>
         <script src="/_app/lightbox.js" defer></script>
+        <script src="/_app/diagrams.js" defer></script>
         """;
 
     // Без defer намеренно, причина — в начале app/assets/layout.js.
