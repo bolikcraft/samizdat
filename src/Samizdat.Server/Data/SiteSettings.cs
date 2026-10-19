@@ -72,12 +72,16 @@ public sealed class SiteSettings(SamizdatDbContext db, IConfiguration configurat
     public DownloadPolicy Download => new(Get("articles.download.readers", "") == "on",
                                           Get("articles.download.guests", "") == "on");
 
+    /// Схемы Mermaid в статьях. Выключено только "off": пустое Get подменяет запасным "on".
+    public bool Diagrams => Get("articles.diagrams", "on") != "off";
+
     /// Всё, что вид страницы берёт из настроек. Задумана как часть ключа кэша страниц:
     /// layout.html рендерится внутри закэшированной страницы, и без этого отпечатка смена
-    /// названия, схемы, фона или разрешения скачивать была бы не видна на статье, отрендеренной раньше.
+    /// названия, схемы, фона, разрешения скачивать или флажка схем Mermaid была бы не видна на статье,
+    /// отрендеренной раньше.
     public string ViewFingerprint
         => $"{ThemeName}|{ColorScheme}|{Get("theme.background", "")}|{background.Version(BackgroundFileName)}"
-           + $"|{Download.Readers}|{Download.Guests}|{Title}";
+           + $"|{Download.Readers}|{Download.Guests}|{Title}|{Diagrams}";
 
     public string Get(string key, string fallback)
         => db.Settings.Find(key)?.Value is { Length: > 0 } value ? value : fallback;

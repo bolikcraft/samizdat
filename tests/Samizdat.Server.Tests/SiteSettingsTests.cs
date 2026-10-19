@@ -381,6 +381,35 @@ public class SiteSettingsTests : IDisposable
     }
 
     [Fact]
+    public void Diagrams_are_on_until_the_owner_turns_them_off()
+    {
+        var factory = StartFactory();
+        using (var scope = factory.Services.CreateScope())
+            Assert.True(scope.ServiceProvider.GetRequiredService<SiteSettings>().Diagrams);
+
+        SetSetting(factory, "articles.diagrams", "off");
+        using (var scope = factory.Services.CreateScope())
+            Assert.False(scope.ServiceProvider.GetRequiredService<SiteSettings>().Diagrams);
+
+        SetSetting(factory, "articles.diagrams", "on");
+        using (var scope = factory.Services.CreateScope())
+            Assert.True(scope.ServiceProvider.GetRequiredService<SiteSettings>().Diagrams);
+    }
+
+    [Fact]
+    public void View_fingerprint_changes_with_the_diagrams_switch()
+    {
+        var factory = StartFactory();
+        using var scope = factory.Services.CreateScope();
+        var settings = scope.ServiceProvider.GetRequiredService<SiteSettings>();
+        var before = settings.ViewFingerprint;
+
+        settings.Set("articles.diagrams", "off");
+
+        Assert.NotEqual(before, settings.ViewFingerprint);
+    }
+
+    [Fact]
     public void The_site_title_is_shown_until_the_owner_turns_it_off()
     {
         var factory = StartFactory();
