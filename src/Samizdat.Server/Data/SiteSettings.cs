@@ -77,7 +77,7 @@ public sealed class SiteSettings(SamizdatDbContext db, IConfiguration configurat
 
     /// Всё, что вид страницы берёт из настроек. Задумана как часть ключа кэша страниц:
     /// layout.html рендерится внутри закэшированной страницы, и без этого отпечатка смена
-    /// названия, схемы, фона, разрешения скачивать или флажка схем Mermaid была бы не видна на статье,
+    /// названия, цветовой схемы, фона, разрешения скачивать или флажка схем Mermaid была бы не видна на статье,
     /// отрендеренной раньше.
     public string ViewFingerprint
         => $"{ThemeName}|{ColorScheme}|{Get("theme.background", "")}|{background.Version(BackgroundFileName)}"
