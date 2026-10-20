@@ -78,8 +78,9 @@ public sealed class ArticleSearch(SamizdatDbContext db)
             -- Закрытую статью читатель находит только по заголовку. MetaVector не годится:
             -- в нём есть описание, а описание — часть текста статьи.
             CROSS JOIN LATERAL (SELECT setweight(to_tsvector('russian', a."Title"), 'A') AS vector) title_only
+            -- Ветки не пересекаются: иначе заголовок обходит минус-слово владельца и индекс по SearchVector.
             WHERE ((a."Visibility" = @shared OR @owner) AND a."SearchVector" @@ q.query)
-               OR title_only.vector @@ q.query
+               OR (NOT (a."Visibility" = @shared OR @owner) AND title_only.vector @@ q.query)
             ORDER BY rank DESC, a."Title"
             LIMIT @limit
             """;
