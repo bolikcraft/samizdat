@@ -34,6 +34,7 @@ public static class Startup
         builder.Services.AddSingleton(new ArticleFiles(dataRoot));
         builder.Services.AddSingleton(new BackgroundFile(dataRoot));
         builder.Services.AddSingleton(new ArticlePackage(dataRoot));
+        builder.Services.AddSingleton<ZipGate>();
         builder.Services.AddSingleton(services =>
             new ThemeFactory(dataRoot, services.GetRequiredService<ILogger<ThemeFactory>>()));
         builder.Services.AddScoped<SiteSettings>();

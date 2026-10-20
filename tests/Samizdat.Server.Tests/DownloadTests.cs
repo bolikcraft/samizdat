@@ -237,6 +237,38 @@ public class DownloadTests : IDisposable
     }
 
     [Fact]
+    public async Task A_fifth_archive_at_once_is_refused_but_a_single_file_is_not()
+    {
+        using var factory = CreateFactory();
+        AddArticle(factory, "tayna", ArticleVisibility.Private);
+        await File.WriteAllBytesAsync(Path.Combine(dataRoot, "articles", "tayna", "ezh.png"), [1, 2, 3]);
+        AddArticle(factory, "prostaya", ArticleVisibility.Private);
+        AddPerson(factory, "hozyain", "parol-dlinny", UserRole.Owner);
+        var client = await Login(factory, "hozyain", "parol-dlinny");
+
+        // Четыре места заняты, как будто четыре архива собираются прямо сейчас.
+        var gate = factory.Services.GetRequiredService<ZipGate>();
+        var busy = Enumerable.Range(0, ZipGate.Parallel).Select(_ => gate.TryEnter()).ToList();
+        HttpResponseMessage refused, single;
+        try
+        {
+            Assert.All(busy, lease => Assert.True(lease.IsAcquired));
+            refused = await client.GetAsync("/download/tayna");
+            single = await client.GetAsync("/download/prostaya");
+        }
+        finally
+        {
+            busy.ForEach(lease => lease.Dispose());
+        }
+        var later = await client.GetAsync("/download/tayna");
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, refused.StatusCode);
+        Assert.Equal(TimeSpan.FromSeconds(5), refused.Headers.RetryAfter?.Delta);
+        Assert.Equal(HttpStatusCode.OK, single.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, later.StatusCode);
+    }
+
+    [Fact]
     public async Task The_source_inside_the_archive_is_trimmed_for_the_reader()
     {
         using var factory = CreateFactory();

@@ -14,7 +14,8 @@ public static class DownloadEndpoints
         // Сегмент download занят служебно (см. ArticleFiles.ReservedSlugs), поэтому маршрут не спорит
         // ни с /{slug}, ни с вложением статьи.
         app.MapGet("/download/{slug}", (string slug, ArticleFiles files, ArticlePackage package,
-                                        SamizdatDbContext db, SiteSettings settings, ClaimsPrincipal user) =>
+                                        SamizdatDbContext db, SiteSettings settings, ClaimsPrincipal user,
+                                        ZipGate gate, HttpContext context) =>
         {
             var row = db.Articles.Find(slug);
             if (row is null || !files.MarkdownExists(slug)) return Results.NotFound();
@@ -23,12 +24,13 @@ public static class DownloadEndpoints
             // Отказ — 404, а не 403: выключенное скачивание не «закрыто», такой функции просто нет.
             if (!ArticleAccess.CanDownload(row.Visibility, role, settings.Download)) return Results.NotFound();
 
-            return Package(files, package, slug, asIs: role == UserRole.Owner);
+            return Package(files, package, gate, context, slug, asIs: role == UserRole.Owner);
         }).RequireAuthorization();
 
         // Гостевой адрес трёхсегментный, а slug у статьи односегментный — со строкой выше не спорит.
         app.MapGet("/download/s/{token}", (string token, ArticleFiles files, ArticlePackage package,
-                                           SamizdatDbContext db, SiteSettings settings, HttpContext context) =>
+                                           SamizdatDbContext db, SiteSettings settings, ZipGate gate,
+                                           HttpContext context) =>
         {
             // Как и остальные гостевые маршруты: после отзыва ссылки файл не должен лежать в прокси.
             context.Response.Headers.CacheControl = "no-store";
@@ -41,12 +43,13 @@ public static class DownloadEndpoints
             if (!files.MarkdownExists(link.Slug)) return Results.NotFound();
 
             // Счётчик открытий не трогаем: скачивание — не открытие страницы.
-            return Package(files, package, link.Slug, asIs: false);
+            return Package(files, package, gate, context, link.Slug, asIs: false);
         }).AllowAnonymous();
     }
 
     /// asIs — файл владельцу, байт в байт. Остальным шапка пересобирается.
-    static IResult Package(ArticleFiles files, ArticlePackage package, string slug, bool asIs)
+    static IResult Package(ArticleFiles files, ArticlePackage package, ZipGate gate, HttpContext context,
+                           string slug, bool asIs)
     {
         try
         {
@@ -73,10 +76,19 @@ public static class DownloadEndpoints
             var attachments = files.Attachments(slug).ToList();
 
             // fileDownloadName сам оформляет Content-Disposition, в том числе кириллицу в имени.
-            // Поток архива Results.File закрывает после отправки, и временный файл удаляется сам.
-            return attachments.Count == 0
-                ? Results.File(markdown, "text/markdown; charset=utf-8", $"{slug}.md")
-                : Results.File(package.Pack(slug, markdown, attachments), "application/zip", $"{slug}.zip");
+            if (attachments.Count == 0)
+                return Results.File(markdown, "text/markdown; charset=utf-8", $"{slug}.md");
+
+            // Место держим только на сборку: отдача готового файла его не занимает.
+            using var lease = gate.TryEnter();
+            if (!lease.IsAcquired)
+            {
+                context.Response.Headers.RetryAfter = "5";
+                return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
+            }
+
+            // Results.File закрывает поток после отправки, и временный файл удаляется сам.
+            return Results.File(package.Pack(slug, markdown, attachments), "application/zip", $"{slug}.zip");
         }
         catch (IOException)
         {
