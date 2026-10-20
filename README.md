@@ -183,16 +183,16 @@ If a person with the login exists, `owner set` gives this person the new passwor
 To update, run `deploy/update.sh` again. Before the update, the script writes a dump of the database
 to `backups/` and keeps the last 10 dumps. If the database is stopped, the script starts it for the dump.
 Then the script gets the new version, downloads the new image of the database and builds the image of
-the site on new base images. Then it gives the database to the role `samizdat_app` and waits until
-the site starts (at most 5 minutes).
+the site on new base images. Then it prepares the role `samizdat_app` and gives the database to it.
+Then it waits until the site starts (at most 5 minutes).
 Without an argument, the script updates to `origin/main`. To go to another version, give the script
 a git ref — a commit or a tag: `deploy/update.sh <ref>`. If the update fails, the script shows
 the command that goes back to the previous version.
 The database changes of each version only add data, so an earlier version works with the new database.
 
 A version from before the role `samizdat_app` has no file `deploy/db-role.sql`. The script of this version
-does not know the step of the role. It goes on with its old text after its own `git checkout`. When `.env`
-has no `SAMIZDAT_DB_PASSWORD` yet, the update stops, because the new `compose.yaml` needs this password.
+does not know the step of the role. After its own `git checkout`, it still runs its old commands.
+When `.env` has no `SAMIZDAT_DB_PASSWORD` yet, the update stops, because the new `compose.yaml` needs this password.
 To go forward from such a version, first get the new version, then start the new script. Do this
 for a site that you installed earlier, and after you go back to such a version:
 
@@ -205,7 +205,8 @@ deploy/update.sh
 The dump contains only the database. It does not contain `data/` (articles, keys, background).
 For a full copy, also copy the folder `data/`, or make a snapshot of the machine.
 
-To restore the database from a dump:
+To restore the database from a dump, first run the new `deploy/update.sh` once. Then the role
+`samizdat_app` exists and owns the database. Without this role, `pg_restore --role=samizdat_app` fails.
 
 ```bash
 docker compose stop app
@@ -219,6 +220,16 @@ docker compose start app
 Behind a reverse proxy, write the address of the proxy in `SAMIZDAT_PROXY` in `.env`, for example
 `SAMIZDAT_PROXY=192.168.1.47`. You can give more than one IP address or network (CIDR), with commas
 between them. If an entry is not an IP address or a network, the server does not start.
+
+If the proxy runs on the same server, do not write `127.0.0.1`. The site sees the connection of this proxy
+from the address of the gateway of the Compose network, and the site does not use the headers from any
+other address. Write the address of the gateway. To find it, run this command. `<folder>` is the name of the
+folder with `compose.yaml`, for example `samizdat` for `/opt/samizdat`:
+
+```bash
+docker network inspect <folder>_default --format '{{(index .IPAM.Config 0).Gateway}}'
+```
+
 The proxy must send two headers:
 
 - `X-Forwarded-For` with the address of the client;
@@ -241,6 +252,17 @@ and asks the person to wait (`Samizdat__Auth__FailuresPerLogin`, the value `0` r
 Each password hash uses 64 MB of memory. The server calculates at most 2 hashes at the same time
 (`Samizdat__Auth__ParallelHashes`) and keeps at most 32 more requests in a queue (`Samizdat__Auth__HashQueue`).
 When the queue is full, the server sends the status 429.
+
+The three keys `Samizdat__Auth__...` are settings of the program, not variables of `.env`. `compose.yaml`
+does not pass them. To change one in Docker, add it to `environment` of the service `app` in the file
+`compose.override.yaml`:
+
+```yaml
+services:
+  app:
+    environment:
+      Samizdat__Auth__FailuresPerLogin: 40
+```
 
 ### From the source code
 
@@ -266,9 +288,9 @@ dotnet run --project src/Samizdat.Cli -- push --dry-run
 dotnet run --project src/Samizdat.Cli -- push
 ```
 
-If the address of the server starts with `http://` and the server is not on your machine, the command line
-tool shows a warning in each command that connects to the server. Without HTTPS, the token and the notes
-go through the network as plain text.
+If the address of the server starts with `http://` and the host is not a loopback address (`localhost`,
+`127.0.0.0/8` or `::1`), the command line tool shows a warning in each command that connects to the
+server. Without HTTPS, the token and the notes go through the network as plain text.
 
 The command `reindex` makes the search index again for all the articles. You need it only after
 an update that changes how the text is read.
