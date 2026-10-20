@@ -30,6 +30,7 @@ services:
       Samizdat__Proxy: ${SAMIZDAT_PROXY:-}
     volumes:
       - ./data:/data
+    # Docker пишет свои правила iptables в обход ufw: порт на 0.0.0.0 открыт всей сети.
     ports:
-      - "${SAMIZDAT_BIND:-0.0.0.0}:${SAMIZDAT_PORT:-8080}:8080"
+      - "${SAMIZDAT_BIND:-127.0.0.1}:${SAMIZDAT_PORT:-8080}:8080"
     restart: unless-stopped
