@@ -299,6 +299,38 @@ public class VisibilityTests : IDisposable
         Assert.DoesNotContain(PagePlaceholder.Nonce, html);
     }
 
+    [Fact]
+    public async Task Reader_does_not_see_the_description_of_a_private_article_on_the_main_page()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+            db.Articles.Add(new ArticleRow
+            {
+                Slug = "tayna", Title = "Тайна", Description = "закрытое описание", ContentHash = "hash-tayna",
+                Visibility = ArticleVisibility.Private, UpdatedAt = DateTimeOffset.UtcNow,
+            });
+            db.Articles.Add(new ArticleRow
+            {
+                Slug = "otkrytaya", Title = "Открытая", Description = "открытое описание",
+                ContentHash = "hash-otkrytaya", Visibility = ArticleVisibility.Shared, UpdatedAt = DateTimeOffset.UtcNow,
+            });
+            await db.SaveChangesAsync();
+        }
+        var reader = await TestLogin.AsReader(factory);
+        var owner = await TestLogin.AsOwner(factory);
+
+        var readerPage = await reader.GetStringAsync("/");
+        var ownerPage = await owner.GetStringAsync("/");
+
+        Assert.Contains("Тайна", readerPage);
+        Assert.DoesNotContain("закрытое описание", readerPage);
+        Assert.Contains("открытое описание", readerPage);
+        Assert.Contains("закрытое описание", ownerPage);
+    }
+
     WebApplicationFactory<Program> CreateFactory() =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {

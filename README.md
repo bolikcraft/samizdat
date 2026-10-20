@@ -29,7 +29,7 @@ the people you allow.
   image embeds, callouts and code with colors.
 - **Navigation.** The side bar shows the folder tree of your vault, with a filter by title.
 - **Users.** The owner makes the accounts. An article is private, or it is open to all the users
-  of the site. A reader sees the titles of the private articles, but not their text.
+  of the site. A reader sees the titles of the private articles, but not their descriptions or text.
 - **Links for other people.** An article can get a link with a term of one day, one week, one
   month, one year, or with no term. The link opens one article to a person who has no account.
   The owner sees how many times the link was opened, and can revoke it.

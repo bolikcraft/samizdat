@@ -42,7 +42,10 @@ public static class PageEndpoints
             {
                 ["slug"] = article.Slug,
                 ["title"] = article.Title,
-                ["description"] = article.Description,
+                // Описание — часть текста статьи: у закрытой читатель видит только заголовок.
+                ["description"] = isOwner || article.Visibility == ArticleVisibility.Shared
+                    ? article.Description
+                    : null,
                 ["date"] = article.Date.HasValue ? article.Date.Value.ToString("yyyy-MM-dd") : null,
                 ["is_shared"] = article.Visibility == ArticleVisibility.Shared,
                 ["as_link"] = isOwner || article.Visibility == ArticleVisibility.Shared,
