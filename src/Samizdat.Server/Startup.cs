@@ -63,6 +63,7 @@ public static class Startup
 
         builder.Services.AddScoped<ArticleIndexer>();
         builder.Services.AddScoped<ArticleSearch>();
+        builder.Services.AddSearchLimits();
 
         // Заголовки прокси принимаются только от адресов из Samizdat:Proxy (в compose — SAMIZDAT_PROXY).
         builder.Services.Configure(TrustedProxies.From(builder.Configuration["Samizdat:Proxy"]));

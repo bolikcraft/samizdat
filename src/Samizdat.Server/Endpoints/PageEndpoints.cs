@@ -96,7 +96,7 @@ public static class PageEndpoints
                     ["snippet"] = hit.Snippet is null ? null : SearchSnippet.ToHtml(hit.Snippet),
                 }).ToList(),
             }), "text/html; charset=utf-8");
-        });
+        }).RequireRateLimiting(SearchLimits.Policy);
 
         group.MapGet("/{slug}", (string slug, PageRenderer pages, ArticleFiles files,
                                  ArticleRenderer markdown,

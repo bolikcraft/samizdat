@@ -629,6 +629,24 @@ public class SearchPageTests(DatabaseFixture database) : IDisposable
     }
 
     [Fact]
+    public async Task Sixty_first_search_in_a_minute_is_refused()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        var client = await TestLogin.AsOwner(factory);
+
+        for (var i = 0; i < 60; i++)
+            Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/search")).StatusCode);
+        var refused = await client.GetAsync("/search");
+        // Счёт у каждого свой: чужой залп соседа не задевает.
+        var other = await TestLogin.AsOwner(factory);
+        var otherAnswer = await other.GetAsync("/search");
+
+        Assert.Equal(HttpStatusCode.TooManyRequests, refused.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, otherAnswer.StatusCode);
+    }
+
+    [Fact]
     public async Task Search_needs_a_password()
     {
         database.ResetDatabase();
