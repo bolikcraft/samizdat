@@ -380,6 +380,7 @@ public class AuthTests : IDisposable
         var second = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
         await TestLogin.PostLogin(first, "aleks", "тайна-тайна");
         await TestLogin.PostLogin(second, "aleks", "тайна-тайна");
+        var neighbour = await TestLogin.As(factory, UserRole.Reader, "anna");
 
         var logout = await TestLogin.Post(first, "/logout", []);
 
@@ -387,6 +388,27 @@ public class AuthTests : IDisposable
         var other = await second.GetAsync("/");
         Assert.Equal(HttpStatusCode.Found, other.StatusCode);
         Assert.StartsWith("/login", other.Headers.Location?.PathAndQuery);
+        Assert.Equal(HttpStatusCode.OK, (await neighbour.GetAsync("/")).StatusCode);
+    }
+
+    // Кнопка «Выйти» на вкладке другого браузера держит токен, выданный вошедшему: запрос уже анонимный.
+    [Fact]
+    public async Task Logout_from_a_browser_whose_session_already_ended_goes_to_login()
+    {
+        var factory = StartServer();
+        AddOwner(factory, "aleks", "тайна-тайна");
+        var first = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        var second = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        await TestLogin.PostLogin(first, "aleks", "тайна-тайна");
+        await TestLogin.PostLogin(second, "aleks", "тайна-тайна");
+        var (name, value) = TestLogin.AntiforgeryToken(await second.GetStringAsync("/"));
+        await TestLogin.Post(first, "/logout", []);
+
+        var late = await second.PostAsync("/logout", new FormUrlEncodedContent(
+            new Dictionary<string, string> { [name] = value }));
+
+        Assert.Equal(HttpStatusCode.Found, late.StatusCode);
+        Assert.Equal("/login", late.Headers.Location?.OriginalString);
     }
 
     [Fact]
@@ -408,8 +430,9 @@ public class AuthTests : IDisposable
         var browser = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
         await TestLogin.PostLogin(browser, "aleks", "тайна-тайна");
 
-        await TestLogin.Post(browser, "/logout", []);
+        var logout = await TestLogin.Post(browser, "/logout", []);
 
+        Assert.Equal("/login", logout.Headers.Location?.OriginalString);
         var cli = factory.CreateClient();
         cli.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         Assert.Equal(HttpStatusCode.OK, (await cli.GetAsync("/api/state")).StatusCode);

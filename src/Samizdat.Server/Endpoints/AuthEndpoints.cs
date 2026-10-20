@@ -103,7 +103,10 @@ public static class AuthEndpoints
 
             await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
             return Results.Redirect("/login");
-        }).RequireValidToken().AllowDuringSetup();
+        }).RequireValidToken(context =>
+            // Вкладка другого браузера держит токен вошедшего, а сессию уже погасили: на вход, не 400.
+            context.User.Identity?.IsAuthenticated == true ? Results.BadRequest() : Results.Redirect("/login"))
+            .AllowDuringSetup();
     }
 
     /// Адрес для возврата после входа. null — адреса нет или он ведёт за пределы сайта.
