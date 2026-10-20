@@ -19,7 +19,7 @@ public sealed class ArticleFiles(string dataRoot)
     // не различают.
     static readonly HashSet<string> ReservedSlugs =
         new(["s", "i", "login", "register", "settings", "assets", "_app", "background", "visibility",
-             "share", "download", "search"],
+             "share", "download", "search", "setup"],
             StringComparer.OrdinalIgnoreCase);
 
     public static bool IsReservedSlug(string slug) => ReservedSlugs.Contains(slug);
