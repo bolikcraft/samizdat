@@ -15,6 +15,14 @@ services:
       test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U samizdat -d samizdat"]
       interval: 5s
       retries: 20
+    # Без cap_drop: entrypoint образа стартует от root и сам переходит на пользователя postgres.
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     restart: unless-stopped
 
   app:
@@ -34,4 +42,17 @@ services:
     # Docker пишет свои правила iptables в обход ufw: порт на 0.0.0.0 открыт всей сети.
     ports:
       - "${SAMIZDAT_BIND:-127.0.0.1}:${SAMIZDAT_PORT:-8080}:8080"
+    # Запись только в /data и /tmp. В /tmp ASP.NET Core кладёт формы больше 64 КБ.
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     restart: unless-stopped
