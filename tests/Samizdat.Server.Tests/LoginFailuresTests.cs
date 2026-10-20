@@ -104,6 +104,49 @@ public class LoginFailuresTests
     }
 
     [Fact]
+    public void Full_table_keeps_only_the_latest_logins()
+    {
+        var failures = new LoginFailures(1, clock, maxLogins: 2);
+
+        foreach (var login in new[] { "a", "b", "c", "d", "e" }) failures.Add(login);
+
+        Assert.False(failures.IsBlocked("a"));
+        Assert.False(failures.IsBlocked("b"));
+        Assert.False(failures.IsBlocked("c"));
+        Assert.True(failures.IsBlocked("d"));
+        Assert.True(failures.IsBlocked("e"));
+    }
+
+    // Истёкшая запись уходит и из очереди вытеснения, иначе вытеснение заденет живой логин.
+    [Fact]
+    public void Expired_login_comes_back_at_the_end_of_the_table()
+    {
+        var failures = new LoginFailures(1, clock, maxLogins: 2);
+        failures.Add("a");
+        clock.Now += LoginFailures.Window;
+        Assert.False(failures.IsBlocked("a"));
+
+        failures.Add("b");
+        failures.Add("a");
+        failures.Add("c");
+
+        Assert.False(failures.IsBlocked("b"));
+        Assert.True(failures.IsBlocked("a"));
+        Assert.True(failures.IsBlocked("c"));
+    }
+
+    [Fact]
+    public void Login_as_long_as_the_column_is_kept()
+    {
+        var failures = new LoginFailures(1, clock);
+        var login = new string('a', 100);
+
+        failures.Add(login);
+
+        Assert.True(failures.IsBlocked(login));
+    }
+
+    [Fact]
     public void Login_longer_than_the_column_is_not_kept()
     {
         var failures = new LoginFailures(1, clock);
