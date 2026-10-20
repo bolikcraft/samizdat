@@ -259,7 +259,7 @@ public class SettingsPageTests : IDisposable
         var appearance = await client.PostAsync("/settings/appearance", new FormUrlEncodedContent(
             new Dictionary<string, string> { [name] = value, ["theme"] = "default", ["color_scheme"] = "dark" }));
         var password = await client.PostAsync("/settings/password", new FormUrlEncodedContent(
-            new Dictionary<string, string> { [name] = value, ["current"] = "неверно", ["new"] = "x", ["new2"] = "x" }));
+            new Dictionary<string, string> { [name] = value, ["current"] = "неверно", ["new"] = "novyy-parol", ["new2"] = "novyy-parol" }));
 
         Assert.Equal("/settings?ok=look#look", appearance.Headers.Location?.OriginalString);
         Assert.Equal("/settings?err=wrong_password#profile", password.Headers.Location?.OriginalString);

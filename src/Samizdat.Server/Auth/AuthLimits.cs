@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.RateLimiting;
 
 namespace Samizdat.Server.Auth;
 
-/// Пределы для анонимных форм с паролем: вход, открытая регистрация, приглашение.
+/// Пределы для форм с паролем: вход, открытая регистрация, приглашение, смена своего пароля.
 public static class AuthLimits
 {
     public const string Policy = "password-forms";

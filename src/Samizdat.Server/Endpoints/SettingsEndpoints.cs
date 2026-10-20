@@ -148,6 +148,11 @@ public static class SettingsEndpoints
             if (CurrentUser(db, user) is not { } person) return LoggedOut();
             // Счётчик тот же, что у входа: иначе чужая открытая сессия подбирала бы пароль здесь.
             if (failures.IsBlocked(person.Login)) return Err("too_many_attempts");
+            // Новый пароль проверяем до хэша текущего: запрос, который всё равно отвергнут, не занимает
+            // общий PasswordGate.
+            if (next.Length < MinPasswordLength) return Err("short_password");
+            if (next.Length > MaxPasswordLength) return Err("long_password");
+            if (next != repeat) return Err("password_mismatch");
 
             bool matches;
             if (current.Length > MaxPasswordLength) matches = false;
@@ -162,9 +167,6 @@ public static class SettingsEndpoints
                 failures.Add(person.Login);
                 return Err("wrong_password");
             }
-            if (next.Length < MinPasswordLength) return Err("short_password");
-            if (next.Length > MaxPasswordLength) return Err("long_password");
-            if (next != repeat) return Err("password_mismatch");
 
             using (var lease = await gate.Enter(context.RequestAborted))
             {
@@ -177,7 +179,7 @@ public static class SettingsEndpoints
             db.SaveChanges();
             await SessionCookie.SignIn(context, person);
             return Ok("password");
-        }).RequireValidToken();
+        }).RequireValidToken().RequireRateLimiting(AuthLimits.Policy);
 
         group.MapPost("/appearance", async (HttpContext context, SiteSettings settings, ThemeFactory themes,
                                             LanguageCatalog catalog) =>

@@ -164,6 +164,45 @@ public class PasswordFormTests : IDisposable
         Assert.Equal("/settings?ok=password#profile", free.Headers.Location?.OriginalString);
     }
 
+    // Место под хэш занято: ответ с кодом ошибки, а не 429, значит хэш текущего пароля не считался.
+    [Fact]
+    public async Task Bad_new_password_is_refused_without_a_hash()
+    {
+        var factory = StartServer(("Samizdat:Auth:ParallelHashes", "1"), ("Samizdat:Auth:HashQueue", "0"));
+        AddPerson(factory, "aleks", "parol-aleksa");
+        var client = await SignIn(factory, "aleks", "parol-aleksa");
+        using var held = await factory.Services.GetRequiredService<PasswordGate>().Enter(CancellationToken.None);
+        Assert.True(held.IsAcquired);
+
+        var tooShort = await ChangePassword(client, "parol-aleksa", "korotko");
+        var tooLong = await ChangePassword(client, "parol-aleksa", LongPassword);
+        var mismatch = await TestLogin.Post(client, "/settings/password", new()
+        {
+            ["current"] = "parol-aleksa", ["new"] = "novyy-parol", ["new2"] = "drugoy-parol",
+        });
+
+        Assert.Equal("/settings?err=short_password#profile", tooShort.Headers.Location?.OriginalString);
+        Assert.Equal("/settings?err=long_password#profile", tooLong.Headers.Location?.OriginalString);
+        Assert.Equal("/settings?err=password_mismatch#profile", mismatch.Headers.Location?.OriginalString);
+    }
+
+    // Предел по адресу общий со входом: вход тратит первую попытку из двух.
+    [Fact]
+    public async Task Too_many_password_changes_from_one_address_get_429()
+    {
+        var factory = StartServer(("Samizdat:Auth:AttemptsPerMinute", "2"));
+        AddPerson(factory, "aleks", "parol-aleksa");
+        var client = await SignIn(factory, "aleks", "parol-aleksa");
+
+        var first = await ChangePassword(client, "mimo-mimo", "novyy-parol");
+        var second = await ChangePassword(client, "parol-aleksa", "novyy-parol");
+
+        Assert.Equal("/settings?err=wrong_password#profile", first.Headers.Location?.OriginalString);
+        Assert.Equal(HttpStatusCode.TooManyRequests, second.StatusCode);
+        Assert.True(second.Headers.Contains("Retry-After"));
+        Assert.True(PasswordHasher.Verify("parol-aleksa", FindUser(factory, "aleks")!.PasswordHash));
+    }
+
     [Fact]
     public async Task Owner_forms_with_a_password_wait_for_a_free_hash_slot()
     {
