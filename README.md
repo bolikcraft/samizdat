@@ -137,7 +137,7 @@ The markup of the page `/setup` is in `app/setup.html`. It uses the classes of t
 
 ### With Docker
 
-You need Docker with the Compose plugin and git. The image is built on your server from the source code.
+You need Docker with the Compose plugin, git, curl and openssl. The image is built on your server from the source code.
 
 ```bash
 git clone https://github.com/bolikcraft/samizdat.git /opt/samizdat
@@ -149,9 +149,12 @@ docker compose run --rm app owner set <login>   # asks for the password
 docker compose run --rm app token new laptop
 ```
 
-The site is at `http://<server>:8080`. To change the port or the address, set `SAMIZDAT_PORT` and
-`SAMIZDAT_BIND` in `.env`. The folders `data/` (articles, keys, background) and `pgdata/`
-(the database) are in the same folder as `compose.yaml`. `docker compose down -v` does not remove them.
+The site listens on the address `127.0.0.1` and the port `8080` of the server. Only programs on the server
+can connect to it, for example a reverse proxy with HTTPS. If the proxy is on a different machine, set
+`SAMIZDAT_BIND=0.0.0.0` in `.env`. Docker adds its own firewall rules for the port, so `ufw` does not
+close it. Use the firewall of your network to let only the proxy connect. To change the port, set
+`SAMIZDAT_PORT`. The folders `data/` (articles, keys, background, and `tmp` for the temporary zip files)
+and `pgdata/` (the database) are in the same folder as `compose.yaml`. `docker compose down -v` does not remove them.
 
 A new database has the demo account `admin` with the password `admin`. When a person signs in with a password
 of less than 8 characters, the site opens only the page `/setup`. On this page, the person sets a new password
@@ -164,16 +167,40 @@ The password must have 8 to 200 characters.
 The command `owner set` with a different login removes the account `admin` if its password is still `admin`.
 If a person with the login exists, `owner set` gives this person the new password and makes this person an owner.
 
-The database uses `POSTGRES_PASSWORD` only when it starts for the first time with an empty `pgdata/`.
-After that, do not change the password in `.env` only. First change it in the database, then in `.env`.
+`.env` contains two passwords of the database:
+
+- `POSTGRES_PASSWORD` is the password of the administrator role `samizdat`. The database uses it only
+  when it starts for the first time with an empty `pgdata/`. After that, do not change the password
+  in `.env` only. First change it in the database, then in `.env`.
+- `SAMIZDAT_DB_PASSWORD` is the password of the role `samizdat_app`. The site connects to the database
+  with this role. The role owns the database, but it is not a superuser. When `.env` does not have this
+  password, `deploy/update.sh` makes one. The script sets this password in the database each time it runs.
+  To change the password, change it in `.env` and run the script. If you make the password yourself,
+  use only letters and digits.
+
+`deploy/update.sh` sets the mode of `.env` to `600`, because the file contains passwords.
 
 To update, run `deploy/update.sh` again. Before the update, the script writes a dump of the database
 to `backups/` and keeps the last 10 dumps. If the database is stopped, the script starts it for the dump.
-Then the script gets the new version, builds the image and waits until the site starts (at most 5 minutes).
+Then the script gets the new version, downloads the new image of the database and builds the image of
+the site on new base images. Then it gives the database to the role `samizdat_app` and waits until
+the site starts (at most 5 minutes).
 Without an argument, the script updates to `origin/main`. To go to another version, give the script
 a git ref — a commit or a tag: `deploy/update.sh <ref>`. If the update fails, the script shows
 the command that goes back to the previous version.
 The database changes of each version only add data, so an earlier version works with the new database.
+
+A version from before the role `samizdat_app` has no file `deploy/db-role.sql`. The script of this version
+does not know the step of the role. It goes on with its old text after its own `git checkout`. When `.env`
+has no `SAMIZDAT_DB_PASSWORD` yet, the update stops, because the new `compose.yaml` needs this password.
+To go forward from such a version, first get the new version, then start the new script. Do this
+for a site that you installed earlier, and after you go back to such a version:
+
+```bash
+git fetch origin
+git checkout --detach origin/main
+deploy/update.sh
+```
 
 The dump contains only the database. It does not contain `data/` (articles, keys, background).
 For a full copy, also copy the folder `data/`, or make a snapshot of the machine.
@@ -183,19 +210,34 @@ To restore the database from a dump:
 ```bash
 docker compose stop app
 # pg_restore --clean does not remove tables that are not in the dump, so remove all tables first.
-docker compose exec -T db psql -U samizdat -d samizdat -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'
-docker compose exec -T db pg_restore -U samizdat -d samizdat < backups/<file>.dump
+docker compose exec -T db psql -U samizdat -d samizdat -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public AUTHORIZATION pg_database_owner;'
+# With --role, the tables belong to samizdat_app, also when the dump is from an earlier version.
+docker compose exec -T db pg_restore -U samizdat -d samizdat --no-owner --role=samizdat_app < backups/<file>.dump
 docker compose start app
 ```
 
-Behind a reverse proxy with HTTPS, the proxy must send the header `X-Forwarded-Proto: https`.
-Without it, the login cookie does not get the `Secure` flag.
+Behind a reverse proxy, write the address of the proxy in `SAMIZDAT_PROXY` in `.env`, for example
+`SAMIZDAT_PROXY=192.168.1.47`. You can give more than one IP address or network (CIDR), with commas
+between them. If an entry is not an IP address or a network, the server does not start.
+The proxy must send two headers:
+
+- `X-Forwarded-For` with the address of the client;
+- `X-Forwarded-Proto` with the value `https`.
+
+The site uses these headers only from the addresses in `SAMIZDAT_PROXY`. It reads the last address
+in `X-Forwarded-For`: the address that the proxy adds. When `SAMIZDAT_PROXY` is empty, the site does not
+use the headers. Then every client has the address of the proxy, and the limits below count all clients
+together. Without `X-Forwarded-Proto: https`, the login cookie does not get the `Secure` flag.
+On HTTPS requests, the site sends the header `Strict-Transport-Security` (HSTS) for one year.
+You can set HSTS on the proxy instead.
 
 The server limits the attempts to sign in and to register. The default limit is 10 attempts in one minute
 from one IP address. When a client sends more attempts, the server sends the status 429.
 To change the limit, set `SAMIZDAT_LOGIN_ATTEMPTS` in `.env`. The value `0` removes the limit.
-The server does not use the header `X-Forwarded-For`. Behind a reverse proxy, all clients have the address
-of the proxy and share one limit.
+Behind a proxy from `SAMIZDAT_PROXY`, the limit uses the address of the client from `X-Forwarded-For`.
+For IPv6, one limit covers a network /64.
+After 20 failed attempts for one login in 15 minutes, the form does not check the password for this login
+and asks the person to wait (`Samizdat__Auth__FailuresPerLogin`, the value `0` removes this limit).
 Each password hash uses 64 MB of memory. The server calculates at most 2 hashes at the same time
 (`Samizdat__Auth__ParallelHashes`) and keeps at most 32 more requests in a queue (`Samizdat__Auth__HashQueue`).
 When the queue is full, the server sends the status 429.
@@ -214,7 +256,7 @@ dotnet user-secrets --project src/Samizdat.Server \
 dotnet run --project src/Samizdat.Server --no-launch-profile -- \
   --urls http://127.0.0.1:5080 --Samizdat:DataRoot=/path/to/data
 
-# 3. Set the owner and make a token for the command line tool.
+# 3. Set the owner (the command asks for the password) and make a token for the command line tool.
 dotnet run --project src/Samizdat.Server --no-launch-profile -- owner set <login>
 dotnet run --project src/Samizdat.Server --no-launch-profile -- token new laptop
 
@@ -223,6 +265,10 @@ dotnet run --project src/Samizdat.Cli -- login
 dotnet run --project src/Samizdat.Cli -- push --dry-run
 dotnet run --project src/Samizdat.Cli -- push
 ```
+
+If the address of the server starts with `http://` and the server is not on your machine, the command line
+tool shows a warning in each command that connects to the server. Without HTTPS, the token and the notes
+go through the network as plain text.
 
 The command `reindex` makes the search index again for all the articles. You need it only after
 an update that changes how the text is read.
