@@ -36,6 +36,8 @@ public static class AuthEndpoints
             // Ключ — логин в том виде, как он записан в базе: логины сравниваются без регистра,
             // и «Admin» с «admin» иначе считались бы порознь. Неизвестный логин считается как введён.
             var key = user?.Login ?? login;
+            // Проверка и запись не атомарны: параллельные запросы чуть превысят предел,
+            // превышение ограничено очередью PasswordGate.
             if (failures.IsBlocked(key))
                 return LoginPage(pages, settings, text, antiforgery, context, text["login.err.too_many"],
                                  returnUrl, StatusCodes.Status429TooManyRequests);
@@ -52,9 +54,8 @@ public static class AuthEndpoints
             }
             if (user is null || !matches)
             {
-                // Проверка и запись не атомарны: параллельные запросы чуть превысят предел,
-                // превышение ограничено очередью PasswordGate. Пустой и длинный пароль не стоят Argon2id
-                // и в счёт не идут: иначе их дешёвый поток вытеснял бы из таблицы счётчик жертвы.
+                // Пустой и длинный пароль хэш не считают и в счёт не идут.
+                // Иначе их дешёвый поток вытеснял бы из таблицы счётчик жертвы.
                 if (password.Length is > 0 and <= SettingsPage.MaxPasswordLength) failures.Add(key);
                 return LoginPage(pages, settings, text, antiforgery, context,
                                  text["login.err.bad_credentials"], returnUrl);

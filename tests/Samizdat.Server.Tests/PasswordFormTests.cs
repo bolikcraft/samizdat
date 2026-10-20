@@ -250,8 +250,6 @@ public class PasswordFormTests : IDisposable
         Assert.Contains(TooMany, await second.Content.ReadAsStringAsync());
     }
 
-    // Такие пароли не стоят Argon2id: если бы они шли в счёт, поток мусорных логинов
-    // дёшево вытеснял бы из таблицы счётчик жертвы.
     [Fact]
     public async Task Empty_and_too_long_passwords_are_not_counted()
     {
@@ -301,6 +299,22 @@ public class PasswordFormTests : IDisposable
         Assert.Contains(TooMany, await client.GetStringAsync("/settings?err=too_many_attempts"));
         var signIn = await TestLogin.PostLogin(NewClient(factory), "aleks", "parol-aleksa");
         Assert.Equal(HttpStatusCode.TooManyRequests, signIn.StatusCode);
+    }
+
+    [Fact]
+    public async Task Refused_password_change_does_not_calculate_a_hash()
+    {
+        var factory = StartWithFailures(1, ("Samizdat:Auth:ParallelHashes", "1"), ("Samizdat:Auth:HashQueue", "0"));
+        AddPerson(factory, "aleks", "parol-aleksa");
+        var client = await SignIn(factory, "aleks", "parol-aleksa");
+        await ChangePassword(client, "mimo-mimo", "novyy-parol");
+        // Место под хэш занято: пустой 429 от PasswordGate значил бы, что форма пошла считать хэш.
+        using var held = await factory.Services.GetRequiredService<PasswordGate>().Enter(CancellationToken.None);
+        Assert.True(held.IsAcquired);
+
+        var refused = await ChangePassword(client, "parol-aleksa", "novyy-parol");
+
+        Assert.Equal("/settings?err=too_many_attempts#profile", refused.Headers.Location?.OriginalString);
     }
 
     [Fact]
