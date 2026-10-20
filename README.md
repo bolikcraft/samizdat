@@ -235,6 +235,9 @@ folder with `compose.yaml`, for example `samizdat` for `/opt/samizdat`:
 docker network inspect <folder>_default --format '{{(index .IPAM.Config 0).Gateway}}'
 ```
 
+After `docker compose down`, the network can get a new address. Then run this command again and compare
+the address with `SAMIZDAT_PROXY`.
+
 The proxy must send two headers:
 
 - `X-Forwarded-For` with the address of the client;
@@ -247,8 +250,8 @@ together. Without `X-Forwarded-Proto: https`, the login cookie does not get the 
 On HTTPS requests, the site sends the header `Strict-Transport-Security` (HSTS) for one year.
 You can set HSTS on the proxy instead.
 
-The server limits the attempts to sign in and to register. The default limit is 10 attempts in one minute
-from one IP address. When a client sends more attempts, the server sends the status 429.
+The server limits the attempts to sign in, to register and to change your password. The default limit
+is 10 attempts in one minute from one IP address. When a client sends more attempts, the server sends the status 429.
 To change the limit, set `SAMIZDAT_LOGIN_ATTEMPTS` in `.env`. The value `0` removes the limit.
 Behind a proxy from `SAMIZDAT_PROXY`, the limit uses the address of the client from `X-Forwarded-For`.
 For IPv6, one limit covers a network /64.
@@ -292,6 +295,10 @@ dotnet run --project src/Samizdat.Cli -- login
 dotnet run --project src/Samizdat.Cli -- push --dry-run
 dotnet run --project src/Samizdat.Cli -- push
 ```
+
+Behind a reverse proxy, give the address of the proxy in the setting `Samizdat:Proxy`, for example
+with the argument `--Samizdat:Proxy=127.0.0.1` or with `dotnet user-secrets`. Without it, the login cookie
+does not get the `Secure` flag, and the site does not send HSTS.
 
 If the address of the server starts with `http://` and the host is not a loopback address (`localhost`,
 `127.0.0.0/8` or `::1`), the command line tool shows a warning in each command that connects to the

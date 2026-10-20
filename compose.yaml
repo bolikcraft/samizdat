@@ -34,7 +34,7 @@ services:
     environment:
       # Без GSS Npgsql ищет libgssapi_krb5, которой нет в chiseled-образе, и пишет ошибку в лог.
       # Роль без прав суперпользователя, её создаёт deploy/update.sh. POSTGRES_PASSWORD сюда не идёт.
-      ConnectionStrings__Postgres: Host=db;Database=samizdat;Username=samizdat_app;Password=${SAMIZDAT_DB_PASSWORD:?set SAMIZDAT_DB_PASSWORD in .env or run deploy/update.sh};GSS Encryption Mode=Disable
+      ConnectionStrings__Postgres: Host=db;Database=samizdat;Username=samizdat_app;Password=${SAMIZDAT_DB_PASSWORD:?run deploy/update.sh};GSS Encryption Mode=Disable
       Samizdat__Auth__AttemptsPerMinute: ${SAMIZDAT_LOGIN_ATTEMPTS:-10}
       Samizdat__Proxy: ${SAMIZDAT_PROXY:-}
     volumes:
