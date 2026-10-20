@@ -119,6 +119,30 @@ public class ProxyTests : IDisposable
     }
 
     [Fact]
+    public async Task Hsts_follows_the_scheme_set_by_the_trusted_proxy()
+    {
+        var factory = StartServer(("Samizdat:Proxy", "10.0.0.1"));
+
+        // Хост не localhost: для него UseHsts молчит.
+        async Task<HttpResponseMessage> Get(string remote)
+        {
+            var client = factory.CreateClient(new WebApplicationFactoryClientOptions
+            {
+                BaseAddress = new Uri("http://samizdat.test"), AllowAutoRedirect = false,
+            });
+            client.DefaultRequestHeaders.Add(TestRemoteAddress.Header, remote);
+            client.DefaultRequestHeaders.Add("X-Forwarded-Proto", "https");
+            return await client.GetAsync("/login");
+        }
+
+        var trusted = await Get("10.0.0.1");
+        var other = await Get("10.0.0.2");
+
+        Assert.Equal("max-age=31536000", Assert.Single(trusted.Headers.GetValues("Strict-Transport-Security")));
+        Assert.False(other.Headers.Contains("Strict-Transport-Security"));
+    }
+
+    [Fact]
     public async Task Limit_counts_the_client_behind_the_proxy()
     {
         var factory = StartServer(("Samizdat:Proxy", "10.0.0.1"), ("Samizdat:Auth:AttemptsPerMinute", "1"));
