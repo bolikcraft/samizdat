@@ -24,7 +24,10 @@
     if (event.key === "Escape" && dialog.open) event.stopPropagation();
   }, true);
 
-  if (window.navigation) navigation.addEventListener("navigate", function () { dialog.close(); });
+  // Та же проверка API, что в navigation.js: элемент статьи с id="navigation" — не API.
+  if (typeof window.Navigation === "function" && window.navigation instanceof window.Navigation) {
+    navigation.addEventListener("navigate", function () { dialog.close(); });
+  }
   // Без Navigation API «назад» уносит страницу в кэш браузера вместе с открытым окном.
   window.addEventListener("pagehide", function () { dialog.close(); });
 })();

@@ -6,7 +6,9 @@
 (function () {
   var tree = document.getElementById("nav-tree");
   var main = document.querySelector("main");
-  if (!window.navigation || !tree || !main) return;
+  // Элемент с id="navigation" браузер тоже отдаёт как window.navigation. Проверяем, что это сам API.
+  var hasApi = typeof window.Navigation === "function" && window.navigation instanceof window.Navigation;
+  if (!hasApi || !tree || !main) return;
 
   // У этих адресов одно звено пути, но дерева на странице нет. Прочие страницы без дерева
   // (вложения, скачивание, гостевые ссылки) длиннее и отсеиваются по форме пути.
@@ -145,7 +147,8 @@
     // Меняем детей, а не сам <main>: forms.js держит ссылку на элемент.
     main.replaceChildren.apply(main, Array.from(page.querySelector("main").childNodes));
     // Схемы в новом <main> рисует diagrams.js. Файл мог ещё не загрузиться.
-    var diagrams = window.drawDiagrams ? window.drawDiagrams() : Promise.resolve();
+    // Тогда window.drawDiagrams бывает элементом статьи с id="drawDiagrams".
+    var diagrams = typeof window.drawDiagrams === "function" ? window.drawDiagrams() : Promise.resolve();
     shownKey = navigation.currentEntry.key;
     document.title = page.title;
     markCurrent(page);

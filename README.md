@@ -103,6 +103,8 @@ The scripts find these elements in the templates of the theme:
 - `.nav-switch`: the `<details>` that opens the side column on a narrow screen.
 - `.search input[name=q]`: the search field in the header.
 - `form.visibility-form`, `details.share` and `form.share-form` in it: the forms of an article.
+  Put `form.visibility-form` and `details.share` directly in `<main>`. The scripts do not look for
+  them deeper, because the text of an article can have elements with the same classes.
 - `.copy-link` with `data-url` and `data-copied`: the button that copies a link.
 - `#sidebar-toggle`: the button that collapses the side column. The script sets `aria-expanded` on it.
 - `#reading-toggle`: the button of the reading mode. Put it outside `<main>`, because the scripts replace

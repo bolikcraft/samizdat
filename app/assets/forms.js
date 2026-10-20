@@ -6,6 +6,7 @@
   var SWAPPED = "form.visibility-form, form.share-form";
 
   // Что забирается из ответа. «Поделиться» целиком: там меняется и ссылка, и набор форм.
+  // Только прямые дети <main>: в тексте статьи бывают элементы с теми же классами.
   var BLOCKS = [".visibility-form", "details.share"];
 
   var main = document.querySelector("main");
@@ -56,8 +57,8 @@
     var fresh = new DOMParser().parseFromString(html, "text/html");
 
     BLOCKS.forEach(function (selector) {
-      var live = main.querySelector(selector);
-      var next = fresh.querySelector(selector);
+      var live = main.querySelector(":scope > " + selector);
+      var next = fresh.querySelector("main > " + selector);
       if (!live || !next) return;
 
       // Раскрытие «Поделиться» держит читатель, а в ответе блок всегда закрыт.
