@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Text;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -368,6 +369,50 @@ public class AuthTests : IDisposable
 
         Assert.True(answer.Headers.Location?.OriginalString.All(char.IsAscii));
         Assert.Equal("/статья", Uri.UnescapeDataString(answer.Headers.Location!.OriginalString));
+    }
+
+    [Fact]
+    public async Task Logout_ends_the_sessions_of_the_person_in_other_browsers()
+    {
+        var factory = StartServer();
+        AddOwner(factory, "aleks", "тайна-тайна");
+        var first = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        var second = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        await TestLogin.PostLogin(first, "aleks", "тайна-тайна");
+        await TestLogin.PostLogin(second, "aleks", "тайна-тайна");
+
+        var logout = await TestLogin.Post(first, "/logout", []);
+
+        Assert.Equal("/login", logout.Headers.Location?.OriginalString);
+        var other = await second.GetAsync("/");
+        Assert.Equal(HttpStatusCode.Found, other.StatusCode);
+        Assert.StartsWith("/login", other.Headers.Location?.PathAndQuery);
+    }
+
+    [Fact]
+    public async Task Logout_keeps_the_api_tokens()
+    {
+        var factory = StartServer();
+        AddOwner(factory, "aleks", "тайна-тайна");
+        var token = ApiToken.Create();
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+            db.ApiTokens.Add(new ApiTokenRow
+            {
+                UserId = db.Users.Single(row => row.Login == "aleks").Id,
+                TokenHash = ApiToken.HashOf(token), CreatedAt = DateTimeOffset.UtcNow,
+            });
+            db.SaveChanges();
+        }
+        var browser = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        await TestLogin.PostLogin(browser, "aleks", "тайна-тайна");
+
+        await TestLogin.Post(browser, "/logout", []);
+
+        var cli = factory.CreateClient();
+        cli.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        Assert.Equal(HttpStatusCode.OK, (await cli.GetAsync("/api/state")).StatusCode);
     }
 
     public void Dispose() => Directory.Delete(dataRoot, recursive: true);

@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -91,8 +92,15 @@ public static class AuthEndpoints
                 : QueryHelpers.AddQueryString("/login", "ReturnUrl", returnUrl));
         }).RequireRateLimiting(AuthLimits.Policy);
 
-        app.MapPost("/logout", async (HttpContext context) =>
+        app.MapPost("/logout", async (HttpContext context, SamizdatDbContext db, ClaimsPrincipal user) =>
         {
+            // Новая метка гасит cookie этого человека во всех браузерах. Токены API живут отдельно.
+            if (user.Identity?.IsAuthenticated == true && SettingsPage.CurrentUser(db, user) is { } person)
+            {
+                person.SessionStamp = UserRow.NewSessionStamp();
+                await db.SaveChangesAsync();
+            }
+
             await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
             return Results.Redirect("/login");
         }).RequireValidToken().AllowDuringSetup();
