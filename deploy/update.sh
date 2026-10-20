@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Обновляет Samizdat на стенде: дамп базы, версия из git, сборка, ожидание старта.
+# Обновляет Samizdat на стенде: дамп базы, версия из git, сборка, роль базы, ожидание старта.
 # Запуск из каталога репозитория: deploy/update.sh [git-ref], по умолчанию origin/main.
 set -euo pipefail
 # Дампы содержат хэши паролей и токенов.
@@ -11,7 +11,7 @@ ref="${1:-origin/main}"
 keep_dumps=10
 wait_seconds=300
 
-for tool in curl git docker; do
+for tool in curl git docker openssl; do
     if ! command -v "$tool" > /dev/null; then
         echo "Не найдена программа $tool. Обновление остановлено." >&2
         exit 1
@@ -27,6 +27,15 @@ fi
 env_value() {
     grep -E "^[[:space:]]*$1=" .env | tail -n 1 | cut -d= -f2- | tr -d "\"' \t\r" || true
 }
+
+# У сайтов, поставленных до роли samizdat_app, этого пароля нет.
+# Без него compose.yaml не читается, поэтому он появляется до первой команды docker compose.
+if [[ -z "$(env_value SAMIZDAT_DB_PASSWORD)" ]]; then
+    printf '\nSAMIZDAT_DB_PASSWORD=%s\n' "$(openssl rand -hex 24)" >> .env
+    echo "В .env добавлен пароль роли базы SAMIZDAT_DB_PASSWORD."
+fi
+chmod 600 .env
+
 port="$(env_value SAMIZDAT_PORT)"
 port="${port:-8080}"
 host="$(env_value SAMIZDAT_BIND)"
@@ -88,7 +97,17 @@ new="$(git rev-parse --short HEAD)"
 # Образ базы compose скачивает всё равно, лишний образ не нужен. chown только там, где владелец другой.
 docker run --rm -v "$PWD/data:/data" "$db_image" find /data ! -user 1654 -exec chown -h 1654:1654 {} +
 
-docker compose build app
+# Свежие образы базы и базовые образы сборки: в них исправления безопасности.
+docker compose pull db
+docker compose build --pull app
+
+# У версий до роли samizdat_app этого файла нет, и при откате на них шаг не нужен.
+if [[ -f deploy/db-role.sql ]]; then
+    docker compose up -d --wait db
+    SAMIZDAT_DB_PASSWORD="$(env_value SAMIZDAT_DB_PASSWORD)" \
+        docker compose exec -T -e SAMIZDAT_DB_PASSWORD db psql -q -U samizdat -d samizdat -f - < deploy/db-role.sql
+fi
+
 docker compose up -d
 
 # Kestrel слушает только после миграций и достройки поискового индекса, поэтому 200 значит «сервер готов».
