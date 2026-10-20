@@ -6,7 +6,8 @@
   // живёт тут, а не в странице: на статье встроенный <script> запрещён. Слушаем документ, а не
   // кнопки: блок «Поделиться» переписывается после отправки формы, и кнопка в нём каждый раз новая.
   document.addEventListener("click", function (event) {
-    var button = event.target.closest(".copy-link");
+    // Только <button>: в статье бывает элемент с тем же классом, а кнопок санитайзер в ней не оставляет.
+    var button = event.target.closest("button.copy-link");
     if (!button) return;
 
     navigator.clipboard.writeText(button.dataset.url).then(function () {

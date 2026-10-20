@@ -16,7 +16,8 @@
   document.addEventListener("DOMContentLoaded", syncButtons);
 
   document.addEventListener("click", function (event) {
-    var button = event.target.closest("#sidebar-toggle, #reading-toggle");
+    // Только <button>: Markdig даёт заголовку «Reading toggle» в статье тот же id.
+    var button = event.target.closest("button#sidebar-toggle, button#reading-toggle");
     if (!button) return;
     // Safari не ставит фокус на кнопку при щелчке, и он остался бы в скрытом поле фильтра или поиска.
     button.focus();
