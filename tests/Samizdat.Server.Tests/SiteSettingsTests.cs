@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Net;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
@@ -465,28 +464,4 @@ public class SiteSettingsTests : IDisposable
     }
 
     static byte[] Jpeg() => [0xFF, 0xD8, 0xFF, 0xE0, 1, 2, 3, 4];
-
-    sealed class CapturingLoggerProvider : ILoggerProvider
-    {
-        public ConcurrentBag<string> Messages { get; } = [];
-
-        public ILogger CreateLogger(string categoryName) => new CapturingLogger(this);
-
-        public void Dispose()
-        {
-        }
-
-        sealed class CapturingLogger(CapturingLoggerProvider owner) : ILogger
-        {
-            public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
-
-            public bool IsEnabled(LogLevel logLevel) => logLevel >= LogLevel.Warning;
-
-            public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
-                                     Func<TState, Exception?, string> formatter)
-            {
-                if (logLevel >= LogLevel.Warning) owner.Messages.Add(formatter(state, exception));
-            }
-        }
-    }
 }

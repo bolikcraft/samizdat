@@ -1,10 +1,12 @@
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Configuration.Json;
 using Microsoft.Extensions.Configuration.Xml;
+using Microsoft.Extensions.Options;
 using Samizdat.Core.Localization;
 using Samizdat.Core.Rendering;
 using Samizdat.Core.Themes;
@@ -117,6 +119,11 @@ public static class Startup
         // Архивы упавшего процесса: DeleteOnClose их уже не удалит.
         app.Services.GetRequiredService<ArticlePackage>().RemoveLeftovers();
 
+        // Information, а не Warning: запуск без прокси — обычный случай.
+        if (app.Services.GetRequiredService<IOptions<ForwardedHeadersOptions>>().Value.ForwardedHeaders
+            == ForwardedHeaders.None)
+            app.Logger.LogInformation("Samizdat:Proxy пуст: заголовки X-Forwarded-* не используются. " +
+                                      "За прокси с TLS cookie останутся без Secure, а HSTS не уйдёт");
         app.UseForwardedHeaders();
         app.UseSecurityHeaders();
         // После UseForwardedHeaders: за прокси https виден только по X-Forwarded-Proto.

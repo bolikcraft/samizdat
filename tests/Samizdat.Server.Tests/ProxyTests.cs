@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Samizdat.Server.Auth;
 using Samizdat.Server.Data;
 
@@ -14,6 +15,7 @@ public class ProxyTests : IDisposable
 {
     readonly DatabaseFixture database;
     readonly string dataRoot = Directory.CreateTempSubdirectory("samizdat-data").FullName;
+    readonly CapturingLoggerProvider logs = new(LogLevel.Information);
 
     public ProxyTests(DatabaseFixture database)
     {
@@ -34,7 +36,11 @@ public class ProxyTests : IDisposable
             // и наблюдатели inotify упираются в системный лимит.
             builder.UseSetting("hostBuilder:reloadConfigOnChange", "false");
             foreach (var (key, value) in settings) builder.UseSetting(key, value);
-            builder.ConfigureServices(services => services.AddSingleton<IStartupFilter, TestRemoteAddress>());
+            builder.ConfigureServices(services =>
+            {
+                services.AddSingleton<IStartupFilter, TestRemoteAddress>();
+                services.AddSingleton<ILoggerProvider>(logs);
+            });
         });
 
         using var scope = factory.Services.CreateScope();
@@ -108,6 +114,23 @@ public class ProxyTests : IDisposable
         var factory = StartServer();
 
         Assert.False(await SessionCookieIsSecure(factory, remote: "10.0.0.1", forwardedProto: "https"));
+    }
+
+    // За прокси с TLS пустая настройка тихо снимает Secure с cookie и HSTS: строка в логе это объясняет.
+    [Fact]
+    public void Empty_setting_is_told_in_the_log_at_start()
+    {
+        StartServer();
+
+        Assert.Contains(logs.Messages, message => message.Contains("Samizdat:Proxy") && message.Contains("X-Forwarded-*"));
+    }
+
+    [Fact]
+    public void Set_setting_is_not_told_in_the_log()
+    {
+        StartServer(("Samizdat:Proxy", "10.0.0.1"));
+
+        Assert.DoesNotContain(logs.Messages, message => message.Contains("Samizdat:Proxy"));
     }
 
     [Fact]
