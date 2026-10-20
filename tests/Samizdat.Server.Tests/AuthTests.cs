@@ -438,5 +438,30 @@ public class AuthTests : IDisposable
         Assert.Equal(HttpStatusCode.OK, (await cli.GetAsync("/api/state")).StatusCode);
     }
 
+    [Fact]
+    public async Task Antiforgery_cookie_is_secure_on_https()
+    {
+        var client = StartServer().CreateClient(new WebApplicationFactoryClientOptions
+        {
+            BaseAddress = new Uri("https://localhost"),
+        });
+
+        var answer = await client.GetAsync("/login");
+
+        var cookies = answer.Headers.TryGetValues("Set-Cookie", out var values) ? values : [];
+        var antiforgery = Assert.Single(cookies, cookie => cookie.StartsWith(".AspNetCore.Antiforgery.", StringComparison.Ordinal));
+        Assert.Contains("secure", antiforgery, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Antiforgery_cookie_is_not_secure_on_plain_http()
+    {
+        var answer = await StartServer().CreateClient().GetAsync("/login");
+
+        var cookies = answer.Headers.TryGetValues("Set-Cookie", out var values) ? values : [];
+        var antiforgery = Assert.Single(cookies, cookie => cookie.StartsWith(".AspNetCore.Antiforgery.", StringComparison.Ordinal));
+        Assert.DoesNotContain("secure", antiforgery, StringComparison.OrdinalIgnoreCase);
+    }
+
     public void Dispose() => Directory.Delete(dataRoot, recursive: true);
 }

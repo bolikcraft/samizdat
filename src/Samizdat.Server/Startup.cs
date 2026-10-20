@@ -91,7 +91,8 @@ public static class Startup
             })
             .AddScheme<AuthenticationSchemeOptions, ApiTokenAuthenticationHandler>(ApiToken.Scheme, _ => { });
         builder.Services.AddAuthorization();
-        builder.Services.AddAntiforgery();
+        // Как у cookie входа: Secure на https, в том числе за прокси с X-Forwarded-Proto.
+        builder.Services.AddAntiforgery(options => options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest);
         builder.AddAuthLimits();
     }
 
