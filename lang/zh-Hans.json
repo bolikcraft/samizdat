@@ -20,6 +20,7 @@
   "layout.settings": "设置",
   "login.err.bad_credentials": "用户名或密码不对",
   "login.err.not_approved": "站长还要批准你的申请。请等待回复。",
+  "login.err.too_many": "尝试次数太多。请等几分钟再试。",
   "login.login": "用户名",
   "login.password": "密码",
   "login.register": "注册账号",

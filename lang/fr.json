@@ -20,6 +20,7 @@
   "layout.settings": "Paramètres",
   "login.err.bad_credentials": "Identifiant ou mot de passe incorrect",
   "login.err.not_approved": "Le propriétaire doit accepter votre demande. Attendez la réponse.",
+  "login.err.too_many": "Trop de tentatives. Attendez quelques minutes et réessayez.",
   "login.login": "Identifiant",
   "login.password": "Mot de passe",
   "login.register": "Créer un compte",

@@ -20,6 +20,7 @@
   "layout.settings": "설정",
   "login.err.bad_credentials": "아이디나 비밀번호가 맞지 않습니다",
   "login.err.not_approved": "소유자가 아직 신청을 승인하지 않았습니다. 답을 기다리세요.",
+  "login.err.too_many": "시도가 너무 많습니다. 몇 분 기다린 뒤 다시 시도하세요.",
   "login.login": "아이디",
   "login.password": "비밀번호",
   "login.register": "계정 만들기",

@@ -14,8 +14,10 @@ public static class AuthLimits
         var attempts = builder.Configuration.GetValue("Samizdat:Auth:AttemptsPerMinute", 10);
         var parallel = Math.Max(1, builder.Configuration.GetValue("Samizdat:Auth:ParallelHashes", 2));
         var queue = Math.Max(0, builder.Configuration.GetValue("Samizdat:Auth:HashQueue", 32));
+        var failuresPerLogin = builder.Configuration.GetValue("Samizdat:Auth:FailuresPerLogin", 20);
         // Через фабрику: экземпляр, созданный контейнером, контейнер и освобождает.
         builder.Services.AddSingleton(_ => new PasswordGate(parallel, queue));
+        builder.Services.AddSingleton(new LoginFailures(failuresPerLogin, TimeProvider.System));
 
         builder.Services.AddRateLimiter(options =>
         {

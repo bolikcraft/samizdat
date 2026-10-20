@@ -24,7 +24,7 @@ public static class AuthEndpoints
         // Токен нужен и анонимной форме: без него чужой сайт впустит жертву в свою учётку (login CSRF).
         app.MapPost("/login", async (HttpContext context, SamizdatDbContext db, PageRenderer pages,
                                      SiteSettings settings, Translator text, IAntiforgery antiforgery,
-                                     PasswordGate gate) =>
+                                     PasswordGate gate, LoginFailures failures) =>
         {
             var form = await context.Request.ReadFormAsync();
             var login = form["login"].ToString();
@@ -32,6 +32,13 @@ public static class AuthEndpoints
             var returnUrl = LocalUrl(form["ReturnUrl"].ToString());
 
             var user = await db.Users.FirstOrDefaultAsync(row => row.Login == login);
+
+            // Ключ — логин в том виде, как он записан в базе: логины сравниваются без регистра,
+            // и «Admin» с «admin» иначе считались бы порознь. Неизвестный логин считается как введён.
+            var key = user?.Login ?? login;
+            if (failures.IsBlocked(key))
+                return LoginPage(pages, settings, text, antiforgery, context, text["login.err.too_many"],
+                                 returnUrl, StatusCodes.Status429TooManyRequests);
 
             bool matches;
             // Пароль длиннее предела не подходит ни к одной учётке, хэш по нему не считаем.
@@ -44,8 +51,14 @@ public static class AuthEndpoints
                 matches = PasswordHasher.Verify(password, user?.PasswordHash ?? PasswordHasher.Decoy);
             }
             if (user is null || !matches)
+            {
+                // Проверка и запись не атомарны: параллельные запросы чуть превысят предел,
+                // превышение ограничено очередью PasswordGate. Пустой и длинный пароль не стоят Argon2id
+                // и в счёт не идут: иначе их дешёвый поток вытеснял бы из таблицы счётчик жертвы.
+                if (password.Length is > 0 and <= SettingsPage.MaxPasswordLength) failures.Add(key);
                 return LoginPage(pages, settings, text, antiforgery, context,
                                  text["login.err.bad_credentials"], returnUrl);
+            }
 
             // Отдельное сообщение, а не «неверный пароль»: иначе человек решит, что опечатался,
             // и будет бить в форму. То, что такой логин есть, форма регистрации и так говорит
@@ -90,7 +103,8 @@ public static class AuthEndpoints
         => url is ['/', ..] && Microsoft.AspNetCore.Http.HttpResults.RedirectHttpResult.IsLocalUrl(url) ? url : null;
 
     static IResult LoginPage(PageRenderer pages, SiteSettings settings, Translator text, IAntiforgery antiforgery,
-                             HttpContext context, string? error, string? returnUrl)
+                             HttpContext context, string? error, string? returnUrl,
+                             int status = StatusCodes.Status200OK)
         => Results.Content(
             pages.Render("login.html", new()
             {
@@ -101,5 +115,5 @@ public static class AuthEndpoints
                 ["antiforgery"] = AntiforgeryHtml.Field(antiforgery, context),
                 ["return_url"] = returnUrl,
             }),
-            "text/html; charset=utf-8");
+            "text/html; charset=utf-8", statusCode: status);
 }

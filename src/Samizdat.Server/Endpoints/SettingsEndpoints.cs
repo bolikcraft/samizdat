@@ -138,7 +138,7 @@ public static class SettingsEndpoints
         });
 
         group.MapPost("/password", async (HttpContext context, SamizdatDbContext db, ClaimsPrincipal user,
-                                          PasswordGate gate) =>
+                                          PasswordGate gate, LoginFailures failures) =>
         {
             var form = await context.Request.ReadFormAsync();
             var current = form["current"].ToString();
@@ -146,6 +146,8 @@ public static class SettingsEndpoints
             var repeat = form["new2"].ToString();
 
             if (CurrentUser(db, user) is not { } person) return LoggedOut();
+            // Счётчик тот же, что у входа: иначе чужая открытая сессия подбирала бы пароль здесь.
+            if (failures.IsBlocked(person.Login)) return Err("too_many_attempts");
 
             bool matches;
             if (current.Length > MaxPasswordLength) matches = false;
@@ -155,7 +157,11 @@ public static class SettingsEndpoints
                 if (!lease.IsAcquired) return PasswordGate.Busy();
                 matches = PasswordHasher.Verify(current, person.PasswordHash);
             }
-            if (!matches) return Err("wrong_password");
+            if (!matches)
+            {
+                failures.Add(person.Login);
+                return Err("wrong_password");
+            }
             if (next.Length < MinPasswordLength) return Err("short_password");
             if (next.Length > MaxPasswordLength) return Err("long_password");
             if (next != repeat) return Err("password_mismatch");

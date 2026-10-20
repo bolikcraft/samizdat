@@ -20,6 +20,7 @@
   "layout.settings": "Nastavení",
   "login.err.bad_credentials": "Chybné jméno nebo heslo",
   "login.err.not_approved": "Vlastník musí vaši žádost schválit. Počkejte na odpověď.",
+  "login.err.too_many": "Příliš mnoho pokusů. Počkejte pár minut a zkuste to znovu.",
   "login.login": "Přihlašovací jméno",
   "login.password": "Heslo",
   "login.register": "Založit účet",

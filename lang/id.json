@@ -20,6 +20,7 @@
   "layout.settings": "Pengaturan",
   "login.err.bad_credentials": "Nama pengguna atau kata sandi salah",
   "login.err.not_approved": "Pemilik harus menyetujui permintaan Anda. Tunggu jawabannya.",
+  "login.err.too_many": "Terlalu banyak percobaan. Tunggu beberapa menit, lalu coba lagi.",
   "login.login": "Nama pengguna",
   "login.password": "Kata sandi",
   "login.register": "Buat akun",

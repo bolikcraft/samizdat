@@ -20,6 +20,7 @@
   "layout.settings": "Налаштування",
   "login.err.bad_credentials": "Хибний логін або пароль",
   "login.err.not_approved": "Заявку ще не схвалено. Дочекайтеся відповіді власника.",
+  "login.err.too_many": "Забагато спроб. Зачекайте кілька хвилин і спробуйте знову.",
   "login.login": "Логін",
   "login.password": "Пароль",
   "login.register": "Зареєструватися",

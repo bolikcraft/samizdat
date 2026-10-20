@@ -20,6 +20,7 @@
   "layout.settings": "Instellingen",
   "login.err.bad_credentials": "Verkeerde gebruikersnaam of verkeerd wachtwoord",
   "login.err.not_approved": "De eigenaar moet je aanvraag goedkeuren. Wacht op een antwoord.",
+  "login.err.too_many": "Te veel pogingen. Wacht een paar minuten en probeer het opnieuw.",
   "login.login": "Gebruikersnaam",
   "login.password": "Wachtwoord",
   "login.register": "Account aanmaken",

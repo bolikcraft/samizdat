@@ -20,6 +20,7 @@
   "layout.settings": "Ayarlar",
   "login.err.bad_credentials": "Kullanıcı adı veya parola yanlış",
   "login.err.not_approved": "Site sahibi başvurunuzu onaylamalı. Yanıtı bekleyin.",
+  "login.err.too_many": "Çok fazla deneme yapıldı. Birkaç dakika bekleyip yeniden deneyin.",
   "login.login": "Kullanıcı adı",
   "login.password": "Parola",
   "login.register": "Hesap oluştur",

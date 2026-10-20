@@ -20,6 +20,7 @@
   "layout.settings": "Settings",
   "login.err.bad_credentials": "Wrong login or password",
   "login.err.not_approved": "The owner must approve your request. Wait for an answer.",
+  "login.err.too_many": "Too many attempts. Wait a few minutes and try again.",
   "login.login": "Login",
   "login.password": "Password",
   "login.register": "Create an account",

@@ -20,6 +20,7 @@
   "layout.settings": "設定",
   "login.err.bad_credentials": "帳號或密碼不對",
   "login.err.not_approved": "擁有者要先通過你的申請。請等候回覆。",
+  "login.err.too_many": "嘗試次數太多。請等幾分鐘再試。",
   "login.login": "帳號",
   "login.password": "密碼",
   "login.register": "建立帳號",

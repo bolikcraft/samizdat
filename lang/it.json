@@ -20,6 +20,7 @@
   "layout.settings": "Impostazioni",
   "login.err.bad_credentials": "Nome utente o password errati",
   "login.err.not_approved": "Il proprietario deve accettare la tua richiesta. Attendi una risposta.",
+  "login.err.too_many": "Troppi tentativi. Attendi qualche minuto e riprova.",
   "login.login": "Nome utente",
   "login.password": "Password",
   "login.register": "Crea un account",

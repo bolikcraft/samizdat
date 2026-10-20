@@ -20,6 +20,7 @@
   "layout.settings": "Настройки",
   "login.err.bad_credentials": "Неверный логин или пароль",
   "login.err.not_approved": "Заявка ещё не одобрена. Дождитесь ответа владельца.",
+  "login.err.too_many": "Слишком много попыток. Подождите несколько минут и попробуйте снова.",
   "login.login": "Логин",
   "login.password": "Пароль",
   "login.register": "Зарегистрироваться",

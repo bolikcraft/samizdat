@@ -43,6 +43,7 @@ public static class SettingsPage
     internal static string SectionOf(string code) => code switch
     {
         "password" or "wrong_password" or "short_password" or "long_password" or "password_mismatch" => "profile",
+        "too_many_attempts" => "profile",
         "language" or "bad_language" => "profile",
         "general" or "bad_title" => "general",
         "token_created" or "token_note" or "token_revoked" => "api",
@@ -64,6 +65,7 @@ public static class SettingsPage
                 // Своей строки нет: текст тот же, что у формы регистрации.
                 "long_password" or "person_long_password" =>
                     text.Format("register.err.long_password", MaxPasswordLength),
+                "too_many_attempts" => text["login.err.too_many"],
                 "bad_title" => text.Format("settings.msg.bad_title", SiteSettings.MaxTitleLength),
                 _ => Known(text, err) ?? text["settings.msg.failed"],
             };

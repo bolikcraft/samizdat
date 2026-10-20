@@ -20,6 +20,7 @@
   "layout.settings": "Налады",
   "login.err.bad_credentials": "Няправільны лагін ці пароль",
   "login.err.not_approved": "Заяўку мусіць ухваліць уладальнік. Пачакайце адказу.",
+  "login.err.too_many": "Зашмат спроб. Пачакайце некалькі хвілін і паспрабуйце зноў.",
   "login.login": "Лагін",
   "login.password": "Пароль",
   "login.register": "Зарэгістравацца",

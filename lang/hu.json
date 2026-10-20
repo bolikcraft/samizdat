@@ -20,6 +20,7 @@
   "layout.settings": "Beállítások",
   "login.err.bad_credentials": "Hibás felhasználónév vagy jelszó",
   "login.err.not_approved": "A tulajdonosnak jóvá kell hagynia a kérelmét. Várja meg a választ.",
+  "login.err.too_many": "Túl sok próbálkozás. Várjon néhány percet, és próbálja újra.",
   "login.login": "Felhasználónév",
   "login.password": "Jelszó",
   "login.register": "Fiók létrehozása",

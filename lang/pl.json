@@ -20,6 +20,7 @@
   "layout.settings": "Ustawienia",
   "login.err.bad_credentials": "Zły login lub hasło",
   "login.err.not_approved": "Właściciel musi przyjąć twoje zgłoszenie. Poczekaj na odpowiedź.",
+  "login.err.too_many": "Za dużo prób. Poczekaj kilka minut i spróbuj ponownie.",
   "login.login": "Login",
   "login.password": "Hasło",
   "login.register": "Załóż konto",

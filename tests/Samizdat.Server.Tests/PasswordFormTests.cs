@@ -184,4 +184,134 @@ public class PasswordFormTests : IDisposable
         Assert.Null(FindUser(factory, "petr"));
         Assert.True(PasswordHasher.Verify("parol-ivana", FindUser(factory, "ivan")!.PasswordHash));
     }
+
+    const string TooMany = "Too many attempts.";
+
+    // Предел по адресу выключен: тест проверяет только счётчик логина.
+    WebApplicationFactory<Program> StartWithFailures(int perLogin, params (string Key, string Value)[] more)
+        => StartServer([("Samizdat:Auth:FailuresPerLogin", perLogin.ToString()),
+                        ("Samizdat:Auth:AttemptsPerMinute", "0"), .. more]);
+
+    [Fact]
+    public async Task Sign_in_is_refused_after_too_many_wrong_passwords_even_with_the_right_one()
+    {
+        var factory = StartWithFailures(2);
+        AddPerson(factory, "aleks", "parol-aleksa");
+        var client = NewClient(factory);
+
+        await TestLogin.PostLogin(client, "aleks", "mimo-mimo");
+        await TestLogin.PostLogin(client, "aleks", "mimo-mimo");
+        var refused = await TestLogin.PostLogin(client, "aleks", "parol-aleksa");
+
+        Assert.Equal(HttpStatusCode.TooManyRequests, refused.StatusCode);
+        Assert.Contains(TooMany, await refused.Content.ReadAsStringAsync());
+        Assert.Equal(HttpStatusCode.Found, (await client.GetAsync("/")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Refused_sign_in_does_not_calculate_a_hash()
+    {
+        var factory = StartWithFailures(1, ("Samizdat:Auth:ParallelHashes", "1"), ("Samizdat:Auth:HashQueue", "0"));
+        AddPerson(factory, "aleks", "parol-aleksa");
+        await TestLogin.PostLogin(NewClient(factory), "aleks", "mimo-mimo");
+        // Место под хэш занято: пустой 429 от PasswordGate значил бы, что форма пошла считать хэш.
+        using var held = await factory.Services.GetRequiredService<PasswordGate>().Enter(CancellationToken.None);
+        Assert.True(held.IsAcquired);
+
+        var refused = await TestLogin.PostLogin(NewClient(factory), "aleks", "parol-aleksa");
+
+        Assert.Contains(TooMany, await refused.Content.ReadAsStringAsync());
+    }
+
+    // Логины в базе сравниваются без регистра, поэтому и счётчик у них общий.
+    [Fact]
+    public async Task Login_in_another_case_shares_the_counter()
+    {
+        var factory = StartWithFailures(2);
+        AddPerson(factory, "aleks", "parol-aleksa");
+
+        await TestLogin.PostLogin(NewClient(factory), "aleks", "mimo-mimo");
+        await TestLogin.PostLogin(NewClient(factory), "ALEKS", "mimo-mimo");
+        var refused = await TestLogin.PostLogin(NewClient(factory), "Aleks", "parol-aleksa");
+
+        Assert.Equal(HttpStatusCode.TooManyRequests, refused.StatusCode);
+    }
+
+    [Fact]
+    public async Task Unknown_login_is_counted_too()
+    {
+        var factory = StartWithFailures(1);
+
+        var first = await TestLogin.PostLogin(NewClient(factory), "nikto", "mimo-mimo");
+        var second = await TestLogin.PostLogin(NewClient(factory), "nikto", "mimo-mimo");
+
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        Assert.Equal(HttpStatusCode.TooManyRequests, second.StatusCode);
+        Assert.Contains(TooMany, await second.Content.ReadAsStringAsync());
+    }
+
+    // Такие пароли не стоят Argon2id: если бы они шли в счёт, поток мусорных логинов
+    // дёшево вытеснял бы из таблицы счётчик жертвы.
+    [Fact]
+    public async Task Empty_and_too_long_passwords_are_not_counted()
+    {
+        var factory = StartWithFailures(2);
+        AddPerson(factory, "aleks", "parol-aleksa");
+
+        for (var i = 0; i < 3; i++)
+        {
+            var empty = await TestLogin.PostLogin(NewClient(factory), "aleks", "");
+            var tooLong = await TestLogin.PostLogin(NewClient(factory), "aleks", LongPassword);
+            Assert.Contains("Wrong login or password", await empty.Content.ReadAsStringAsync());
+            Assert.Contains("Wrong login or password", await tooLong.Content.ReadAsStringAsync());
+        }
+        var right = await TestLogin.PostLogin(NewClient(factory), "aleks", "parol-aleksa");
+
+        Assert.Equal(HttpStatusCode.Redirect, right.StatusCode);
+    }
+
+    [Fact]
+    public async Task Successful_sign_in_does_not_reset_the_counter()
+    {
+        var factory = StartWithFailures(2);
+        AddPerson(factory, "aleks", "parol-aleksa");
+
+        await TestLogin.PostLogin(NewClient(factory), "aleks", "mimo-mimo");
+        var right = await TestLogin.PostLogin(NewClient(factory), "aleks", "parol-aleksa");
+        await TestLogin.PostLogin(NewClient(factory), "aleks", "mimo-mimo");
+        var refused = await TestLogin.PostLogin(NewClient(factory), "aleks", "parol-aleksa");
+
+        Assert.Equal(HttpStatusCode.Redirect, right.StatusCode);
+        Assert.Equal(HttpStatusCode.TooManyRequests, refused.StatusCode);
+    }
+
+    [Fact]
+    public async Task Wrong_current_password_in_settings_counts_for_the_login()
+    {
+        var factory = StartWithFailures(2);
+        AddPerson(factory, "aleks", "parol-aleksa");
+        var client = await SignIn(factory, "aleks", "parol-aleksa");
+
+        await ChangePassword(client, "mimo-mimo", "novyy-parol");
+        await ChangePassword(client, "mimo-mimo", "novyy-parol");
+        var refused = await ChangePassword(client, "parol-aleksa", "novyy-parol");
+
+        Assert.Equal("/settings?err=too_many_attempts#profile", refused.Headers.Location?.OriginalString);
+        Assert.True(PasswordHasher.Verify("parol-aleksa", FindUser(factory, "aleks")!.PasswordHash));
+        Assert.Contains(TooMany, await client.GetStringAsync("/settings?err=too_many_attempts"));
+        var signIn = await TestLogin.PostLogin(NewClient(factory), "aleks", "parol-aleksa");
+        Assert.Equal(HttpStatusCode.TooManyRequests, signIn.StatusCode);
+    }
+
+    [Fact]
+    public async Task Zero_turns_the_counter_off()
+    {
+        var factory = StartWithFailures(0);
+        AddPerson(factory, "aleks", "parol-aleksa");
+
+        for (var i = 0; i < 5; i++) await TestLogin.PostLogin(NewClient(factory), "aleks", "mimo-mimo");
+        var right = await TestLogin.PostLogin(NewClient(factory), "aleks", "parol-aleksa");
+
+        Assert.Equal(HttpStatusCode.Redirect, right.StatusCode);
+    }
 }

@@ -20,6 +20,7 @@
   "layout.settings": "設定",
   "login.err.bad_credentials": "ログイン名かパスワードが違います",
   "login.err.not_approved": "所有者が申請を承認していません。返事をお待ちください。",
+  "login.err.too_many": "試行回数が多すぎます。数分待ってからもう一度お試しください。",
   "login.login": "ログイン名",
   "login.password": "パスワード",
   "login.register": "アカウントを作る",
