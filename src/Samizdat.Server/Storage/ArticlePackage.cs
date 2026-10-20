@@ -4,21 +4,51 @@ namespace Samizdat.Server.Storage;
 
 /// Папка статьи одним архивом. Внутри архива всё лежит в каталоге со slug в имени: распакованный
 /// архив не должен рассыпаться по папке загрузок.
-public static class ArticlePackage
+public sealed class ArticlePackage(string dataRoot)
 {
-    public static byte[] Pack(string slug, byte[] markdown, IEnumerable<(string Name, string FullPath)> attachments)
+    // Не /tmp: в контейнере это tmpfs, то есть память.
+    readonly string folder = Path.Combine(dataRoot, "tmp");
+
+    /// Архив во временном файле, поток стоит на его начале. Файл удаляется, когда поток закрывают.
+    public FileStream Pack(string slug, byte[] markdown, IEnumerable<(string Name, string FullPath)> attachments)
     {
-        using var buffer = new MemoryStream();
-
-        // leaveOpen: архив закрывается раньше буфера — он дописывает оглавление в Dispose,
-        // и без этого ToArray вернул бы обрезанный файл.
-        using (var zip = new ZipArchive(buffer, ZipArchiveMode.Create, leaveOpen: true))
+        Directory.CreateDirectory(folder);
+        var file = new FileStream(Path.Combine(folder, $"{Guid.NewGuid():N}.zip"),
+            new FileStreamOptions
+            {
+                Mode = FileMode.CreateNew, Access = FileAccess.ReadWrite, Options = FileOptions.DeleteOnClose,
+            });
+        try
         {
-            Write(zip, $"{slug}/index.md", markdown);
-            foreach (var (name, path) in attachments) Write(zip, $"{slug}/{name}", File.ReadAllBytes(path));
-        }
+            // leaveOpen: архив дописывает оглавление в Dispose, а файл нужен дальше — его отдают.
+            using (var zip = new ZipArchive(file, ZipArchiveMode.Create, leaveOpen: true))
+            {
+                Write(zip, $"{slug}/index.md", markdown);
+                foreach (var (name, path) in attachments)
+                {
+                    // Потоком, а не File.ReadAllBytes: большое вложение не ложится в память целиком.
+                    using var source = File.OpenRead(path);
+                    using var entry = zip.CreateEntry($"{slug}/{name}").Open();
+                    source.CopyTo(entry);
+                }
+            }
 
-        return buffer.ToArray();
+            file.Position = 0;
+            return file;
+        }
+        catch
+        {
+            // Вложение могли увести выкладкой посреди сборки: закрытие удаляет недописанный файл.
+            file.Dispose();
+            throw;
+        }
+    }
+
+    /// Архивы, которые не удалил упавший процесс: DeleteOnClose срабатывает только при закрытии потока.
+    public void RemoveLeftovers()
+    {
+        if (!Directory.Exists(folder)) return;
+        foreach (var file in Directory.EnumerateFiles(folder)) File.Delete(file);
     }
 
     static void Write(ZipArchive zip, string path, byte[] bytes)

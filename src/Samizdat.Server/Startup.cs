@@ -33,6 +33,7 @@ public static class Startup
 
         builder.Services.AddSingleton(new ArticleFiles(dataRoot));
         builder.Services.AddSingleton(new BackgroundFile(dataRoot));
+        builder.Services.AddSingleton(new ArticlePackage(dataRoot));
         builder.Services.AddSingleton(services =>
             new ThemeFactory(dataRoot, services.GetRequiredService<ILogger<ThemeFactory>>()));
         builder.Services.AddScoped<SiteSettings>();
@@ -111,6 +112,9 @@ public static class Startup
             IndexBackfill.Run(app.Services, services.GetRequiredService<ArticleFiles>(),
                               services.GetRequiredService<ILogger<Program>>(), force: false);
         }
+
+        // До приёма запросов: иначе уйдут архивы, которые сейчас отдаются.
+        app.Services.GetRequiredService<ArticlePackage>().RemoveLeftovers();
 
         app.UseForwardedHeaders();
         app.UseSecurityHeaders();

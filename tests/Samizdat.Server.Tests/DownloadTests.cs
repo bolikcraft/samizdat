@@ -21,14 +21,39 @@ public class ArticlePackageTests
             var picture = Path.Combine(root, "ezh.png");
             File.WriteAllBytes(picture, [1, 2, 3]);
 
-            var bytes = ArticlePackage.Pack("tayna", Encoding.UTF8.GetBytes("текст"),
-                                            [("ezh.png", picture)]);
-
-            using var zip = new ZipArchive(new MemoryStream(bytes), ZipArchiveMode.Read);
+            using var zip = new ZipArchive(new ArticlePackage(root).Pack("tayna", Encoding.UTF8.GetBytes("текст"),
+                                                                         [("ezh.png", picture)]),
+                                           ZipArchiveMode.Read);
             Assert.Equal(["tayna/index.md", "tayna/ezh.png"], zip.Entries.Select(entry => entry.FullName));
 
             using var source = new StreamReader(zip.GetEntry("tayna/index.md")!.Open());
             Assert.Equal("текст", source.ReadToEnd());
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void The_archive_lies_in_the_tmp_folder_of_the_data_and_goes_away_on_close()
+    {
+        var root = Directory.CreateTempSubdirectory("samizdat-zip").FullName;
+        try
+        {
+            var picture = Path.Combine(root, "ezh.png");
+            File.WriteAllBytes(picture, [1, 2, 3]);
+
+            var archive = new ArticlePackage(root).Pack("tayna", Encoding.UTF8.GetBytes("текст"),
+                                                        [("ezh.png", picture)]);
+            var path = archive.Name;
+            Assert.Equal(Path.Combine(root, "tmp"), Path.GetDirectoryName(path));
+            Assert.True(File.Exists(path));
+            Assert.Equal(0, archive.Position);
+
+            archive.Dispose();
+
+            Assert.False(File.Exists(path));
         }
         finally
         {
@@ -179,6 +204,36 @@ public class DownloadTests : IDisposable
 
         using var zip = new ZipArchive(await answer.Content.ReadAsStreamAsync(), ZipArchiveMode.Read);
         Assert.Equal(["tayna/index.md", "tayna/ezh.png"], zip.Entries.Select(entry => entry.FullName));
+    }
+
+    [Fact]
+    public async Task The_temporary_archive_is_gone_after_the_answer()
+    {
+        using var factory = CreateFactory();
+        AddArticle(factory, "tayna", ArticleVisibility.Private);
+        await File.WriteAllBytesAsync(Path.Combine(dataRoot, "articles", "tayna", "ezh.png"), [1, 2, 3]);
+        AddPerson(factory, "hozyain", "parol-parol", UserRole.Owner);
+
+        var client = await Login(factory, "hozyain", "parol-parol");
+        var answer = await client.GetAsync("/download/tayna");
+
+        Assert.Equal("application/zip", answer.Content.Headers.ContentType?.MediaType);
+        var tmp = Path.Combine(dataRoot, "tmp");
+        Assert.True(Directory.Exists(tmp));
+        Assert.Empty(Directory.EnumerateFiles(tmp));
+    }
+
+    [Fact]
+    public void Archives_left_after_a_crash_are_removed_on_start()
+    {
+        var tmp = Directory.CreateDirectory(Path.Combine(dataRoot, "tmp")).FullName;
+        var left = Path.Combine(tmp, "ostatok.zip");
+        File.WriteAllBytes(left, [1, 2, 3]);
+
+        using var factory = CreateFactory();
+        _ = factory.Server;
+
+        Assert.False(File.Exists(left));
     }
 
     [Fact]
