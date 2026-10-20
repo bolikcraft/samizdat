@@ -81,7 +81,7 @@ public static class HtmlCleaner
         // адрес открыл бы во фрейме наши же страницы.
         sanitizer.FilterUrl += (_, args) =>
         {
-            if (args.Tag.NodeName == "IFRAME"
+            if (IsFrame(args.Tag)
                 && args.SanitizedUrl?.StartsWith("https://", StringComparison.OrdinalIgnoreCase) != true)
                 args.SanitizedUrl = null;
         };
@@ -89,7 +89,7 @@ public static class HtmlCleaner
         // Значение из статьи не берём: атрибута sandbox нет в белом списке, ставим свой.
         sanitizer.PostProcessNode += (_, args) =>
         {
-            if (args.Node is IElement { NodeName: "IFRAME" } frame) frame.SetAttribute("sandbox", FrameSandbox);
+            if (args.Node is IElement element && IsFrame(element)) element.SetAttribute("sandbox", FrameSandbox);
         };
 
         // KeepChildNodes оставил бы код из <script> и <style> видимым текстом на странице.
@@ -100,6 +100,9 @@ public static class HtmlCleaner
 
         return sanitizer;
     }
+
+    /// Внутри math и svg NodeName у iframe строчными буквами, не IFRAME. Тег math потом снимается, и остаётся настоящий фрейм.
+    static bool IsFrame(IElement element) => element.LocalName.Equals("iframe", StringComparison.OrdinalIgnoreCase);
 
     /// position и z-index позволили бы статье положить свой блок поверх шапки и форм страницы.
     static HashSet<string> CssProperties()

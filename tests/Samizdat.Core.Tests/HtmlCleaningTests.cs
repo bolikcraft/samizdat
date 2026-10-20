@@ -152,6 +152,10 @@ public class HtmlCleaningTests
     [InlineData("<iframe src=\"/settings\"></iframe>")]
     [InlineData("<iframe src=\"http://example.com\"></iframe>")]
     [InlineData("<iframe srcdoc=\"<script>alert(1)</script>\"></iframe>")]
+    [InlineData("<math><iframe src=\"/settings\"></iframe></math>")]
+    [InlineData("<math><iframe src=\"http://example.com\"></iframe></math>")]
+    [InlineData("<math><mrow><iframe src=\"/settings\"></iframe></mrow></math>")]
+    [InlineData("<svg><switch><iframe src=\"/settings\"></iframe></switch></svg>")]
     public void Frame_without_an_https_address_gets_no_content(string markdown)
     {
         var html = Render(markdown);
@@ -167,13 +171,28 @@ public class HtmlCleaningTests
         Assert.Contains("sandbox=\"allow-scripts allow-same-origin allow-popups allow-presentation\"", html);
     }
 
-    [Fact]
-    public void Sandbox_from_the_article_is_replaced()
+    [Theory]
+    [InlineData("<iframe src=\"https://example.com/\" sandbox=\"allow-top-navigation allow-scripts\"></iframe>")]
+    [InlineData("<math><iframe src=\"https://example.com/\" sandbox=\"allow-top-navigation allow-scripts\"></iframe></math>")]
+    [InlineData("<math><mrow><iframe src=\"https://example.com/\" sandbox=\"allow-top-navigation allow-scripts\"></iframe></mrow></math>")]
+    [InlineData("<svg><switch><iframe src=\"https://example.com/\" sandbox=\"allow-top-navigation allow-scripts\"></iframe></switch></svg>")]
+    public void Sandbox_from_the_article_is_replaced(string markdown)
     {
-        var html = Render("<iframe src=\"https://example.com/\" sandbox=\"allow-top-navigation allow-scripts\"></iframe>");
+        var html = Render(markdown);
 
         Assert.Contains("sandbox=\"allow-scripts allow-same-origin allow-popups allow-presentation\"", html);
         Assert.DoesNotContain("allow-top-navigation", html);
+    }
+
+    [Theory]
+    [InlineData("<math><style>body{display:none}</style></math>")]
+    [InlineData("<math><script>alert(1)</script></math>")]
+    public void Raw_text_tag_inside_math_leaves_no_text(string markdown)
+    {
+        var html = Render(markdown);
+
+        Assert.DoesNotContain("display", html);
+        Assert.DoesNotContain("alert", html);
     }
 
     [Fact]
