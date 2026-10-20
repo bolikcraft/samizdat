@@ -262,10 +262,15 @@ public class DownloadTests : IDisposable
         }
         var later = await client.GetAsync("/download/tayna");
 
+        Assert.Equal(4, ZipGate.Parallel);
         Assert.Equal(HttpStatusCode.ServiceUnavailable, refused.StatusCode);
         Assert.Equal(TimeSpan.FromSeconds(5), refused.Headers.RetryAfter?.Delta);
         Assert.Equal(HttpStatusCode.OK, single.StatusCode);
         Assert.Equal(HttpStatusCode.OK, later.StatusCode);
+
+        // Каждая сборка возвращает место: иначе после четырёх скачиваний пятое получило бы 503.
+        for (var i = 0; i <= ZipGate.Parallel; i++)
+            Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/download/tayna")).StatusCode);
     }
 
     [Fact]
