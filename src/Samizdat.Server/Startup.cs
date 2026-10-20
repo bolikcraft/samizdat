@@ -113,7 +113,7 @@ public static class Startup
                               services.GetRequiredService<ILogger<Program>>(), force: false);
         }
 
-        // До приёма запросов: иначе уйдут архивы, которые сейчас отдаются.
+        // Архивы упавшего процесса: DeleteOnClose их уже не удалит.
         app.Services.GetRequiredService<ArticlePackage>().RemoveLeftovers();
 
         app.UseForwardedHeaders();
