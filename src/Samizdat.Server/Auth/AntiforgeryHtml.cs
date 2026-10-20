@@ -1,5 +1,6 @@
 using System.Text.Encodings.Web;
 using Microsoft.AspNetCore.Antiforgery;
+using Samizdat.Server.Rendering;
 
 namespace Samizdat.Server.Auth;
 
@@ -7,7 +8,7 @@ public static class AntiforgeryHtml
 {
     // Кэшируемые страницы (article.html) подставляют этот плейсхолдер вместо токена текущего гостя,
     // чтобы одна закэшированная страница не разошлась под чужими antiforgery-cookie. См. PageEndpoints.
-    public const string Placeholder = "__ANTIFORGERY__";
+    public static readonly string Placeholder = PagePlaceholder.Of("ANTIFORGERY");
 
     /// Готовое скрытое поле формы с actual-токеном текущего запроса.
     public static string Field(IAntiforgery antiforgery, HttpContext context)

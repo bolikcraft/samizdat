@@ -2,6 +2,7 @@ using System.Net;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Samizdat.Server.Data;
+using Samizdat.Server.Rendering;
 
 namespace Samizdat.Server.Tests;
 
@@ -276,7 +277,26 @@ public class VisibilityTests : IDisposable
         Assert.Contains($"<summary>{ivanLogin}</summary>", ivanPage);
         Assert.Contains($"<summary>{petrLogin}</summary>", petrPage);
         Assert.DoesNotContain(ivanLogin, petrPage);
-        Assert.DoesNotContain("__USER_LOGIN__", petrPage);
+        Assert.DoesNotContain(PagePlaceholder.Nonce, petrPage);
+    }
+
+    // Подменяются только метки самой страницы. Прежние метки без случайной части, набранные
+    // в тексте статьи, остаются текстом.
+    [Fact]
+    public async Task Markers_typed_in_the_article_text_stay_as_text()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        await AddArticle(factory, "metki", ArticleVisibility.Shared,
+                         body: "`__USER_LOGIN__` `__ANTIFORGERY__` `__SHARE_PANEL__`");
+        var owner = await TestLogin.AsOwner(factory);
+
+        var html = await owner.GetStringAsync("/metki");
+
+        Assert.Contains("<code>__USER_LOGIN__</code>", html);
+        Assert.Contains("<code>__ANTIFORGERY__</code>", html);
+        Assert.Contains("<code>__SHARE_PANEL__</code>", html);
+        Assert.DoesNotContain(PagePlaceholder.Nonce, html);
     }
 
     WebApplicationFactory<Program> CreateFactory() =>

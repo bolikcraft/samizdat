@@ -27,7 +27,7 @@ public static class PageEndpoints
     static readonly ConcurrentDictionary<string, EntityTagHeaderValue> AppTags = new();
 
     // Логин в кэшированной странице: ячейка общая для всех читателей и для всех владельцев.
-    const string LoginPlaceholder = "__USER_LOGIN__";
+    static readonly string LoginPlaceholder = PagePlaceholder.Of("USER_LOGIN");
 
     public static RouteGroupBuilder MapPages(this WebApplication app)
     {

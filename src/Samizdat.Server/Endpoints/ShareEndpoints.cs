@@ -246,11 +246,11 @@ public static class ShareEndpoints
     static readonly int[] AllowedDays = [0, 1, 7, 30, 365];
 
     // Base вложений в кэшированном html — плейсхолдер: html один на статью, а токен у каждой ссылки свой.
-    internal const string AttachmentBase = "__SHARE_BASE__/";
+    internal static readonly string AttachmentBase = PagePlaceholder.Of("SHARE_BASE") + "/";
 
     // Адрес скачивания в кэшированном html — тоже плейсхолдер: html один на статью, а токен
     // у каждой ссылки свой.
-    internal const string DownloadUrl = "__SHARE_DOWNLOAD__";
+    internal static readonly string DownloadUrl = PagePlaceholder.Of("SHARE_DOWNLOAD");
 
     // Своё пространство ключей: ApiEndpoints держит slug на время PUT/DELETE статьи,
     // и «Поделиться» не должно ждать выкладку.

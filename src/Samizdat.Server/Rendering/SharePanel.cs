@@ -11,7 +11,7 @@ namespace Samizdat.Server.Rendering;
 /// правки статьи. В кэшированном html вместо блока стоит Placeholder.
 public static class SharePanel
 {
-    public const string Placeholder = "__SHARE_PANEL__";
+    public static readonly string Placeholder = PagePlaceholder.Of("SHARE_PANEL");
 
     public static string Render(PageRenderer pages, SamizdatDbContext db, string slug,
                                 IAntiforgery antiforgery, HttpContext context, ClaimsPrincipal user,

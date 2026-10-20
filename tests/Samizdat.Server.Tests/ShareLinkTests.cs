@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Samizdat.Server.Auth;
 using Samizdat.Server.Data;
+using Samizdat.Server.Rendering;
 using Samizdat.Server.Search;
 
 namespace Samizdat.Server.Tests;
@@ -813,8 +814,22 @@ public class ShareLinkTests : IDisposable
         Assert.DoesNotContain("user-menu", firstPage);
         Assert.Contains($"src=\"/s/{first}/shema.png\"", firstPage);
         Assert.Contains($"src=\"/s/{second}/shema.png\"", secondPage);
-        Assert.DoesNotContain("__SHARE_BASE__", firstPage);
-        Assert.DoesNotContain("__SHARE_PANEL__", firstPage);
+        Assert.DoesNotContain(PagePlaceholder.Nonce, firstPage);
+    }
+
+    [Fact]
+    public async Task Markers_typed_in_the_text_stay_as_text_on_the_guest_page()
+    {
+        using var factory = StartFactory();
+        WriteArticle("statya", "---\ntitle: Про ежей\n---\n\n`__SHARE_BASE__/ezh.png` `__SHARE_DOWNLOAD__`");
+        RegisterArticle(factory, "statya", "Про ежей");
+        var token = AddLink(factory, "statya");
+
+        var html = await factory.CreateClient().GetStringAsync($"/s/{token}");
+
+        Assert.Contains("<code>__SHARE_BASE__/ezh.png</code>", html);
+        Assert.Contains("<code>__SHARE_DOWNLOAD__</code>", html);
+        Assert.DoesNotContain(PagePlaceholder.Nonce, html);
     }
 
     [Fact]
