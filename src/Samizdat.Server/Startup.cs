@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
-using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Configuration.Json;
@@ -65,13 +64,8 @@ public static class Startup
         builder.Services.AddScoped<ArticleIndexer>();
         builder.Services.AddScoped<ArticleSearch>();
 
-        // Адрес прокси заранее неизвестен (он на другой машине или в другом контейнере) — доверяем заголовку с любого адреса.
-        builder.Services.Configure<ForwardedHeadersOptions>(options =>
-        {
-            options.ForwardedHeaders = ForwardedHeaders.XForwardedProto;
-            options.KnownIPNetworks.Clear();
-            options.KnownProxies.Clear();
-        });
+        // Заголовки прокси принимаются только от адресов из Samizdat:Proxy (в compose — SAMIZDAT_PROXY).
+        builder.Services.Configure(TrustedProxies.From(builder.Configuration["Samizdat:Proxy"]));
 
         builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
             .AddCookie(options =>

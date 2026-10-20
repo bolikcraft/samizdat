@@ -29,8 +29,8 @@ public static class AuthLimits
                         ((int)Math.Ceiling(after.TotalSeconds)).ToString(CultureInfo.InvariantCulture);
                 return ValueTask.CompletedTask;
             };
-            // Адрес берём у соединения, а не из X-Forwarded-For: заголовок подделает любой,
-            // кто ходит на порт мимо прокси.
+            // Адрес соединения после UseForwardedHeaders: за прокси из Samizdat:Proxy это адрес клиента,
+            // а X-Forwarded-For от прочих отправителей сюда не попадает.
             options.AddPolicy(Policy, context => attempts <= 0
                 ? RateLimitPartition.GetNoLimiter("")
                 : RateLimitPartition.GetFixedWindowLimiter(
