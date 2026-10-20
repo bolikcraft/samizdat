@@ -6,12 +6,20 @@ namespace Samizdat.Cli;
 
 public sealed class SamizdatClient(HttpClient http)
 {
-    public static SamizdatClient FromConfig(CliConfig config)
+    public static SamizdatClient FromConfig(CliConfig config, TextWriter warnings)
     {
         var http = new HttpClient { BaseAddress = new Uri(config.ServerUrl) };
+        if (PlainHttpWarning(http.BaseAddress) is { } warning) warnings.WriteLine(warning);
         http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", config.Token);
         return new SamizdatClient(http);
     }
+
+    /// Токен идёт в каждом запросе, и по http его видит любой узел в сети.
+    /// IsLoopback — это localhost, 127.0.0.0/8 и ::1: такой трафик не выходит с машины.
+    public static string? PlainHttpWarning(Uri server)
+        => server.Scheme == Uri.UriSchemeHttp && !server.IsLoopback
+            ? $"Внимание: {server.GetLeftPart(UriPartial.Authority)} без https. Токен и заметки идут по сети открытым текстом."
+            : null;
 
     public Task<Dictionary<string, string>> GetStateAsync()
         => WithTimeout("/api/state",

@@ -26,7 +26,7 @@ public static class PushCommand
         if (string.IsNullOrWhiteSpace(vault))
             throw new CliException("Не задан путь к вольту: samizdat login или --vault <путь>");
 
-        return await RunAsync(args, vault, SamizdatClient.FromConfig(config));
+        return await RunAsync(args, vault, SamizdatClient.FromConfig(config, Console.Error));
     }
 
     public static async Task<int> RunAsync(ParsedArgs args, string vault, SamizdatClient client)

@@ -23,7 +23,7 @@ try
         case "pull":
         {
             var slug = parsed.Argument(0) ?? throw new CliException("Нужен slug: samizdat pull <slug>");
-            var client = SamizdatClient.FromConfig(CliConfig.Load());
+            var client = SamizdatClient.FromConfig(CliConfig.Load(), Console.Error);
             Console.WriteLine(await client.GetMarkdownAsync(slug));
             return 0;
         }

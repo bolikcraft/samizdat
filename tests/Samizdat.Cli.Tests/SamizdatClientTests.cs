@@ -57,4 +57,47 @@ public class SamizdatClientTests
 
         Assert.Contains("a: сервер не ответил", error.Message);
     }
+
+    [Theory]
+    [InlineData("http://notes.example.com")]
+    [InlineData("http://192.168.1.47:8080")]
+    public void Plain_http_to_another_host_gets_a_warning(string url)
+    {
+        var warning = SamizdatClient.PlainHttpWarning(new Uri(url));
+
+        Assert.NotNull(warning);
+        Assert.Contains(new Uri(url).GetLeftPart(UriPartial.Authority), warning);
+    }
+
+    [Theory]
+    [InlineData("https://notes.example.com")]
+    [InlineData("http://localhost:5080")]
+    [InlineData("http://LocalHost:5080")]
+    [InlineData("http://127.0.0.1:5080")]
+    [InlineData("http://127.10.20.30")]
+    [InlineData("http://[::1]:5080")]
+    public void Https_and_loopback_get_no_warning(string url)
+    {
+        Assert.Null(SamizdatClient.PlainHttpWarning(new Uri(url)));
+    }
+
+    [Fact]
+    public void Client_from_config_writes_the_warning()
+    {
+        var warnings = new StringWriter();
+
+        SamizdatClient.FromConfig(new CliConfig { ServerUrl = "http://notes.example.com", Token = "t" }, warnings);
+
+        Assert.Contains("http://notes.example.com", warnings.ToString());
+    }
+
+    [Fact]
+    public void Client_from_config_is_silent_for_https()
+    {
+        var warnings = new StringWriter();
+
+        SamizdatClient.FromConfig(new CliConfig { ServerUrl = "https://notes.example.com", Token = "t" }, warnings);
+
+        Assert.Equal("", warnings.ToString());
+    }
 }
