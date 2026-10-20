@@ -33,7 +33,12 @@ public static class HtmlCleaner
     };
 
     /// Без allow-top-navigation: фрейм из статьи не уведёт вкладку на свой адрес.
-    const string FrameSandbox = "allow-scripts allow-same-origin allow-popups allow-presentation";
+    /// allow-popups-to-escape-sandbox: окно из плеера, например «Смотреть на YouTube», иначе наследует песочницу и остаётся пустым.
+    const string FrameSandbox = "allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-presentation";
+
+    /// YouTube без Referer не показывает встроенный плеер (ошибка 153), а сайт шлёт Referrer-Policy: same-origin.
+    /// Наружу уходит только адрес сайта, без пути и без токена ссылки.
+    const string FrameReferrerPolicy = "strict-origin-when-cross-origin";
 
     // Инициализируется после наборов тегов: статические поля создаются в порядке объявления.
     static readonly HtmlSanitizer Sanitizer = Create();
@@ -86,10 +91,12 @@ public static class HtmlCleaner
                 args.SanitizedUrl = null;
         };
 
-        // Значение из статьи не берём: атрибута sandbox нет в белом списке, ставим свой.
+        // Значения из статьи не берём: атрибутов sandbox и referrerpolicy нет в белом списке, ставим свои.
         sanitizer.PostProcessNode += (_, args) =>
         {
-            if (args.Node is IElement element && IsFrame(element)) element.SetAttribute("sandbox", FrameSandbox);
+            if (args.Node is not IElement element || !IsFrame(element)) return;
+            element.SetAttribute("sandbox", FrameSandbox);
+            element.SetAttribute("referrerpolicy", FrameReferrerPolicy);
         };
 
         // KeepChildNodes оставил бы код из <script> и <style> видимым текстом на странице.

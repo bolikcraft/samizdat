@@ -4,6 +4,9 @@ namespace Samizdat.Core.Tests;
 
 public class HtmlCleaningTests
 {
+    const string FrameSandbox = "sandbox=\"allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-presentation\"";
+    const string FrameReferrer = "referrerpolicy=\"strict-origin-when-cross-origin\"";
+
     readonly ArticleRenderer renderer = new();
 
     string Render(string markdown) => renderer.Render(markdown, "s", NoArticles.Instance);
@@ -160,7 +163,7 @@ public class HtmlCleaningTests
     {
         var html = Render(markdown);
 
-        Assert.Contains("<iframe sandbox=\"allow-scripts allow-same-origin allow-popups allow-presentation\"></iframe>", html);
+        Assert.Contains($"<iframe {FrameSandbox} {FrameReferrer}></iframe>", html);
     }
 
     [Fact]
@@ -168,7 +171,24 @@ public class HtmlCleaningTests
     {
         var html = Render("![](https://www.youtube.com/watch?v=dQw4w9WgXcQ)");
 
-        Assert.Contains("sandbox=\"allow-scripts allow-same-origin allow-popups allow-presentation\"", html);
+        Assert.Contains(FrameSandbox, html);
+    }
+
+    [Fact]
+    public void Frame_gets_a_referrer_policy_that_sends_only_the_origin()
+    {
+        var html = Render("![](https://www.youtube.com/watch?v=dQw4w9WgXcQ)");
+
+        Assert.Contains(FrameReferrer, html);
+    }
+
+    [Fact]
+    public void Referrer_policy_from_the_article_is_replaced()
+    {
+        var html = Render("<iframe src=\"https://example.com/\" referrerpolicy=\"unsafe-url\"></iframe>");
+
+        Assert.Contains(FrameReferrer, html);
+        Assert.DoesNotContain("unsafe-url", html);
     }
 
     [Theory]
@@ -180,7 +200,8 @@ public class HtmlCleaningTests
     {
         var html = Render(markdown);
 
-        Assert.Contains("sandbox=\"allow-scripts allow-same-origin allow-popups allow-presentation\"", html);
+        Assert.Contains(FrameSandbox, html);
+        Assert.Contains(FrameReferrer, html);
         Assert.DoesNotContain("allow-top-navigation", html);
     }
 
