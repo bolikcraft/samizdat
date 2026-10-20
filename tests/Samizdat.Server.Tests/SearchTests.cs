@@ -194,6 +194,30 @@ public class ArticleSearchTests(DatabaseFixture database) : IDisposable
     }
 
     [Fact]
+    public async Task Reader_does_not_find_a_private_article_by_its_description()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        AddArticle(factory, "tayna", "Тайна", "секретный текст", ArticleVisibility.Private,
+                   description: "заметки про гипервизор");
+
+        Assert.Empty(await Find(factory, "гипервизор", isOwner: false));
+    }
+
+    [Fact]
+    public async Task Reader_finds_a_shared_article_by_its_description()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        AddArticle(factory, "otkrytaya", "Открытая", "просто текст", ArticleVisibility.Shared,
+                   description: "заметки про гипервизор");
+
+        var hit = Assert.Single(await Find(factory, "гипервизор", isOwner: false));
+
+        Assert.NotNull(hit.Snippet);
+    }
+
+    [Fact]
     public async Task Reader_finds_a_shared_article_by_its_text()
     {
         database.ResetDatabase();

@@ -71,12 +71,15 @@ public sealed class ArticleSearch(SamizdatDbContext db)
                              THEN '' ELSE ' ' || @ellipsis END)
                        END AS snippet,
                    ts_rank_cd(CASE WHEN a."Visibility" = @shared OR @owner
-                                   THEN a."SearchVector" ELSE a."MetaVector" END, q.query) AS rank
+                                   THEN a."SearchVector" ELSE title_only.vector END, q.query) AS rank
             FROM articles a
             JOIN edges ON edges."Slug" = a."Slug"
             CROSS JOIN q
+            -- Закрытую статью читатель находит только по заголовку. MetaVector не годится:
+            -- в нём есть описание, а описание — часть текста статьи.
+            CROSS JOIN LATERAL (SELECT setweight(to_tsvector('russian', a."Title"), 'A') AS vector) title_only
             WHERE ((a."Visibility" = @shared OR @owner) AND a."SearchVector" @@ q.query)
-               OR a."MetaVector" @@ q.query
+               OR title_only.vector @@ q.query
             ORDER BY rank DESC, a."Title"
             LIMIT @limit
             """;

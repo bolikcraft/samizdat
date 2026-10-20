@@ -71,8 +71,8 @@ in their editor.
 - **The slug is the address.** The folder of the note is a separate field, so you can move a note
   between folders and the links still work.
 - **Search is in the database.** PostgreSQL makes the search vectors from the title, the
-  description and the text. The rights are part of the query, so a reader cannot find the text of
-  a private article.
+  description and the text. The rights are part of the query, so a reader finds a private article
+  only by its title.
 - **A language is a file.** `en` and `ru` are in the program. Put a file `<code>.json` into
   `<data root>/lang/` and that language comes into the list in the settings. A file with a code
   that the program knows replaces only the lines that it contains; the other lines stay. A line
