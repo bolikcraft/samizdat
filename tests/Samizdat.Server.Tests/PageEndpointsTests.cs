@@ -387,6 +387,27 @@ public class PageEndpointsTests : IDisposable
     }
 
     [Fact]
+    public async Task Https_answer_carries_hsts_for_a_year_and_http_answer_does_not()
+    {
+        var factory = StartFactory();
+        // UseHsts молчит для localhost, поэтому у хоста другое имя.
+        var https = factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            BaseAddress = new Uri("https://samizdat.test"), AllowAutoRedirect = false,
+        });
+        var http = factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            BaseAddress = new Uri("http://samizdat.test"), AllowAutoRedirect = false,
+        });
+
+        var secure = await https.GetAsync("/login");
+        var plain = await http.GetAsync("/login");
+
+        Assert.Equal("max-age=31536000", Assert.Single(secure.Headers.GetValues("Strict-Transport-Security")));
+        Assert.False(plain.Headers.Contains("Strict-Transport-Security"));
+    }
+
+    [Fact]
     public async Task Error_page_also_sends_the_content_security_policy()
     {
         // Фигурные скобки YAML читает как словарь: разбор шапки бросает исключение, и отвечает страница 500.

@@ -67,6 +67,9 @@ public static class Startup
         // Заголовки прокси принимаются только от адресов из Samizdat:Proxy (в compose — SAMIZDAT_PROXY).
         builder.Services.Configure(TrustedProxies.From(builder.Configuration["Samizdat:Proxy"]));
 
+        // Год, без preload. UseHsts шлёт заголовок только на https-запросах и не шлёт для localhost.
+        builder.Services.AddHsts(options => options.MaxAge = TimeSpan.FromDays(365));
+
         builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
             .AddCookie(options =>
             {
@@ -110,6 +113,8 @@ public static class Startup
 
         app.UseForwardedHeaders();
         app.UseSecurityHeaders();
+        // После UseForwardedHeaders: за прокси https виден только по X-Forwarded-Proto.
+        app.UseHsts();
         app.MapErrorHandling();
         app.UseAuthentication();
         app.UseSetupGate();
