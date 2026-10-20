@@ -24,4 +24,8 @@
     <ProjectReference Include="..\..\src\Samizdat.Server\Samizdat.Server.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="..\..\deploy\db-role.sql" Link="deploy\db-role.sql" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>
