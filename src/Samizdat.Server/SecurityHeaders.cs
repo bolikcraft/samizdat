@@ -11,6 +11,9 @@ public static class SecurityHeaders
         + "img-src 'self' http: https:; media-src 'self' http: https:; frame-src https:; "
         + "object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
 
+    /// Камера, микрофон и прочее не нужны ни теме, ни фрейму из статьи.
+    public const string PermissionsPolicy = "camera=(), microphone=(), geolocation=(), payment=(), usb=()";
+
     /// Ставить до обработчика ошибок: колбэк OnStarting переживает очистку ответа, и страница 500
     /// тоже получает политику.
     public static void UseSecurityHeaders(this WebApplication app) =>
@@ -20,10 +23,16 @@ public static class SecurityHeaders
             {
                 var response = context.Response;
                 response.Headers.XContentTypeOptions = "nosniff";
-                // Маршрут со своей политикой (вложения) не перетираем.
-                if (response.ContentType?.StartsWith("text/html", StringComparison.OrdinalIgnoreCase) == true
-                    && !response.Headers.ContainsKey(HeaderNames.ContentSecurityPolicy))
-                    response.Headers.ContentSecurityPolicy = PagePolicy;
+                // В адресе страницы slug и токен гостевой ссылки: чужим сайтам он не уходит.
+                response.Headers["Referrer-Policy"] = "same-origin";
+                if (response.ContentType?.StartsWith("text/html", StringComparison.OrdinalIgnoreCase) == true)
+                {
+                    response.Headers["Permissions-Policy"] = PermissionsPolicy;
+                    response.Headers["Cross-Origin-Opener-Policy"] = "same-origin";
+                    // Маршрут со своей политикой (вложения) не перетираем.
+                    if (!response.Headers.ContainsKey(HeaderNames.ContentSecurityPolicy))
+                        response.Headers.ContentSecurityPolicy = PagePolicy;
+                }
                 return Task.CompletedTask;
             });
             return next(context);

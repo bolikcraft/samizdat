@@ -349,6 +349,44 @@ public class PageEndpointsTests : IDisposable
     }
 
     [Fact]
+    public async Task Html_pages_send_the_referrer_permissions_and_opener_policies()
+    {
+        WriteArticle("st", "---\ntitle: T\n---\nтекст\n");
+        var factory = StartFactory();
+        Register(factory, "st", "T");
+        var client = LoginClient(factory);
+
+        var article = await client.GetAsync("/st");
+        var missing = await client.GetAsync("/net-takoy");
+        var login = await factory.CreateClient().GetAsync("/login");
+
+        foreach (var response in new[] { article, missing, login })
+        {
+            Assert.Equal("same-origin", Assert.Single(response.Headers.GetValues("Referrer-Policy")));
+            Assert.Equal("camera=(), microphone=(), geolocation=(), payment=(), usb=()",
+                         Assert.Single(response.Headers.GetValues("Permissions-Policy")));
+            Assert.Equal("same-origin", Assert.Single(response.Headers.GetValues("Cross-Origin-Opener-Policy")));
+        }
+    }
+
+    [Fact]
+    public async Task Other_answers_send_only_the_referrer_policy()
+    {
+        var guest = StartFactory().CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+
+        var script = await guest.GetAsync("/_app/forms.js");
+        var redirect = await guest.GetAsync("/");
+
+        Assert.Equal(HttpStatusCode.Redirect, redirect.StatusCode);
+        foreach (var response in new[] { script, redirect })
+        {
+            Assert.Equal("same-origin", Assert.Single(response.Headers.GetValues("Referrer-Policy")));
+            Assert.False(response.Headers.Contains("Permissions-Policy"));
+            Assert.False(response.Headers.Contains("Cross-Origin-Opener-Policy"));
+        }
+    }
+
+    [Fact]
     public async Task Error_page_also_sends_the_content_security_policy()
     {
         // Фигурные скобки YAML читает как словарь: разбор шапки бросает исключение, и отвечает страница 500.
