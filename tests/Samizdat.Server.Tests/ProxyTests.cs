@@ -191,4 +191,18 @@ public class ProxyTests : IDisposable
     [InlineData("192.168.1/24")]
     public void Bad_entry_stops_the_server(string setting)
         => Assert.Throws<InvalidOperationException>(() => TrustedProxies.From(setting));
+
+    [Fact]
+    public async Task Addresses_of_one_ipv6_network_share_the_limit()
+    {
+        var factory = StartServer(("Samizdat:Auth:AttemptsPerMinute", "1"));
+
+        var first = await TestLogin.PostLogin(ClientFrom(factory, "2001:db8:1:2::1"), "aleks", "mimo-mimo");
+        var sameNetwork = await TestLogin.PostLogin(ClientFrom(factory, "2001:db8:1:2::2"), "aleks", "mimo-mimo");
+        var otherNetwork = await TestLogin.PostLogin(ClientFrom(factory, "2001:db8:1:3::1"), "aleks", "mimo-mimo");
+
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        Assert.Equal(HttpStatusCode.TooManyRequests, sameNetwork.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, otherNetwork.StatusCode);
+    }
 }

@@ -34,7 +34,7 @@ public static class AuthLimits
             options.AddPolicy(Policy, context => attempts <= 0
                 ? RateLimitPartition.GetNoLimiter("")
                 : RateLimitPartition.GetFixedWindowLimiter(
-                    context.Connection.RemoteIpAddress?.ToString() ?? "",
+                    ClientAddress.LimitKey(context.Connection.RemoteIpAddress),
                     _ => new FixedWindowRateLimiterOptions
                     {
                         PermitLimit = attempts, Window = TimeSpan.FromMinutes(1), QueueLimit = 0,
