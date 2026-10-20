@@ -4,12 +4,16 @@
 \getenv app_password SAMIZDAT_DB_PASSWORD
 
 -- psql не подставляет переменные внутри DO $$...$$, поэтому условие сделано через \gexec.
-SELECT 'CREATE ROLE samizdat_app LOGIN'
+SELECT 'CREATE ROLE samizdat_app LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS'
 WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'samizdat_app')
 \gexec
 
+-- Текст ALTER ROLE содержит пароль, и с log_statement = ddl он попал бы в лог сервера.
+SET log_statement = 'none';
+
 -- Пароль ставится на каждом запуске: его могли сменить в .env.
-ALTER ROLE samizdat_app WITH LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE PASSWORD :'app_password';
+ALTER ROLE samizdat_app WITH LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS
+    PASSWORD :'app_password';
 
 SELECT format('ALTER DATABASE %I OWNER TO samizdat_app', current_database())
 \gexec

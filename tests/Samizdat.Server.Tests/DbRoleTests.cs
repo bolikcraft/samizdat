@@ -32,7 +32,7 @@ public class DbRoleTests : IAsyncLifetime
         Assert.Equal("admin", (await db.Users.SingleAsync()).Login);
         var rights = await db.Database
             .SqlQueryRaw<bool>("""
-                SELECT rolsuper OR rolcreatedb OR rolcreaterole AS "Value"
+                SELECT rolsuper OR rolcreatedb OR rolcreaterole OR rolreplication OR rolbypassrls AS "Value"
                 FROM pg_roles WHERE rolname = current_user
                 """)
             .SingleAsync();
