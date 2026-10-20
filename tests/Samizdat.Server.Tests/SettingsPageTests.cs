@@ -1027,8 +1027,8 @@ public class SettingsPageTests : IDisposable
     public async Task The_publishing_section_has_the_diagrams_switch_above_downloading()
     {
         var factory = StartFactory();
-        AddOwner(factory, "aleks", "тайна");
-        var client = await LoginClient(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
+        var client = await LoginClient(factory, "aleks", "тайна-тайна");
 
         var html = await client.GetStringAsync("/settings");
         var publishing = Regex.Match(html, "id=\"publishing\".*?</section>", RegexOptions.Singleline).Value;
@@ -1044,10 +1044,10 @@ public class SettingsPageTests : IDisposable
     public async Task The_diagrams_switch_is_unchecked_while_diagrams_are_off()
     {
         var factory = StartFactory();
-        AddOwner(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
         using (var scope = factory.Services.CreateScope())
             scope.ServiceProvider.GetRequiredService<SiteSettings>().Set("articles.diagrams", "off");
-        var client = await LoginClient(factory, "aleks", "тайна");
+        var client = await LoginClient(factory, "aleks", "тайна-тайна");
 
         var html = await client.GetStringAsync("/settings");
 
@@ -1058,9 +1058,9 @@ public class SettingsPageTests : IDisposable
     public async Task The_owner_switches_diagrams_off_and_on()
     {
         var factory = StartFactory();
-        AddOwner(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
         var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
-        await TestLogin.PostLogin(client, "aleks", "тайна");
+        await TestLogin.PostLogin(client, "aleks", "тайна-тайна");
         var (name, value) = AntiforgeryToken(await client.GetStringAsync("/settings"));
 
         // Снятый флажок форма не присылает: приходит одно поле antiforgery.
@@ -1080,8 +1080,8 @@ public class SettingsPageTests : IDisposable
     public async Task Saving_the_diagrams_switch_shows_its_message()
     {
         var factory = StartFactory();
-        AddOwner(factory, "aleks", "тайна");
-        var client = await LoginClient(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
+        var client = await LoginClient(factory, "aleks", "тайна-тайна");
 
         var html = await client.GetStringAsync("/settings?ok=diagrams");
 
@@ -1104,8 +1104,8 @@ public class SettingsPageTests : IDisposable
     public async Task The_diagrams_switch_without_the_token_is_rejected()
     {
         var factory = StartFactory();
-        AddOwner(factory, "aleks", "тайна");
-        var client = await LoginClient(factory, "aleks", "тайна");
+        AddOwner(factory, "aleks", "тайна-тайна");
+        var client = await LoginClient(factory, "aleks", "тайна-тайна");
 
         var response = await client.PostAsync("/settings/diagrams", new FormUrlEncodedContent(
             new Dictionary<string, string> { ["diagrams"] = "on" }));
