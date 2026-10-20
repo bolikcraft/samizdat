@@ -219,6 +219,46 @@ public class PeopleTests : IDisposable
         Assert.Empty(db.ApiTokens.Where(row => row.UserId == ivan));
     }
 
+    // Ссылки удалённого читателя гаснут: иначе SET NULL отдал бы их владельцам живыми.
+    [Fact]
+    public async Task Deleting_a_person_revokes_their_live_share_links()
+    {
+        database.ResetDatabase();
+        using var factory = CreateFactory();
+        AddPerson(factory, "hozyain", "parol-hozyaina", UserRole.Owner);
+        var ivan = AddPerson(factory, "ivan", "parol-ivana", UserRole.Reader);
+        var earlier = new DateTimeOffset(2026, 9, 1, 12, 0, 0, TimeSpan.Zero);
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<SamizdatDbContext>();
+            db.Articles.Add(new ArticleRow
+            {
+                Slug = "statya", Title = "Статья", ContentHash = "h", UpdatedAt = DateTimeOffset.UtcNow,
+            });
+            db.ShareLinks.AddRange(
+                new ShareLinkRow { Token = "zhivaya-ivana-00000000", Slug = "statya", CreatedAt = earlier, CreatedByUserId = ivan },
+                new ShareLinkRow
+                {
+                    Token = "otozvana-ivana-0000000", Slug = "statya", CreatedAt = earlier, CreatedByUserId = ivan,
+                    RevokedAt = earlier,
+                },
+                new ShareLinkRow { Token = "vladeltsa-000000000000", Slug = "statya", CreatedAt = earlier });
+            db.SaveChanges();
+        }
+        var owner = await Login(factory, "hozyain", "parol-hozyaina");
+
+        await Post(owner, $"/settings/people/{ivan}/delete", []);
+
+        using var check = factory.Services.CreateScope();
+        var links = check.ServiceProvider.GetRequiredService<SamizdatDbContext>().ShareLinks.AsNoTracking()
+            .ToDictionary(link => link.Token);
+        Assert.NotNull(links["zhivaya-ivana-00000000"].RevokedAt);
+        Assert.Equal(earlier, links["otozvana-ivana-0000000"].RevokedAt);
+        Assert.Null(links["vladeltsa-000000000000"].RevokedAt);
+        Assert.Equal(HttpStatusCode.Gone,
+                     (await factory.CreateClient().GetAsync("/s/zhivaya-ivana-00000000")).StatusCode);
+    }
+
     // Ждущего эта кнопка не должна снести в обход очереди: его место — раздел «Пользователи».
     [Fact]
     public async Task A_pending_person_is_not_deleted_from_the_people_table()

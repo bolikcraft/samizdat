@@ -499,8 +499,20 @@ public static class SettingsEndpoints
             if (person.Id == me.Id) return Err("self_delete");
             if (person.Role == UserRole.Owner) return Err("other_owner");
 
+            // Ссылки удалённого читателя гаснут: иначе SET NULL отдал бы их владельцам живыми.
+            await using var transaction = await db.Database.BeginTransactionAsync();
+            // Блокировка строки человека: его параллельный /share ждёт на внешнем ключе и не вставит
+            // ссылку между отзывом и удалением.
+            await db.Database.ExecuteSqlAsync($"SELECT 1 FROM users WHERE \"Id\" = {person.Id} FOR UPDATE");
+            var now = DateTimeOffset.UtcNow;
+            await db.ShareLinks
+                .Where(link => link.CreatedByUserId == person.Id && link.RevokedAt == null
+                               && (link.ExpiresAt == null || link.ExpiresAt > now))
+                .ExecuteUpdateAsync(set => set.SetProperty(link => link.RevokedAt, (DateTimeOffset?)now));
+
             db.Users.Remove(person);
             await db.SaveChangesAsync();
+            await transaction.CommitAsync();
             return Ok("person_deleted");
         }).RequireValidToken().OwnerOnly();
 
