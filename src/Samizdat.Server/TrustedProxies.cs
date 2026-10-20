@@ -14,8 +14,11 @@ public static class TrustedProxies
         List<System.Net.IPNetwork> networks = [];
         foreach (var entry in (setting ?? "").Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
         {
-            if (entry.Contains('/') && System.Net.IPNetwork.TryParse(entry, out var network)) networks.Add(network);
-            else if (!entry.Contains('/') && IPAddress.TryParse(entry, out var address)) proxies.Add(address);
+            // TryParse читает «10.1» как 10.0.0.1: адрес IPv4 без четырёх чисел — опечатка, а не сокращение.
+            var host = entry.Split('/')[0];
+            var complete = host.Contains(':') || host.Count(c => c == '.') == 3;
+            if (complete && entry.Contains('/') && System.Net.IPNetwork.TryParse(entry, out var network)) networks.Add(network);
+            else if (complete && !entry.Contains('/') && IPAddress.TryParse(entry, out var address)) proxies.Add(address);
             // Молча пропущенная запись оставила бы всех клиентов с адресом прокси.
             else throw new InvalidOperationException($"Samizdat:Proxy: «{entry}» — не адрес IP и не сеть CIDR.");
         }

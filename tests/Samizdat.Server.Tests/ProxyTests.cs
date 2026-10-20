@@ -145,6 +145,20 @@ public class ProxyTests : IDisposable
         Assert.Equal(HttpStatusCode.TooManyRequests, second.StatusCode);
     }
 
+    // Прокси дописывает адрес клиента в конец. Сервер берёт только этот адрес, даже если он из сети прокси:
+    // иначе клиент из этой сети подставил бы перед ним любой адрес и обошёл лимит.
+    [Fact]
+    public async Task Only_the_last_forwarded_address_counts()
+    {
+        var factory = StartServer(("Samizdat:Proxy", "10.0.0.0/24"), ("Samizdat:Auth:AttemptsPerMinute", "1"));
+
+        var first = await TestLogin.PostLogin(ClientFrom(factory, "10.0.0.1", "203.0.113.1, 10.0.0.5"), "aleks", "mimo-mimo");
+        var second = await TestLogin.PostLogin(ClientFrom(factory, "10.0.0.1", "203.0.113.2, 10.0.0.5"), "aleks", "mimo-mimo");
+
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        Assert.Equal(HttpStatusCode.TooManyRequests, second.StatusCode);
+    }
+
     [Fact]
     public void Setting_takes_addresses_and_networks()
     {
@@ -172,6 +186,9 @@ public class ProxyTests : IDisposable
     [Theory]
     [InlineData("10.0.0.1, ne-adres")]
     [InlineData("10.0.0.0/40")]
+    [InlineData("192.168.147")]
+    [InlineData("10.1")]
+    [InlineData("192.168.1/24")]
     public void Bad_entry_stops_the_server(string setting)
         => Assert.Throws<InvalidOperationException>(() => TrustedProxies.From(setting));
 }
