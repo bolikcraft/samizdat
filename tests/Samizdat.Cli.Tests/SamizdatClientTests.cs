@@ -69,6 +69,18 @@ public class SamizdatClientTests
         Assert.Contains(new Uri(url).GetLeftPart(UriPartial.Authority), warning);
     }
 
+    // Предупреждение видно на экране и в логах: логин и пароль из адреса туда попасть не должны.
+    [Fact]
+    public void Warning_does_not_show_the_user_and_password_from_the_address()
+    {
+        var warning = SamizdatClient.PlainHttpWarning(new Uri("http://user:pass@notes.example.com:8080/x"));
+
+        Assert.NotNull(warning);
+        Assert.Contains("http://notes.example.com:8080", warning);
+        Assert.DoesNotContain("user", warning);
+        Assert.DoesNotContain("pass", warning);
+    }
+
     [Theory]
     [InlineData("https://notes.example.com")]
     [InlineData("http://localhost:5080")]
