@@ -79,16 +79,29 @@ public static class DownloadEndpoints
             if (attachments.Count == 0)
                 return Results.File(markdown, "text/markdown; charset=utf-8", $"{slug}.md");
 
-            // Место держим только на сборку: отдача готового файла его не занимает.
-            using var lease = gate.TryEnter();
+            // Место держим до конца ответа: пока клиент читает архив, файл лежит в <DataRoot>/tmp.
+            var lease = gate.TryEnter();
             if (!lease.IsAcquired)
             {
                 context.Response.Headers.RetryAfter = "5";
                 return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
             }
 
+            FileStream archive;
+            try
+            {
+                archive = package.Pack(slug, markdown, attachments);
+            }
+            catch
+            {
+                lease.Dispose();
+                throw;
+            }
+
             // Results.File закрывает поток после отправки, и временный файл удаляется сам.
-            return Results.File(package.Pack(slug, markdown, attachments), "application/zip", $"{slug}.zip");
+            // Место возвращается позже, когда ответ закончен или соединение оборвано.
+            context.Response.RegisterForDispose(lease);
+            return Results.File(archive, "application/zip", $"{slug}.zip");
         }
         catch (IOException)
         {

@@ -1,5 +1,6 @@
 using System.IO.Compression;
 using System.Net;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -271,6 +272,45 @@ public class DownloadTests : IDisposable
         // Каждая сборка возвращает место: иначе после четырёх скачиваний пятое получило бы 503.
         for (var i = 0; i <= ZipGate.Parallel; i++)
             Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/download/tayna")).StatusCode);
+    }
+
+    [Fact]
+    public async Task The_place_is_held_until_the_client_has_read_the_whole_archive()
+    {
+        using var factory = CreateFactory();
+        AddArticle(factory, "tayna", ArticleVisibility.Private);
+        // Случайные байты не сжимаются, а несколько МБ заведомо больше буфера TestServer:
+        // пока клиент не читает, сервер застревает в середине отдачи.
+        await File.WriteAllBytesAsync(Path.Combine(dataRoot, "articles", "tayna", "ezh.bin"),
+                                      RandomNumberGenerator.GetBytes(4 * 1024 * 1024));
+        AddPerson(factory, "hozyain", "parol-dlinny", UserRole.Owner);
+        var client = await Login(factory, "hozyain", "parol-dlinny");
+
+        var slow = new List<HttpResponseMessage>();
+        try
+        {
+            for (var i = 0; i < ZipGate.Parallel; i++)
+            {
+                var started = await client.GetAsync("/download/tayna", HttpCompletionOption.ResponseHeadersRead);
+                Assert.Equal(HttpStatusCode.OK, started.StatusCode);
+                slow.Add(started);
+            }
+
+            var refused = await client.GetAsync("/download/tayna");
+            Assert.Equal(HttpStatusCode.ServiceUnavailable, refused.StatusCode);
+        }
+        finally
+        {
+            // Дочитываем тела: сервер заканчивает ответы и возвращает места.
+            foreach (var response in slow)
+            {
+                await response.Content.CopyToAsync(Stream.Null);
+                response.Dispose();
+            }
+        }
+
+        var later = await client.GetAsync("/download/tayna");
+        Assert.Equal(HttpStatusCode.OK, later.StatusCode);
     }
 
     [Fact]
