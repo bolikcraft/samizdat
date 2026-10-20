@@ -156,7 +156,34 @@ public class HtmlCleaningTests
     {
         var html = Render(markdown);
 
-        Assert.Contains("<iframe></iframe>", html);
+        Assert.Contains("<iframe sandbox=\"allow-scripts allow-same-origin allow-popups allow-presentation\"></iframe>", html);
+    }
+
+    [Fact]
+    public void Frame_gets_a_sandbox_without_top_navigation()
+    {
+        var html = Render("![](https://www.youtube.com/watch?v=dQw4w9WgXcQ)");
+
+        Assert.Contains("sandbox=\"allow-scripts allow-same-origin allow-popups allow-presentation\"", html);
+    }
+
+    [Fact]
+    public void Sandbox_from_the_article_is_replaced()
+    {
+        var html = Render("<iframe src=\"https://example.com/\" sandbox=\"allow-top-navigation allow-scripts\"></iframe>");
+
+        Assert.Contains("sandbox=\"allow-scripts allow-same-origin allow-popups allow-presentation\"", html);
+        Assert.DoesNotContain("allow-top-navigation", html);
+    }
+
+    [Fact]
+    public void Position_and_z_index_are_removed_from_the_style()
+    {
+        var html = Render("<div style=\"position: fixed; z-index: 9999; width: 100%\">поверх</div>");
+
+        Assert.DoesNotContain("position", html);
+        Assert.DoesNotContain("z-index", html);
+        Assert.Contains("width: 100%", html);
     }
 
     [Fact]

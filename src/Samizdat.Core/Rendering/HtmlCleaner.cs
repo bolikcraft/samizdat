@@ -1,3 +1,4 @@
+using AngleSharp.Dom;
 using Ganss.Xss;
 
 namespace Samizdat.Core.Rendering;
@@ -30,6 +31,9 @@ public static class HtmlCleaner
         "refX", "refY", "orient", "offset", "stop-color", "stop-opacity", "gradientUnits", "gradientTransform",
         "clip-path", "vector-effect", "role", "aria-label", "aria-hidden",
     };
+
+    /// Без allow-top-navigation: фрейм из статьи не уведёт вкладку на свой адрес.
+    const string FrameSandbox = "allow-scripts allow-same-origin allow-popups allow-presentation";
 
     // Инициализируется после наборов тегов: статические поля создаются в порядке объявления.
     static readonly HtmlSanitizer Sanitizer = Create();
@@ -66,7 +70,7 @@ public static class HtmlCleaner
             {
                 "href", "src", "cite", "poster",
             },
-            AllowedCssProperties = HtmlSanitizerDefaults.AllowedCssProperties,
+            AllowedCssProperties = CssProperties(),
         })
         {
             // Незнакомый тег убирается, а текст внутри остаётся: иначе <center> из вставки съест абзац.
@@ -82,6 +86,12 @@ public static class HtmlCleaner
                 args.SanitizedUrl = null;
         };
 
+        // Значение из статьи не берём: атрибута sandbox нет в белом списке, ставим свой.
+        sanitizer.PostProcessNode += (_, args) =>
+        {
+            if (args.Node is IElement { NodeName: "IFRAME" } frame) frame.SetAttribute("sandbox", FrameSandbox);
+        };
+
         // KeepChildNodes оставил бы код из <script> и <style> видимым текстом на странице.
         sanitizer.RemovingTag += (_, args) =>
         {
@@ -89,5 +99,13 @@ public static class HtmlCleaner
         };
 
         return sanitizer;
+    }
+
+    /// position и z-index позволили бы статье положить свой блок поверх шапки и форм страницы.
+    static HashSet<string> CssProperties()
+    {
+        var properties = new HashSet<string>(HtmlSanitizerDefaults.AllowedCssProperties, StringComparer.OrdinalIgnoreCase);
+        properties.ExceptWith(["position", "z-index"]);
+        return properties;
     }
 }
