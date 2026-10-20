@@ -197,10 +197,15 @@ To go forward from such a version, first get the new version, then start the new
 for a site that you installed earlier, and after you go back to such a version:
 
 ```bash
+git rev-parse --short HEAD   # write down this commit: deploy/update.sh <commit> goes back to it
 git fetch origin
 git checkout --detach origin/main
 deploy/update.sh
 ```
+
+After these commands, the script shows the new commit as the previous version: in its last line,
+in the message about a failed update and in the name of the dump. To go back, use the commit
+from the first command.
 
 The dump contains only the database. It does not contain `data/` (articles, keys, background).
 For a full copy, also copy the folder `data/`, or make a snapshot of the machine.
