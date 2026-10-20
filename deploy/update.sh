@@ -30,11 +30,13 @@ env_value() {
 
 # У сайтов, поставленных до роли samizdat_app, этого пароля нет.
 # Без него compose.yaml не читается, поэтому он появляется до первой команды docker compose.
+chmod 600 .env
 if [[ -z "$(env_value SAMIZDAT_DB_PASSWORD)" ]]; then
-    printf '\nSAMIZDAT_DB_PASSWORD=%s\n' "$(openssl rand -hex 24)" >> .env
+    # Отдельное присваивание: ошибку $(...) в аргументах printf set -e не видит.
+    pw="$(openssl rand -hex 24)"
+    printf '\nSAMIZDAT_DB_PASSWORD=%s\n' "$pw" >> .env
     echo "В .env добавлен пароль роли базы SAMIZDAT_DB_PASSWORD."
 fi
-chmod 600 .env
 
 port="$(env_value SAMIZDAT_PORT)"
 port="${port:-8080}"
